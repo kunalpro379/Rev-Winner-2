@@ -1,0 +1,544 @@
+Analyze the entire Rev Winner platform end-to-end, including:
+
+Web App (frontend + backend)
+
+All existing packages & pricing
+
+Individual subscriptions
+
+Enterprise subscriptions
+
+License Manager role
+
+Admin panel
+
+Payment gateway
+
+Session tracking
+
+Token usage
+
+Minutes usage
+
+Emails
+
+Security
+
+Analytics
+
+Automation
+
+Support
+
+
+⚠️ CRITICAL RULES (NON-NEGOTIABLE):
+
+1. Do NOT break, remove, modify, or regress any existing functionality, APIs, UI, billing logic, authentication, or user flows.
+
+
+2. Do NOT create any new pages or new routes.
+
+
+3. Use the CURRENT existing Admin panel link and the CURRENT existing License Manager link for all modifications.
+
+
+4. All enhancements must be built inside the existing Admin & License Manager interfaces only.
+
+
+
+
+---
+
+✅ OBJECTIVE
+
+Extend the current Rev Winner Admin Panel & License Manager Panel into a fully enterprise-grade SaaS Control System that supports:
+
+✅ Individual Subscribers
+✅ Enterprise Customers
+✅ Enterprise License Managers
+✅ Rev Winner Super Admin
+
+And make ALL OF THIS FULLY FUNCTIONAL & WORKING END-TO-END:
+
+✅ License assignment
+✅ License revocation
+✅ License reassignment
+✅ Usage tracking
+✅ Token tracking
+✅ Session tracking
+✅ Billing
+✅ Renewals
+✅ Emails
+✅ Security
+✅ Compliance
+✅ Analytics
+✅ Alerts
+✅ Automation
+
+
+---
+
+✅ ROLE-BASED ACCESS STRUCTURE (RBAC – MUST BE IMPLEMENTED)
+
+1. Super Admin (Rev Winner Internal Team)
+
+Full platform control
+
+Assign/revoke License Managers
+
+View all users & enterprises
+
+View billing, tokens, minutes, traffic
+
+Control security, compliance & emails
+
+
+2. Enterprise License Manager
+
+Assign/revoke team licenses
+
+Track team usage
+
+View billing & invoices
+
+Monitor renewals
+
+Track team adoption
+
+
+3. Individual Subscriber
+
+Self-manage plan
+
+View usage
+
+View invoices
+
+Track tokens & minutes
+
+
+
+---
+
+✅ ENTERPRISE ACCOUNT MANAGEMENT
+
+Each enterprise must show:
+
+Company profile
+
+Contract start/end
+
+Plan type
+
+Total licenses purchased
+
+Active vs available licenses
+
+Assigned License Manager(s)
+
+Billing cycle
+
+Payment status
+
+Auto-renewal
+
+Renewal alerts
+
+
+
+---
+
+✅ LICENSE MANAGEMENT SYSTEM
+
+Must support:
+
+Assign licenses via email & role
+
+Revoke instantly
+
+Reassign revoked licenses
+
+Pause/resume licenses
+
+Trial licenses
+
+Bulk CSV upload
+
+
+License states:
+
+Active, Paused, Revoked, Expired, Trial
+
+
+
+---
+
+✅ USER MANAGEMENT (ENTERPRISE + INDIVIDUAL)
+
+Track:
+
+Name, Email, Company, Role
+
+License type
+
+Last login
+
+Active status
+
+Total sessions
+
+Total minutes
+
+Total tokens
+
+
+Feature-wise usage:
+
+Live Transcripts
+
+Shift Gears
+
+Present to Win
+
+Meeting Minutes
+
+Conversation Analysis
+
+
+Admin actions:
+
+Suspend
+
+Change role
+
+Reset access
+
+Force logout
+
+Upgrade/downgrade
+
+
+
+---
+
+✅ SESSION, MINUTES & TOKEN INTELLIGENCE
+
+Live session monitoring
+
+Session duration
+
+Device & IP
+
+Daily & monthly minutes
+
+Enterprise pooled minutes
+
+Token usage per user, feature & enterprise
+
+AI cost vs revenue
+
+
+
+---
+
+✅ BILLING & SUBSCRIPTION SYSTEM
+
+Individual:
+
+Masked cards, invoices, failed payments, refunds
+
+
+Enterprise:
+
+Bulk invoices
+
+Purchase orders
+
+License top-ups
+
+Auto-renewals
+
+GST / tax
+
+Credit notes
+
+
+
+---
+
+✅ TRACEABILITY & COMPLIANCE (AUDIT LOGS)
+
+Track:
+
+License assignments & revocations
+
+Role changes
+
+Billing changes
+
+Data access
+
+Report exports
+
+
+Must be audit-ready for legal, ISO & SOC.
+
+
+---
+
+✅ SECURITY & ACCESS CONTROL
+
+RBAC
+
+IP restrictions
+
+2FA
+
+Login anomaly detection
+
+Geo mismatch
+
+Device session control
+
+Forced logout
+
+
+
+---
+
+✅ PLATFORM ANALYTICS (CTO VIEW)
+
+Total users & enterprises
+
+DAU / MAU
+
+Feature adoption %
+
+Trial → paid conversion
+
+Churn
+
+Revenue vs AI cost
+
+Power users
+
+Underutilized enterprises
+
+
+
+---
+
+✅ WEB TRAFFIC & APP PERFORMANCE
+
+Website visitors
+
+Signup conversion
+
+App load time
+
+API performance
+
+Error rate
+
+Crash logs
+
+
+
+---
+
+✅ AUTOMATION & ALERT ENGINE
+
+Alerts for:
+
+License exhaustion
+
+Low tokens
+
+Payment failures
+
+Renewals
+
+Abnormal AI usage
+
+Dormant enterprises
+
+Security risks
+
+
+
+---
+
+✅ SUPPORT & ESCALATION
+
+User tickets
+
+Enterprise escalations
+
+Billing issues
+
+License disputes
+
+SLA alerts
+
+
+
+---
+
+✅ DATA EXPORT & REPORTING
+
+Usage reports
+
+Billing reports
+
+Token cost reports
+
+ROI reports
+
+Compliance exports
+
+
+
+---
+
+✅ EMAIL NOTIFICATION SYSTEM
+
+Automated emails for:
+
+License actions
+
+Billing & payments
+
+Renewals (30d, 7d, 24h, expiry)
+
+Usage thresholds (70%, 90%, 100%)
+
+Security events
+
+Role changes
+
+Data exports
+
+Support tickets
+
+Downtime
+
+
+Admin controls:
+
+Email template editor
+
+Alert ON/OFF toggles
+
+Separate rules for:
+
+Individual users
+
+Enterprise users
+
+License Managers
+
+
+Retry logic
+
+Full email audit trail
+
+
+
+---
+
+✅ MULTI-CHANNEL READY (FUTURE – DO NOT ACTIVATE)
+
+In-app notifications
+
+WhatsApp
+
+SMS
+
+Slack / Teams
+
+
+
+---
+
+✅ BURGER MENU STRUCTURE (MANDATORY – INSIDE EXISTING ADMIN UI)
+
+Use the existing Admin Panel UI only and add these as burger menu items:
+
+Dashboard
+
+Enterprises
+
+License Managers ✅ (Explicit menu item added as requested)
+
+Licenses
+
+Users
+
+Usage & Tokens
+
+Sessions & Minutes
+
+Billing
+
+Security
+
+Compliance Logs
+
+Analytics
+
+Traffic & Performance
+
+Automation & Alerts
+
+Support
+
+Reports
+
+Email Notifications
+
+System Settings
+
+
+
+---
+
+✅ FINAL EXECUTION RULES FOR REPLIT
+
+✅ Analyze the entire existing Rev Winner system
+✅ Map what already exists vs what is missing
+✅ Make all missing modules fully functional
+✅ Do NOT create new pages or links
+✅ Use only the existing Admin & License Manager links
+✅ Maintain 100% backward compatibility
+✅ Ensure full working flow for:
+
+Individual subscriptions
+
+Enterprise subscriptions
+
+License Managers
+
+Admin operations
+
+Billing
+
+Tokens
+
+Sessions
+
+Emails
+
+Security
+
+Analytics
+
+
+✅ System must be:
+
+Scalable
+
+Secure
+
+Audit-ready
+
+Enterprise-grade

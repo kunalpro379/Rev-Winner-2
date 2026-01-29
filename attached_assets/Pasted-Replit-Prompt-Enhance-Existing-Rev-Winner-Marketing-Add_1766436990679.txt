@@ -1,0 +1,108 @@
+Replit Prompt: Enhance Existing Rev Winner Marketing Add-On
+Objective
+Enhance the existing Rev Winner Marketing Add-On (already built and accessible via a hidden page, not visible in the main menu).
+This task is not to create a new add-on, but to extend and modify the existing one with advanced AI-driven marketing capabilities using stored conversation data and universal knowledge.
+All enhancements must remain contained within the existing marketing add-on page and must not interfere with any other Rev Winner features.
+Core Data Principles
+All customer and user conversations already stored in Rev Winner act as the Data Bank.
+Every user’s conversation history must be stored in one centralized location and accessible for content generation.
+Content generation must clearly follow data-source rules defined by user-selected toggles.
+1. ChatGPT-Like Marketing Chatbot (New Section)
+Add a conversational chatbot interface inside the marketing add-on with two toggle modes:
+Toggle Modes
+Data Bank Mode
+Responses must be generated primarily and strictly from stored conversation data.
+Universal knowledge may be used only for contextual awareness, not dominance.
+Priority order:
+Stored conversation data (highest)
+Universal knowledge (supporting only)
+Universal Mode
+Responses are generated freely from the universal knowledge base.
+No restriction on content sources.
+Purpose
+The chatbot is strictly for marketing use cases:
+Messaging ideas
+Positioning
+Campaign copy
+Thought leadership content
+Market narratives
+2. Post Generation Section (GPT Posts)
+Allow users to generate marketing posts with the following options:
+Post Length Options
+Short
+Medium
+Long
+Hashtag Options
+Manually add hashtags
+Auto-generate hashtags based on content (on demand)
+Both options must be available simultaneously
+Contact Details Options
+Toggle to add:
+Email
+Phone
+Website
+User enters details once and can reuse them
+Other Controls
+Tone selector (e.g., Professional, Bold, Thought-Leadership, Conversational, Analytical)
+Copy button for generated content
+Regenerate button for alternate outputs
+3. Video Script Generation Section
+Enable video script generation with:
+Video Length Options
+Short videos
+Medium-length videos
+Long videos
+Controls
+Tone selection
+Hashtag options (manual + auto)
+Copy & Regenerate buttons
+4. Research & Insight Generation Section
+Create a section where users:
+Enter a key topic
+Generate research-style insights derived from:
+Data Bank (conversation-based insights)
+Universal Knowledge (if toggle enabled)
+Use Cases
+Research papers
+Newsletters
+Blogs
+Strategy documents
+Rules
+Same toggle rules apply:
+Data Bank mode → data-first
+Universal mode → unrestricted
+5. Infographics, Charts & Numbers Section (New)
+Add a dedicated section for:
+Infographics
+Charts
+Numerical insights
+Analytical summaries
+Data Source Toggle
+Data Bank
+Universal Knowledge
+Output
+Structured data summaries
+Chart-ready data
+Infographic-friendly insights
+6. Access Control & License Management
+Default Access
+The License Manager has default access to the marketing add-on.
+User Allocation Flow
+License Manager assigns Marketing Add-On access from the License Manager page.
+Assigned user receives:
+A secure link to the Marketing Add-On page
+A “Set New Password” link
+After password setup:
+User gains access only to the Marketing Add-On
+No access to other Rev Winner admin features
+7. Multi-Device Access
+Marketing add-on must be accessible across multiple devices (desktop, tablet, laptop).
+8. UX & Safety Requirements
+Clean, intuitive interface
+Clear section separation
+No noise or disruption to existing workflows
+Secure handling of all stored conversation data
+Final Instruction
+Do not create a new marketing page.
+Modify and extend the existing hidden marketing add-on page only.
+Ensure all generated content remains focused on marketing use cases.

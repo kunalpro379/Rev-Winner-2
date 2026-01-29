@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  
+  <!-- Homepage - Highest Priority -->
+  <url>
+    <loc>https://revwinner.com/</loc>
+    <lastmod>2024-12-11</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://revwinner.com/assets/rev-winner-logo.png</image:loc>
+      <image:title>Rev Winner - AI Sales Assistant</image:title>
+      <image:caption>Rev Winner - AI-Powered Sales Assistant for Real-Time Conversation Intelligence</image:caption>
+    </image:image>
+  </url>
+  
+  <!-- Pricing/Packages - High Priority for Conversions -->
+  <url>
+    <loc>https://revwinner.com/packages</loc>
+    <lastmod>2024-12-11</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+  </url>
+  
+  <!-- Help/Documentation - High Priority for SEO -->
+  <url>
+    <loc>https://revwinner.com/help</loc>
+    <lastmod>2024-12-11</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  
+  <!-- Contact -->
+  <url>
+    <loc>https://revwinner.com/contact</loc>
+    <lastmod>2024-12-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- Blog Hub - High Priority for Content SEO -->
+  <url>
+    <loc>https://revwinner.com/blog</loc>
+    <lastmod>2024-12-11</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  
+  <!-- Blog Articles - SEO Content -->
+  <url>
+    <loc>https://revwinner.com/blog/ai-transforming-sales-discovery-2025</loc>
+    <lastmod>2024-12-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  
+  <url>
+    <loc>https://revwinner.com/blog/10-proven-sales-techniques</loc>
+    <lastmod>2024-12-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  
+  <url>
+    <loc>https://revwinner.com/blog/science-real-time-sales-coaching</loc>
+    <lastmod>2024-12-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  
+  <url>
+    <loc>https://revwinner.com/blog/mastering-discovery-questions</loc>
+    <lastmod>2024-12-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  
+  <url>
+    <loc>https://revwinner.com/blog/handle-sales-objections-pro</loc>
+    <lastmod>2024-12-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  
+  <url>
+    <loc>https://revwinner.com/blog/building-trust-cold-calls</loc>
+    <lastmod>2024-12-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  
+  <!-- Conversion Pages -->
+  <url>
+    <loc>https://revwinner.com/register</loc>
+    <lastmod>2024-12-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  
+  <url>
+    <loc>https://revwinner.com/login</loc>
+    <lastmod>2024-12-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  
+  <!-- Interactive Content -->
+  <url>
+    <loc>https://revwinner.com/sales-challenge-hub</loc>
+    <lastmod>2024-12-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.65</priority>
+  </url>
+  
+  <!-- Legal Pages -->
+  <url>
+    <loc>https://revwinner.com/terms</loc>
+    <lastmod>2024-12-12</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  
+  <url>
+    <loc>https://revwinner.com/privacy-policy</loc>
+    <lastmod>2024-12-12</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  
+  <url>
+    <loc>https://revwinner.com/cancellation-and-refund-policy</loc>
+    <lastmod>2024-12-12</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  
+  <url>
+    <loc>https://revwinner.com/shipping-policy</loc>
+    <lastmod>2024-12-12</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  
+</urlset>

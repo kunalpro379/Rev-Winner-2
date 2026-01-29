@@ -1,0 +1,125 @@
+Rev Winner – Terms & Conditions
+
+Effective Date: November 2025
+Product of: Healthcaa Technologies (India)
+
+Welcome to Rev Winner, an AI-powered Sales Assistant Platform designed to empower sales professionals with real-time insights, transcription, and coaching intelligence. By using Rev Winner (“the Platform,” “Service,” or “App”), you agree to these Terms and Conditions (“Terms”). Please read them carefully before using our services.
+
+
+---
+
+1. Acceptance of Terms
+
+By accessing or using Rev Winner, you agree to be bound by these Terms. If you do not agree, please do not use the Service. Rev Winner reserves the right to modify these Terms at any time, and continued use after updates constitutes acceptance.
+
+
+---
+
+2. Services Provided
+
+Rev Winner provides AI-driven sales enablement features including:
+
+Real-time transcription and speech analysis (via Deepgram API)
+
+AI-powered conversation insights and recommendations
+
+Subscription-based access to tools and services
+
+
+The platform may integrate with third-party APIs such as OpenAI, Deepgram, and Razorpay for AI processing, transcription, and payments.
+
+
+---
+
+3. Subscriptions & Payments
+
+Users can choose between Free Trial, Individual, Team, or Enterprise plans.
+
+Subscription fees are billed in USD (for international users) and INR (for Indian users) through Razorpay.
+
+Deepgram Text-to-Speech usage is metered and billed as per actual usage. The current maximum rate is $0.1600 per minute or less, subject to change based on Deepgram’s pricing.
+
+Applicable GST will be charged at 18%.
+For example, if your subscription is $499, then your total payable amount will be $499 + 18% of $499.
+
+All payments are processed securely via Razorpay under Purpose Code P0805 (SaaS Export).
+
+Refunds are not provided once a subscription period has begun.
+
+Rev Winner reserves the right to suspend or terminate access in case of non-payment or misuse.
+
+
+
+---
+
+4. Data Usage & Privacy
+
+Rev Winner does not store your conversation audio or transcripts.
+We store only limited user information required for account management and billing, such as:
+
+Name, Email, Phone Number
+
+AI usage (minutes), Speech-to-text usage (Deepgram)
+
+Subscription type, start date, end date, and payment history
+
+
+Your data is encrypted and securely handled. Please refer to our Privacy Policy for more details.
+
+
+---
+
+5. User Responsibilities
+
+You must provide accurate registration details and maintain account confidentiality.
+
+You are solely responsible for your use of AI-generated outputs.
+
+Users are prohibited from sharing, leaking, or uploading proprietary or confidential company data into the system.
+
+Users are not allowed to misuse the system for illegal, unethical, or harmful activities.
+
+
+
+---
+
+6. Team & Enterprise Users
+
+Team Admins are responsible for managing licenses, adding/removing users, and ensuring compliance.
+
+Rev Winner is not responsible for internal disputes or unauthorized data sharing among team members.
+
+Each organization’s admin assumes full accountability for ethical use and data compliance.
+
+
+
+---
+
+7. Intellectual Property
+
+All content, software, UI/UX design, and brand assets of Rev Winner remain the property of Healthcaa Technologies. Unauthorized use, modification, or resale is strictly prohibited.
+
+
+---
+
+8. Liability Limitation
+
+Rev Winner is provided “as is” and “as available.”
+We do not guarantee uninterrupted or error-free service.
+Rev Winner and Healthcaa Technologies shall not be liable for any loss, direct or indirect, arising from the use or inability to use the Service.
+
+
+---
+
+9. Governing Law
+
+These Terms are governed by the laws of India. For users outside India, disputes shall be handled under international arbitration rules applicable to cross-border SaaS agreements.
+
+
+---
+
+10. Contact Information
+
+For questions, billing, or support:
+📧 support@revwinner.com
+🌐 www.revwinner.com

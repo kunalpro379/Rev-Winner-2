@@ -1,0 +1,63 @@
+# Rev Winner - AI Sales Assistant
+# robots.txt for https://revwinner.com
+# Last Updated: December 2024
+# Optimized for Google & Bing SEO
+
+# Allow all search engine crawlers
+User-agent: *
+Allow: /
+
+# Crawl delay for respectful indexing
+Crawl-delay: 1
+
+# Primary Marketing Pages - High Priority
+Allow: /
+Allow: /packages
+Allow: /help
+Allow: /contact
+Allow: /blog
+Allow: /terms
+Allow: /assets/
+Allow: /assets/rev-winner-logo.png
+
+# Registration/Conversion Pages
+Allow: /register
+Allow: /login
+
+# Google-specific directives
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0
+
+# Bing-specific directives
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 1
+
+# Disallow private/admin areas
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /api/*
+Disallow: /license-manager
+Disallow: /license-manager/*
+Disallow: /profile
+Disallow: /settings
+Disallow: /cart
+Disallow: /checkout
+Disallow: /invoice
+Disallow: /subscribe
+Disallow: /subscription-success
+Disallow: /subscription-cancel
+Disallow: /manage-subscription
+Disallow: /setup-license-manager
+Disallow: /sales-assistant
+Disallow: /train-me
+Disallow: /call-recordings
+Disallow: /app
+
+# Prevent indexing of password/auth flows
+Disallow: /forgot-password
+Disallow: /reset-password
+
+# Sitemap Location
+Sitemap: https://revwinner.com/sitemap.xml

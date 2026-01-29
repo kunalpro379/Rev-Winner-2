@@ -1,0 +1,3378 @@
+import { Router, type Request, type Response } from "express";
+import { authenticateToken } from "./middleware/auth";
+import { captureRawBody } from "./middleware/raw-body";
+import { billingStorage } from "./storage-billing";
+import { authStorage } from "./storage-auth";
+import { PaymentGatewayFactory, type PaymentGatewayProvider } from "./services/payments";
+import {
+  getPackageBySku,
+  getPackageOrAddonBySku,
+  getAddonTypeFromSku,
+  calculateEndDate,
+  getAllPackages,
+  PLATFORM_ACCESS_PACKAGES,
+} from "./config/pricing";
+import {
+  purchasePlatformAccessSchema,
+  type AddonPurchase,
+  addonPurchases,
+} from "../shared/schema";
+import { z } from "zod";
+import { eventLogger } from './services/event-logger';
+import { db } from "./db";
+import { eq } from "drizzle-orm";
+
+// Helper function to get Razorpay credentials based on environment
+function getRazorpayKeyId(): string | undefined {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const razorpayMode = process.env.RAZORPAY_MODE || (isDevelopment ? 'TEST' : 'LIVE');
+  
+  if (razorpayMode === 'TEST') {
+    return process.env.RAZORPAY_TEST_KEY_ID || process.env.RAZORPAY_KEY_ID;
+  } else {
+    // LIVE or PRODUCTION mode
+    return process.env.RAZORPAY_LIVE_KEY_ID || process.env.RAZORPAY_KEY_ID;
+  }
+}
+
+function getRazorpayKeySecret(): string | undefined {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const razorpayMode = process.env.RAZORPAY_MODE || (isDevelopment ? 'TEST' : 'LIVE');
+  
+  if (razorpayMode === 'TEST') {
+    return process.env.RAZORPAY_TEST_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET;
+  } else {
+    // LIVE or PRODUCTION mode
+    return process.env.RAZORPAY_LIVE_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET;
+  }
+}
+
+/**
+ * Activate cart checkout items after payment verification
+ * This function is called from both the cart verify endpoint and the webhook handler
+ */
+async function activateCartCheckout(
+  pendingOrder: any,
+  verifiedPaymentId: string,
+  req?: Request
+): Promise<{ success: boolean; activatedAddons: AddonPurchase[]; message?: string }> {
+  try {
+    const userId = pendingOrder.userId;
+    const orderId = pendingOrder.id; 
+
+    // Extract cart items from metadata
+    const metadata = pendingOrder.metadata as any;
+    const cartItems = metadata?.items as Array<{
+      packageSku: string;
+      packageName: string;
+      addonType: string;
+      basePrice: string;
+      currency: string;
+      quantity: number;
+      metadata: any;
+      purchaseMode?: string;
+      teamManagerName?: string;
+      teamManagerEmail?: string;
+      companyName?: string;
+    }>;
+
+    if (!cartItems || cartItems.length === 0) {
+      return { success: false, activatedAddons: [], message: "No items found in order" };
+    }
+
+    // Extract per-item promo codes and increment usage counts
+    const perItemPromoCodes = metadata?.perItemPromoCodes as Array<{
+      cartItemId: string;
+      promoCodeId: string | null;
+      promoCodeCode: string | null;
+      appliedDiscountAmount: string | null;
+    }> || [];
+
+    // Increment usage counts for all unique promo codes used
+    const uniquePromoCodeIds = Array.from(new Set(
+      perItemPromoCodes
+        .filter(p => p.promoCodeId)
+        .map(p => p.promoCodeId!)
+    ));
+
+    for (const promoCodeId of uniquePromoCodeIds) {
+      await authStorage.incrementPromoCodeUses(promoCodeId);
+    }
+
+    const activatedAddons: AddonPurchase[] = [];
+
+    // Activate each item in the cart
+    for (const item of cartItems) {
+      const pkg = await getPackageOrAddonBySku(item.packageSku);
+      if (!pkg) continue;
+
+      // Map addonType from cart format to addonPurchases format
+      // Cart uses: 'usage_bundle', 'service', 'platform_access'
+      // addonPurchases needs: 'session_minutes', 'train_me', 'dai', 'platform_access'
+      let mappedAddonType = item.addonType;
+      if (item.addonType === 'usage_bundle') {
+        // Session minutes are stored as 'usage_bundle' in cart but 'session_minutes' in addonPurchases
+        mappedAddonType = 'session_minutes';
+        console.log(`[Cart Activation] Mapping addonType: ${item.addonType} → ${mappedAddonType} for package ${item.packageSku} (${pkg.name})`);
+      } else if (item.addonType === 'service') {
+        // Determine if it's train_me or dai based on package SKU or metadata
+        const packageSkuLower = item.packageSku.toLowerCase();
+        const packageNameLower = (pkg.name || '').toLowerCase();
+        if (packageSkuLower.includes('train') || packageNameLower.includes('train')) {
+          mappedAddonType = 'train_me';
+        } else if (packageSkuLower.includes('dai') || packageNameLower.includes('dai')) {
+          mappedAddonType = 'dai';
+        } else {
+          // Default to train_me for service type if unclear
+          mappedAddonType = 'train_me';
+        }
+        console.log(`[Cart Activation] Mapping addonType: ${item.addonType} → ${mappedAddonType} for package ${item.packageSku} (${pkg.name})`);
+      }
+      
+      console.log(`[Cart Activation] Creating purchase: addonType=${mappedAddonType}, packageSku=${item.packageSku}, totalUnits=${pkg.totalUnits || 0}`);
+
+      // For session_minutes: Check if user already has an active purchase and add to it
+      // This handles the unique constraint that prevents multiple active purchases per user per addon type
+      if (mappedAddonType === 'session_minutes') {
+        const existingPurchase = await billingStorage.getActiveAddonPurchase(userId, 'session_minutes');
+        const newMinutes = (pkg.totalUnits || 0) * item.quantity;
+        const startDate = new Date();
+        const endDate = pkg.validityDays ? calculateEndDate(startDate, pkg.validityDays) : null;
+
+        if (existingPurchase) {
+          // Add minutes to existing purchase
+          const currentTotalUnits = existingPurchase.totalUnits || 0;
+          const currentUsedUnits = existingPurchase.usedUnits || 0;
+          const newTotalUnits = currentTotalUnits + newMinutes;
+          
+          // Use the latest endDate (whichever is later)
+          const existingEndDate = existingPurchase.endDate;
+          const finalEndDate = existingEndDate && endDate 
+            ? (existingEndDate > endDate ? existingEndDate : endDate)
+            : (endDate || existingEndDate);
+
+          // Update metadata to include this purchase
+          const existingMetadata = (existingPurchase.metadata as any) || {};
+          const purchaseHistory = Array.isArray(existingMetadata.purchaseHistory) 
+            ? existingMetadata.purchaseHistory 
+            : [];
+        
+          purchaseHistory.push({
+            orderId: orderId,
+            packageSku: item.packageSku,
+            packageName: pkg.name,
+            minutesAdded: newMinutes,
+            amount: item.basePrice,
+            currency: item.currency || 'USD',
+            quantity: item.quantity,
+            purchasedViaCart: true,
+            paymentId: verifiedPaymentId,
+            gatewayProvider: pendingOrder.gatewayProvider,
+            purchasedAt: startDate.toISOString(),
+          });
+
+          // Update the purchase
+          const updatedPurchase = await db
+            .update(addonPurchases)
+            .set({
+              totalUnits: newTotalUnits,
+              endDate: finalEndDate,
+              updatedAt: new Date(),
+              metadata: {
+                ...existingMetadata,
+                purchaseHistory,
+                lastPurchaseOrderId: orderId,
+                lastPurchaseDate: startDate.toISOString(),
+              },
+            })
+            .where(eq(addonPurchases.id, existingPurchase.id))
+            .returning()
+            .then((result: AddonPurchase[]) => result[0]);
+
+          activatedAddons.push(updatedPurchase);
+          console.log(`[Cart Activation] Added ${newMinutes} minutes to existing session_minutes purchase. New total: ${newTotalUnits} minutes`);
+        } else {
+          // Create new purchase
+          const addon = await billingStorage.createAddonPurchase({
+            userId,
+            organizationId: null,
+            addonType: mappedAddonType,
+            packageSku: item.packageSku,
+            billingType: 'one_time',
+            purchaseAmount: item.basePrice,
+            currency: item.currency || 'USD',
+            totalUnits: newMinutes,
+            usedUnits: 0,
+            status: 'active',
+            startDate,
+            endDate,
+            gatewayTransactionId: null,
+            metadata: {
+              packageName: pkg.name,
+              basePrice: item.basePrice,
+              quantity: item.quantity,
+              purchasedViaCart: true,
+              cartOrderId: orderId,
+              paymentId: verifiedPaymentId,
+              gatewayProvider: pendingOrder.gatewayProvider,
+              originalAddonType: item.addonType,
+              purchaseHistory: [{
+                orderId: orderId,
+                packageSku: item.packageSku,
+                packageName: pkg.name,
+                minutesAdded: newMinutes,
+                amount: item.basePrice,
+                currency: item.currency || 'USD',
+                quantity: item.quantity,
+                purchasedViaCart: true,
+                paymentId: verifiedPaymentId,
+                gatewayProvider: pendingOrder.gatewayProvider,
+                purchasedAt: startDate.toISOString(),
+              }],
+            },
+          });
+
+          activatedAddons.push(addon);
+          console.log(`[Cart Activation] Created new session_minutes purchase with ${newMinutes} minutes`);
+        }
+      } else {
+        // For platform_access subscriptions: Create one purchase per quantity item
+        for (let i = 0; i < item.quantity; i++) {
+          const startDate = new Date();
+          const endDate = pkg.validityDays ? calculateEndDate(startDate, pkg.validityDays) : null;
+
+          const addon = await billingStorage.createAddonPurchase({
+            userId,
+            organizationId: null,
+            addonType: mappedAddonType,
+            packageSku: item.packageSku,
+            billingType: 'one_time',
+            purchaseAmount: item.basePrice,
+            currency: item.currency || 'USD',
+            totalUnits: pkg.totalUnits || 0,
+            usedUnits: 0,
+            status: 'active',
+            startDate,
+            endDate,
+            gatewayTransactionId: null,
+            metadata: {
+              packageName: pkg.name,
+              basePrice: item.basePrice,
+              quantity: 1,
+              purchasedViaCart: true,
+              cartOrderId: orderId,
+              paymentId: verifiedPaymentId,
+              gatewayProvider: pendingOrder.gatewayProvider,
+              itemNumber: i + 1,
+              totalItems: item.quantity,
+              originalAddonType: item.addonType, // Store original for reference
+            },
+          });
+
+          activatedAddons.push(addon);
+        }
+      }
+    }
+
+    // Check if any purchased item is a platform_access subscription
+    const platformAccessItems = cartItems.filter(item => item.addonType === 'platform_access');
+    
+    console.log(`[Cart Activation] Found ${platformAccessItems.length} platform_access items out of ${cartItems.length} total items`);
+    
+    if (platformAccessItems.length > 0) {
+      const subscriptionItem = platformAccessItems[0];
+      const pkg = await getPackageOrAddonBySku(subscriptionItem.packageSku);
+      
+      if (pkg) {
+        const existingSubscription = await authStorage.getSubscriptionByUserId(userId);
+        
+        const currentPeriodStart = new Date();
+        const currentPeriodEnd = new Date();
+        
+        // Calculate period end based on billingType
+        if (pkg.billingType === '36_months') {
+          currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 3);
+        } else if (pkg.billingType === '12_months') {
+          currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 1);
+        } else if (pkg.billingType === '6_months') {
+          currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 6);
+        } else if (pkg.validityDays) {
+          currentPeriodEnd.setDate(currentPeriodEnd.getDate() + pkg.validityDays);
+        } else {
+          currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
+        }
+        
+        let planType = 'yearly';
+        if (pkg.billingType === '36_months') {
+          planType = 'three_year';
+        } else if (pkg.billingType === '12_months') {
+          planType = 'yearly';
+        } else {
+          planType = 'monthly';
+        }
+        
+        if (existingSubscription) {
+          await authStorage.updateSubscription(existingSubscription.id, {
+            planId: undefined,
+            planType,
+            status: 'active',
+            currentPeriodStart,
+            currentPeriodEnd,
+            sessionsUsed: '0',
+            sessionsLimit: undefined,
+            minutesUsed: '0',
+            minutesLimit: undefined,
+            sessionHistory: [],
+          });
+        } else {
+          await authStorage.createSubscription({
+            userId,
+            planId: undefined,
+            planType,
+            status: 'active',
+            currentPeriodStart,
+            currentPeriodEnd,
+            sessionsUsed: '0',
+            sessionsLimit: undefined,
+            minutesUsed: '0',
+            minutesLimit: undefined,
+            sessionHistory: [],
+          });
+        }
+
+        // Create audit log for subscription activation
+        await eventLogger.log({
+          actorId: userId,
+          action: 'subscription.activated',
+          targetType: 'subscription',
+          targetId: existingSubscription?.id || 'new',
+          metadata: { 
+            packageSku: subscriptionItem.packageSku,
+            billingType: pkg.billingType,
+            source: 'cart_checkout',
+            orderId,
+          },
+          ipAddress: req?.ip,
+          userAgent: req?.get('user-agent'),
+        });
+      }
+    }
+
+    // Mark pending order as completed
+    await billingStorage.updatePendingOrderStatus(orderId, userId, 'completed', new Date());
+
+    // Clear user's cart
+    await billingStorage.clearCart(userId);
+
+    // Refresh user entitlements
+    await billingStorage.refreshUserEntitlements(userId);
+
+    console.log(`[Cart Activation] Successfully activated ${activatedAddons.length} items for order ${orderId}`);
+
+    return { success: true, activatedAddons };
+  } catch (error: any) {
+    console.error("[Cart Activation] Error activating cart checkout:", error);
+    return { success: false, activatedAddons: [], message: error.message };
+  }
+}
+
+// Get the base URL for payment callbacks - uses APP_URL in production, falls back to request host
+function getBaseUrl(req: Request): string {
+  // Use APP_URL environment variable if set (for production/development with tunnels)
+  if (process.env.APP_URL) {
+    const appUrl = process.env.APP_URL.trim();
+    // Ensure it ends without trailing slash
+    return appUrl.endsWith('/') ? appUrl.slice(0, -1) : appUrl;
+  }
+  
+  // Get host from request
+  const host = req.get('host') || 'localhost:5000';
+  const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
+  
+  // For Cashfree:
+  // - PRODUCTION mode requires HTTPS URLs and domain whitelisting
+  // - SANDBOX mode allows HTTP for localhost and doesn't require whitelisting
+  // Check if we're using sandbox mode (for localhost development)
+  const isSandbox = process.env.CASHFREE_ENVIRONMENT === 'SANDBOX' || 
+    (!process.env.APP_URL && isLocalhost && process.env.NODE_ENV !== 'production');
+  
+  // Use HTTP for localhost in sandbox mode, HTTPS otherwise
+  if (isSandbox && isLocalhost) {
+    return `http://${host}`;
+  }
+  
+  // Force HTTPS for production mode or non-localhost
+  return `https://${host}`;
+}
+
+// Get Cashfree mode for frontend SDK
+function getCashfreeMode(): 'sandbox' | 'production' {
+  return process.env.CASHFREE_ENVIRONMENT === 'SANDBOX' ? 'sandbox' : 'production';
+}
+
+export function setupBillingRoutes(app: Router) {
+  console.log('🔧 Setting up billing routes...');
+  
+  // ========================================
+  // PRICING & PACKAGES
+  // ========================================
+
+  // Get session minutes packages
+  app.get("/api/session-minutes/packages", async (req: Request, res: Response) => {
+    try {
+      // Get published addons from database
+      const publishedAddons = await billingStorage.getPublishedAddons();
+      // Filter for session minutes addons (slug should be 'session-minutes' or check metadata)
+      const sessionMinutesAddons = publishedAddons.filter(addon => 
+        addon.slug === 'session-minutes' || 
+        (addon.metadata as any)?.addonType === 'session_minutes' ||
+        addon.type === 'usage_bundle'
+      );
+      
+      // Transform to frontend format
+      const packages: Array<{ id: string; minutes: number; price: number; name: string }> = [];
+      
+      for (const addon of sessionMinutesAddons) {
+        // Check if addon has pricingTiers (for usage_bundle type)
+        if (addon.pricingTiers && Array.isArray(addon.pricingTiers)) {
+          const tiers = addon.pricingTiers as Array<{ minutes: number; price: string; currency: string }>;
+          for (const tier of tiers) {
+            packages.push({
+              id: `${addon.id}-${tier.minutes}`, // Unique ID for each tier
+              minutes: tier.minutes,
+              price: parseFloat(tier.price),
+              name: `${addon.displayName} - ${tier.minutes} minutes`,
+            });
+          }
+        } else {
+          // Fallback: use flatPrice and metadata
+          const metadata = (addon.metadata as { minutes?: number }) || {};
+          const minutes = metadata.minutes || 0;
+          const price = parseFloat(addon.flatPrice || '0');
+          
+          if (minutes > 0 && price > 0) {
+            packages.push({
+              id: addon.id,
+              minutes,
+              price,
+              name: addon.displayName,
+            });
+          }
+        }
+      }
+      
+      res.json({ packages });
+    } catch (error: any) {
+      console.error("Get session minutes packages error:", error);
+      res.status(500).json({ message: "Failed to fetch session minutes packages", error: error.message });
+    }
+  });
+
+  // Validate promo code (with category support)
+  app.post("/api/promo-codes/validate", authenticateToken, async (req: Request, res: Response) => {
+    console.log('[Promo Code Validation] Endpoint hit with body:', req.body);
+    try {
+      const { code, category, planType } = req.body;
+
+      if (!code) {
+        return res.status(400).json({ message: "Promo code is required", valid: false });
+      }
+
+      const promoCode = await authStorage.validatePromoCode(code, planType);
+
+      if (!promoCode) {
+        console.log('[Promo Code Validation] Code not found or expired:', code);
+        return res.status(400).json({
+          message: "Invalid or expired promo code",
+          valid: false
+        });
+      }
+
+      // Check for plan type mismatch
+      if ((promoCode as any).planTypeMismatch) {
+        const allowedTypes = (promoCode as any).allowedPlanTypes || [];
+        const planTypeNames: Record<string, string> = {
+          'yearly': '1-Year',
+          'three_year': '3-Year',
+          'monthly': 'Monthly',
+          'six_month': '6-Month',
+          'free_trial': 'Free Trial'
+        };
+        const allowedNames = allowedTypes.map((t: string) => planTypeNames[t] || t).join(', ');
+        return res.status(400).json({
+          message: `This promo code is only valid for ${allowedNames} plan${allowedTypes.length > 1 ? 's' : ''}.`,
+          valid: false,
+          planTypeMismatch: true,
+          allowedPlanTypes: allowedTypes
+        });
+      }
+
+      // Validate category if provided
+      if (category && promoCode.category && promoCode.category !== category) {
+        return res.status(400).json({
+          message: `This promo code is only valid for ${promoCode.category} purchases, not ${category}.`,
+          valid: false,
+          invalidCategory: true,
+          expectedCategory: promoCode.category,
+          providedCategory: category
+        });
+      }
+
+      const discountMessage = promoCode.discountType === 'percentage'
+        ? `${promoCode.discountValue}% discount applied!`
+        : `₹${promoCode.discountValue} discount applied!`;
+
+      const response = {
+        valid: true,
+        promoCode: {
+          code: promoCode.code,
+          category: promoCode.category,
+          allowedPlanTypes: promoCode.allowedPlanTypes,
+          discountType: promoCode.discountType,
+          discountValue: parseFloat(promoCode.discountValue),
+        },
+        message: discountMessage
+      };
+
+      console.log('[Promo Code Validation] Success:', response);
+      res.json(response);
+    } catch (error) {
+      console.error("Validate promo code error:", error);
+      res.status(500).json({ message: "Failed to validate promo code", valid: false });
+    }
+  });
+
+  // Create order for session minutes purchase
+  app.post("/api/session-minutes/create-order", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const validation = z.object({
+        packageId: z.string(),
+        promoCode: z.string().optional(),
+        paymentGateway: z.enum(['cashfree', 'razorpay']).optional(),
+      }).safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid request", errors: validation.error.errors });
+      }
+
+      const { packageId, promoCode, paymentGateway: requestedGateway } = validation.data;
+      
+      // Use requested gateway or fall back to configured default
+      const { DEFAULT_PAYMENT_GATEWAY } = await import("./config/payment.config");
+      const paymentGateway = requestedGateway || DEFAULT_PAYMENT_GATEWAY;
+
+      // Get package/addon by ID
+      const pkg = await getPackageOrAddonBySku(packageId);
+      if (!pkg) {
+        return res.status(404).json({ message: "Package not found" });
+      }
+
+      // Verify it's a session minutes package
+      const addonType = await getAddonTypeFromSku(packageId);
+      if (addonType !== 'usage_bundle') {
+        return res.status(400).json({ message: "Invalid package type for session minutes" });
+      }
+
+      // Calculate price with promo code if provided
+      let finalPrice = pkg.price;
+      let discountAmount = 0;
+      let validatedPromo: any = null;
+      if (promoCode) {
+        const promo = await authStorage.validatePromoCode(promoCode);
+        if (promo) {
+          // Validate promo code category matches the purchase type
+          if (promo.category && promo.category !== 'session_minutes') {
+            return res.status(400).json({ 
+              message: `This promo code is only valid for ${promo.category} purchases, not session minutes.` 
+            });
+          }
+          
+          validatedPromo = promo;
+          if (promo.discountType === 'percentage') {
+            discountAmount = finalPrice * (parseFloat(promo.discountValue) / 100);
+          } else {
+            discountAmount = parseFloat(promo.discountValue);
+          }
+          finalPrice = Math.max(0, finalPrice - discountAmount);
+        } else {
+          return res.status(400).json({ message: "Invalid or expired promo code" });
+        }
+      }
+
+      // Get user info for payment gateway
+      const user = await authStorage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Create pending order
+      const pendingOrder = await billingStorage.createPendingOrder({
+        userId,
+        packageSku: packageId,
+        addonType: 'session_minutes',
+        amount: finalPrice.toFixed(2),
+        currency: pkg.currency || 'USD',
+        gatewayOrderId: '',
+        gatewayProvider: paymentGateway,
+        status: 'pending',
+        metadata: {
+          packageName: pkg.name,
+          packageMinutes: pkg.totalUnits || 0,
+          originalPrice: pkg.price.toString(),
+          discountAmount: discountAmount.toString(),
+          promoCode: promoCode || null,
+        },
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes expiry
+      });
+
+      // Create payment gateway order
+      const gateway = PaymentGatewayFactory.getGateway(paymentGateway);
+      const baseUrl = getBaseUrl(req);
+      
+      // Keep all payments in USD - no currency conversion
+      let finalCurrency = pkg.currency || 'USD';
+      let finalAmount = finalPrice;
+
+      const order = await gateway.createOrder({
+        amount: finalAmount,
+        currency: finalCurrency,
+        receipt: `SM-${pendingOrder.id.substring(0, 32)}`,
+        metadata: {
+          userId,
+          packageSku: packageId,
+          addonType: 'session_minutes',
+          pendingOrderId: pendingOrder.id,
+          returnUrl: `${baseUrl}/payment/success?orderId=${pendingOrder.id}`,
+          notifyUrl: `${baseUrl}/api/billing/webhook`,
+        },
+        customerName: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email?.split('@')[0] || 'Customer',
+        customerEmail: user.email || 'customer@example.com',
+        customerPhone: user.mobile || '9999999999',
+      });
+
+      // Update pending order with gateway order ID
+      await billingStorage.updatePendingOrderGatewayId(pendingOrder.id, order.providerOrderId);
+
+      // Log gateway transaction
+      const gatewayProvider = await billingStorage.getGatewayProviderByName(gateway.getProviderName());
+      if (gatewayProvider) {
+        await billingStorage.createGatewayTransaction({
+          providerId: gatewayProvider.id,
+          providerTransactionId: order.providerOrderId,
+          transactionType: 'order',
+          status: order.status,
+          amount: finalAmount.toFixed(2),
+          currency: finalCurrency,
+          userId,
+          relatedEntity: 'pending_order',
+          payload: order.metadata,
+          metadata: { packageSku: packageId, pendingOrderId: pendingOrder.id },
+        });
+      }
+
+      // Return response based on gateway
+      if (paymentGateway === 'razorpay') {
+        res.json({
+          orderId: pendingOrder.id,
+          razorpayOrderId: order.providerOrderId,
+          razorpayKeyId: getRazorpayKeyId(),
+          packageName: pkg.name,
+          amount: finalAmount,
+          currency: finalCurrency,
+        });
+      } else {
+        res.json({
+          orderId: pendingOrder.id,
+          paymentSessionId: order.paymentSessionId,
+          gatewayOrderId: order.providerOrderId,
+          packageName: pkg.name,
+          amount: finalAmount,
+          currency: finalCurrency,
+          cashfreeMode: getCashfreeMode(), // Tell frontend which mode to use
+          cashfreeEnvironment: getCashfreeMode(), // Alias for compatibility
+        });
+      }
+    } catch (error: any) {
+      console.error("Create session minutes order error:", error);
+      res.status(500).json({ message: error.message || "Failed to create order" });
+    }
+  });
+
+  // Verify session minutes purchase payment
+  app.post("/api/session-minutes/verify-payment", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const validation = z.object({
+        orderId: z.string(), // Rev Winner pending order ID
+        razorpay_payment_id: z.string().optional(),
+        razorpay_order_id: z.string().optional(),
+        razorpay_signature: z.string().optional(),
+        cfPaymentId: z.string().optional(), // Cashfree payment ID
+      }).safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid request", errors: validation.error.errors });
+      }
+
+      const { orderId, razorpay_payment_id, razorpay_signature, cfPaymentId } = validation.data;
+
+      // Get pending order
+      const pendingOrder = await billingStorage.getPendingOrder(orderId);
+      if (!pendingOrder) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Validate order belongs to user
+      if (pendingOrder.userId !== userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Validate order is still pending
+      if (pendingOrder.status !== 'pending') {
+        return res.status(400).json({ message: `Order already ${pendingOrder.status}` });
+      }
+
+      // Validate order not expired
+      if (new Date() > new Date(pendingOrder.expiresAt)) {
+        await billingStorage.updatePendingOrderStatus(orderId, userId, 'expired');
+        return res.status(400).json({ message: "Order has expired" });
+      }
+
+      // Validate addon type
+      if (pendingOrder.addonType !== 'session_minutes') {
+        return res.status(400).json({ message: "Invalid order type" });
+      }
+
+      // Get package details
+      const pkg = await getPackageOrAddonBySku(pendingOrder.packageSku);
+      if (!pkg) {
+        return res.status(400).json({ message: "Invalid package in order" });
+      }
+
+      // Verify payment with gateway
+      const gateway = PaymentGatewayFactory.getGateway(pendingOrder.gatewayProvider as PaymentGatewayProvider);
+      const gatewayOrderId = pendingOrder.gatewayOrderId;
+      
+      if (!gatewayOrderId) {
+        return res.status(400).json({ message: "Gateway order ID not found" });
+      }
+
+      let isPaid = false;
+      let verifiedPaymentId: string | undefined;
+
+      if (pendingOrder.gatewayProvider === 'razorpay') {
+        if (!razorpay_payment_id || !razorpay_signature) {
+          return res.status(400).json({ message: "Missing Razorpay verification data" });
+        }
+        
+        // Verify signature
+        const signatureValid = gateway.verifyPaymentSignature(gatewayOrderId, razorpay_payment_id, razorpay_signature);
+        if (!signatureValid) {
+          return res.status(400).json({ message: "Invalid payment signature" });
+        }
+        
+        // Double-check payment status
+        const paymentStatus = await gateway.getPaymentStatus(razorpay_payment_id);
+        isPaid = paymentStatus.status === 'captured' || paymentStatus.status === 'authorized';
+        verifiedPaymentId = razorpay_payment_id;
+      } else {
+        // Cashfree uses API-based verification
+        const paymentStatus = await gateway.getPaymentStatus(gatewayOrderId);
+        isPaid = paymentStatus.status === 'PAID' || 
+                 paymentStatus.status === 'SUCCESS' || 
+                 paymentStatus.status === 'captured';
+        verifiedPaymentId = cfPaymentId || paymentStatus.paymentId;
+        
+        // DEVELOPMENT BYPASS: In sandbox mode, if payment is still ACTIVE, treat as paid for testing
+        // Remove this in production!
+        if (!isPaid && process.env.NODE_ENV === 'development' && paymentStatus.status === 'ACTIVE') {
+          console.log('⚠️ DEV MODE: Bypassing payment verification for testing');
+          isPaid = true;
+          verifiedPaymentId = gatewayOrderId;
+        }
+      }
+
+      if (!isPaid) {
+        await billingStorage.updatePendingOrderStatus(orderId, userId, 'failed');
+        return res.status(400).json({ message: "Payment not completed" });
+      }
+
+      // Check if user already has an active session minutes purchase
+      // Due to unique constraint, we need to add minutes to existing purchase instead of creating new one
+      const existingPurchase = await billingStorage.getActiveAddonPurchase(userId, 'session_minutes');
+      
+      let purchase: AddonPurchase;
+      const newMinutes = pkg.totalUnits || 0;
+      const startDate = new Date();
+      const endDate = pkg.validityDays ? calculateEndDate(startDate, pkg.validityDays) : null;
+
+      if (existingPurchase) {
+        // Add minutes to existing purchase
+        const currentTotalUnits = existingPurchase.totalUnits || 0;
+        const currentUsedUnits = existingPurchase.usedUnits || 0;
+        const newTotalUnits = currentTotalUnits + newMinutes;
+        
+        // Update existing purchase with additional minutes
+        // Use the latest endDate (whichever is later)
+        const existingEndDate = existingPurchase.endDate;
+        const finalEndDate = existingEndDate && endDate 
+          ? (existingEndDate > endDate ? existingEndDate : endDate)
+          : (endDate || existingEndDate);
+
+        // Update metadata to include this purchase
+        const existingMetadata = (existingPurchase.metadata as any) || {};
+        const purchaseHistory = Array.isArray(existingMetadata.purchaseHistory) 
+          ? existingMetadata.purchaseHistory 
+          : [];
+        
+        purchaseHistory.push({
+          orderId: pendingOrder.id,
+          packageSku: pendingOrder.packageSku,
+          packageName: pkg.name,
+          minutesAdded: newMinutes,
+          amount: pendingOrder.amount,
+          currency: pendingOrder.currency,
+          gatewayOrderId: gatewayOrderId,
+          paymentId: verifiedPaymentId,
+          gatewayProvider: pendingOrder.gatewayProvider,
+          purchasedAt: startDate.toISOString(),
+        });
+
+        // Update the purchase
+        purchase = await db
+          .update(addonPurchases)
+          .set({
+            totalUnits: newTotalUnits,
+            // Keep usedUnits as is (don't reset it)
+            endDate: finalEndDate,
+            updatedAt: new Date(),
+            metadata: {
+              ...existingMetadata,
+              purchaseHistory,
+              lastPurchaseOrderId: pendingOrder.id,
+              lastPurchaseDate: startDate.toISOString(),
+            },
+          })
+          .where(eq(addonPurchases.id, existingPurchase.id))
+          .returning()
+          .then((result: AddonPurchase[]) => result[0]);
+
+        console.log(`[Session Minutes] Added ${newMinutes} minutes to existing purchase. New total: ${newTotalUnits} minutes`);
+      } else {
+        // Create new purchase - but handle race condition where another request might have created one
+        try {
+          purchase = await billingStorage.createAddonPurchase({
+            userId,
+            addonType: 'session_minutes',
+            packageSku: pendingOrder.packageSku,
+            billingType: 'one_time',
+            purchaseAmount: pendingOrder.amount,
+            currency: pendingOrder.currency,
+            totalUnits: newMinutes,
+            usedUnits: 0,
+            status: 'active',
+            startDate,
+            endDate,
+            gatewayTransactionId: null,
+            metadata: {
+              packageName: pkg.name,
+              gatewayOrderId: gatewayOrderId,
+              paymentId: verifiedPaymentId,
+              gatewayProvider: pendingOrder.gatewayProvider,
+              pendingOrderId: pendingOrder.id,
+              purchaseHistory: [{
+                orderId: pendingOrder.id,
+                packageSku: pendingOrder.packageSku,
+                packageName: pkg.name,
+                minutesAdded: newMinutes,
+                amount: pendingOrder.amount,
+                currency: pendingOrder.currency,
+                gatewayOrderId: gatewayOrderId,
+                paymentId: verifiedPaymentId,
+                gatewayProvider: pendingOrder.gatewayProvider,
+                purchasedAt: startDate.toISOString(),
+              }],
+            },
+          });
+          
+          console.log(`[Session Minutes] Created new purchase with ${newMinutes} minutes`);
+        } catch (error: any) {
+          // Handle race condition: if another request created a purchase between our check and create
+          if (error?.code === '23505' && error?.constraint === 'unique_active_addon_per_user') {
+            console.log(`[Session Minutes] Race condition detected - another purchase was created. Retrying with update...`);
+            
+            // Re-check for existing purchase (it might have been created by another request)
+            const retryExistingPurchase = await billingStorage.getActiveAddonPurchase(userId, 'session_minutes');
+            
+            if (retryExistingPurchase) {
+              // Add minutes to the purchase that was just created
+              const currentTotalUnits = retryExistingPurchase.totalUnits || 0;
+              const newTotalUnits = currentTotalUnits + newMinutes;
+              
+              const existingEndDate = retryExistingPurchase.endDate;
+              const finalEndDate = existingEndDate && endDate 
+                ? (existingEndDate > endDate ? existingEndDate : endDate)
+                : (endDate || existingEndDate);
+
+              const existingMetadata = (retryExistingPurchase.metadata as any) || {};
+              const purchaseHistory = Array.isArray(existingMetadata.purchaseHistory) 
+                ? existingMetadata.purchaseHistory 
+                : [];
+            
+              purchaseHistory.push({
+                orderId: pendingOrder.id,
+                packageSku: pendingOrder.packageSku,
+                packageName: pkg.name,
+                minutesAdded: newMinutes,
+                amount: pendingOrder.amount,
+                currency: pendingOrder.currency,
+                gatewayOrderId: gatewayOrderId,
+                paymentId: verifiedPaymentId,
+                gatewayProvider: pendingOrder.gatewayProvider,
+                purchasedAt: startDate.toISOString(),
+              });
+
+              purchase = await db
+                .update(addonPurchases)
+                .set({
+                  totalUnits: newTotalUnits,
+                  endDate: finalEndDate,
+                  updatedAt: new Date(),
+                  metadata: {
+                    ...existingMetadata,
+                    purchaseHistory,
+                    lastPurchaseOrderId: pendingOrder.id,
+                    lastPurchaseDate: startDate.toISOString(),
+                  },
+                })
+                .where(eq(addonPurchases.id, retryExistingPurchase.id))
+                .returning()
+                .then((result: AddonPurchase[]) => result[0]);
+
+              console.log(`[Session Minutes] Added ${newMinutes} minutes to existing purchase (race condition recovery). New total: ${newTotalUnits} minutes`);
+            } else {
+              // This shouldn't happen, but re-throw if it does
+              throw error;
+            }
+          } else {
+            // Re-throw if it's not the duplicate key error
+            throw error;
+          }
+        }
+      }
+
+      // Create payment record for tracking and invoices
+      // Get user's organization ID (if they have an active enterprise license)
+      const organizationId = await authStorage.getUserOrganizationId(userId);
+      
+      // Check if payment record already exists (avoid duplicates)
+      const existingPayment = await authStorage.getPaymentByRazorpayOrderId(gatewayOrderId);
+      
+      if (!existingPayment) {
+        // Calculate amount in smallest unit (cents/paise)
+        const amountInSmallestUnit = Math.round(parseFloat(pendingOrder.amount) * 100);
+        
+        // Create payment record
+        await authStorage.createPayment({
+          userId,
+          organizationId,
+          razorpayOrderId: gatewayOrderId,
+          razorpayPaymentId: verifiedPaymentId,
+          amount: amountInSmallestUnit.toString(),
+          currency: pendingOrder.currency,
+          status: 'succeeded',
+          paymentMethod: pendingOrder.gatewayProvider || 'razorpay', // Track payment gateway
+          metadata: {
+            type: 'session_minutes',
+            packageSku: pendingOrder.packageSku,
+            packageName: pkg.name,
+            minutes: newMinutes,
+            orderId: pendingOrder.id,
+            gatewayProvider: pendingOrder.gatewayProvider,
+            // Include payment metadata
+            displayAmount: (pendingOrder.metadata as any)?.displayAmount,
+            displayCurrency: (pendingOrder.metadata as any)?.displayCurrency,
+            actualAmount: (pendingOrder.metadata as any)?.actualAmount,
+            actualCurrency: (pendingOrder.metadata as any)?.actualCurrency,
+            exchangeRate: (pendingOrder.metadata as any)?.exchangeRate,
+          },
+        });
+        
+        console.log(`[Session Minutes] Payment record created for order ${pendingOrder.id}`);
+      } else {
+        console.log(`[Session Minutes] Payment record already exists for order ${gatewayOrderId}`);
+      }
+
+      // Mark pending order as completed
+      await billingStorage.updatePendingOrderStatus(orderId, userId, 'completed', new Date());
+
+      // Increment promo code usage if one was used
+      const promoCodeUsed = (pendingOrder.metadata as any)?.promoCode;
+      if (promoCodeUsed) {
+        try {
+          const promo = await authStorage.validatePromoCode(promoCodeUsed);
+          if (promo) {
+            await authStorage.incrementPromoCodeUses(promo.id);
+            console.log(`[Promo Code] Incremented usage for code: ${promoCodeUsed}`);
+          }
+        } catch (error) {
+          console.error(`[Promo Code] Failed to increment usage for code: ${promoCodeUsed}`, error);
+          // Don't fail the purchase if promo code increment fails
+        }
+      }
+
+      // Refresh user entitlements
+      await billingStorage.refreshUserEntitlements(userId);
+
+      res.json({
+        success: true,
+        purchase,
+        minutesAdded: newMinutes, // Include minutes added for frontend display
+        message: "Session minutes purchased successfully",
+      });
+    } catch (error: any) {
+      console.error("Verify session minutes payment error:", error);
+      res.status(500).json({ message: error.message || "Failed to verify payment" });
+    }
+  });
+
+  // Get session minutes status for current user
+  app.get("/api/session-minutes/status", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      
+      // Check if user is super user (unlimited access)
+      const user = await authStorage.getUserById(userId);
+      const isSuperUser = user?.role === 'super_admin' || (req as any).jwtUser?.superUser === true;
+      
+      if (isSuperUser) {
+        return res.json({
+          hasActiveMinutes: true,
+          totalMinutesRemaining: Infinity,
+          nextExpiryDate: null,
+          superUserAccess: true,
+        });
+      }
+      
+      // Get session minutes balance from database
+      const balance = await billingStorage.getSessionMinutesBalance(userId);
+      
+      res.json({
+        hasActiveMinutes: balance.remainingMinutes > 0,
+        totalMinutesRemaining: balance.remainingMinutes,
+        nextExpiryDate: balance.expiresAt ? balance.expiresAt.toISOString() : null,
+        superUserAccess: false,
+      });
+    } catch (error: any) {
+      console.error("Get session minutes status error:", error);
+      res.status(500).json({ message: "Failed to fetch session minutes status", error: error.message });
+    }
+  });
+
+  // ========================================
+  // TRAIN ME ADD-ON
+  // ========================================
+
+  // Create order for Train Me purchase
+  app.post("/api/train-me/create-order", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const validation = z.object({
+        paymentGateway: z.enum(['cashfree', 'razorpay']).optional(),
+      }).safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid request", errors: validation.error.errors });
+      }
+
+      const { paymentGateway: requestedGateway } = validation.data;
+      
+      // Use requested gateway or fall back to configured default
+      const { DEFAULT_PAYMENT_GATEWAY } = await import("./config/payment.config");
+      const paymentGateway = requestedGateway || DEFAULT_PAYMENT_GATEWAY;
+
+      // Find Train Me addon by slug
+      const publishedAddons = await billingStorage.getPublishedAddons();
+      const trainMeAddon = publishedAddons.find(a => a.slug === 'train-me' || a.slug === 'train_me');
+      
+      if (!trainMeAddon) {
+        return res.status(404).json({ message: "Train Me addon not found. Please contact support." });
+      }
+
+      // Get package details
+      const pkg = await getPackageOrAddonBySku(trainMeAddon.id);
+      if (!pkg) {
+        return res.status(400).json({ message: "Train Me package not available" });
+      }
+
+      // Get user info for payment gateway
+      const user = await authStorage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Create pending order
+      const pendingOrder = await billingStorage.createPendingOrder({
+        userId,
+        packageSku: trainMeAddon.id,
+        addonType: 'train_me',
+        amount: pkg.price.toFixed(2),
+        currency: pkg.currency || 'USD',
+        gatewayOrderId: '',
+        gatewayProvider: paymentGateway,
+        status: 'pending',
+        metadata: {
+          packageName: pkg.name,
+          originalPrice: pkg.price.toString(),
+        },
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes expiry
+      });
+
+      // Create payment gateway order
+      const gateway = PaymentGatewayFactory.getGateway(paymentGateway);
+      const baseUrl = getBaseUrl(req);
+      
+      // Keep all payments in USD - no currency conversion
+      let finalCurrency = pkg.currency || 'USD';
+      let finalAmount = pkg.price;
+
+      const order = await gateway.createOrder({
+        amount: finalAmount,
+        currency: finalCurrency,
+        receipt: `TM-${pendingOrder.id.substring(0, 32)}`,
+        metadata: {
+          userId,
+          packageSku: trainMeAddon.id,
+          addonType: 'train_me',
+          pendingOrderId: pendingOrder.id,
+          returnUrl: `${baseUrl}/payment/success?orderId=${pendingOrder.id}`,
+          notifyUrl: `${baseUrl}/api/billing/webhook`,
+        },
+        customerName: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email?.split('@')[0] || 'Customer',
+        customerEmail: user.email || 'customer@example.com',
+        customerPhone: user.mobile || '9999999999',
+      });
+
+      // Update pending order with gateway order ID
+      await billingStorage.updatePendingOrderGatewayId(pendingOrder.id, order.providerOrderId);
+
+      // Log gateway transaction
+      const gatewayProvider = await billingStorage.getGatewayProviderByName(gateway.getProviderName());
+      if (gatewayProvider) {
+        await billingStorage.createGatewayTransaction({
+          providerId: gatewayProvider.id,
+          providerTransactionId: order.providerOrderId,
+          transactionType: 'order',
+          status: order.status,
+          amount: finalAmount.toFixed(2),
+          currency: finalCurrency,
+          userId,
+          relatedEntity: 'pending_order',
+          payload: order.metadata,
+          metadata: { packageSku: trainMeAddon.id, pendingOrderId: pendingOrder.id },
+        });
+      }
+
+      // Return response based on gateway
+      if (paymentGateway === 'razorpay') {
+        res.json({
+          orderId: pendingOrder.id,
+          razorpayOrderId: order.providerOrderId,
+          razorpayKeyId: getRazorpayKeyId(),
+          packageName: pkg.name,
+          amount: finalAmount,
+          currency: finalCurrency,
+        });
+      } else {
+        res.json({
+          orderId: pendingOrder.id,
+          paymentSessionId: order.paymentSessionId,
+          gatewayOrderId: order.providerOrderId,
+          packageName: pkg.name,
+          amount: finalAmount,
+          currency: finalCurrency,
+          cashfreeMode: getCashfreeMode(),
+          cashfreeEnvironment: getCashfreeMode(),
+        });
+      }
+    } catch (error: any) {
+      console.error("Create Train Me order error:", error);
+      res.status(500).json({ message: error.message || "Failed to create order" });
+    }
+  });
+
+  // Verify Train Me purchase payment
+  app.post("/api/train-me/verify-payment", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const validation = z.object({
+        orderId: z.string(), // Rev Winner pending order ID
+        razorpay_payment_id: z.string().optional(),
+        razorpay_order_id: z.string().optional(),
+        razorpay_signature: z.string().optional(),
+        cfPaymentId: z.string().optional(), // Cashfree payment ID
+        cashfreeOrderId: z.string().optional(), // Cashfree order ID
+      }).safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid request", errors: validation.error.errors });
+      }
+
+      const { orderId, razorpay_payment_id, razorpay_signature, cfPaymentId, cashfreeOrderId } = validation.data;
+
+      // Get pending order
+      const pendingOrder = await billingStorage.getPendingOrder(orderId);
+      if (!pendingOrder) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Validate order belongs to user
+      if (pendingOrder.userId !== userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Validate order is still pending
+      if (pendingOrder.status !== 'pending') {
+        return res.status(400).json({ message: `Order already ${pendingOrder.status}` });
+      }
+
+      // Validate order not expired
+      if (new Date() > new Date(pendingOrder.expiresAt)) {
+        await billingStorage.updatePendingOrderStatus(orderId, userId, 'expired');
+        return res.status(400).json({ message: "Order has expired" });
+      }
+
+      // Validate addon type
+      if (pendingOrder.addonType !== 'train_me') {
+        return res.status(400).json({ message: "Invalid order type" });
+      }
+
+      // Get package details
+      const pkg = await getPackageOrAddonBySku(pendingOrder.packageSku);
+      if (!pkg) {
+        return res.status(400).json({ message: "Invalid package in order" });
+      }
+
+      // Verify payment with gateway
+      const gateway = PaymentGatewayFactory.getGateway(pendingOrder.gatewayProvider as PaymentGatewayProvider);
+      const gatewayOrderId = pendingOrder.gatewayOrderId;
+      
+      if (!gatewayOrderId) {
+        return res.status(400).json({ message: "Gateway order ID not found" });
+      }
+
+      let isPaid = false;
+      let verifiedPaymentId: string | undefined;
+
+      if (pendingOrder.gatewayProvider === 'razorpay') {
+        if (!razorpay_payment_id || !razorpay_signature) {
+          return res.status(400).json({ message: "Missing Razorpay verification data" });
+        }
+        
+        // Verify signature
+        const signatureValid = gateway.verifyPaymentSignature(gatewayOrderId, razorpay_payment_id, razorpay_signature);
+        if (!signatureValid) {
+          return res.status(400).json({ message: "Invalid payment signature" });
+        }
+        
+        // Double-check payment status
+        const paymentStatus = await gateway.getPaymentStatus(razorpay_payment_id);
+        isPaid = paymentStatus.status === 'captured' || paymentStatus.status === 'authorized';
+        verifiedPaymentId = razorpay_payment_id;
+      } else {
+        // Cashfree uses API-based verification
+        const verifyOrderId = cashfreeOrderId || gatewayOrderId;
+        const paymentStatus = await gateway.getPaymentStatus(verifyOrderId);
+        isPaid = paymentStatus.status === 'PAID' || 
+                 paymentStatus.status === 'SUCCESS' || 
+                 paymentStatus.status === 'captured';
+        verifiedPaymentId = cfPaymentId || paymentStatus.paymentId;
+      }
+
+      if (!isPaid) {
+        await billingStorage.updatePendingOrderStatus(orderId, userId, 'failed');
+        return res.status(400).json({ message: "Payment not completed" });
+      }
+
+      // Check if user already has an active Train Me purchase
+      // Due to unique constraint, we need to extend existing purchase instead of creating new one
+      const existingPurchase = await billingStorage.getActiveAddonPurchase(userId, 'train_me');
+      
+      let purchase: AddonPurchase;
+      const startDate = new Date();
+      const endDate = pkg.validityDays ? calculateEndDate(startDate, pkg.validityDays) : calculateEndDate(startDate, 30); // Default 30 days
+
+      if (existingPurchase) {
+        // Extend existing purchase
+        const existingEndDate = existingPurchase.endDate;
+        const finalEndDate = existingEndDate && endDate 
+          ? (existingEndDate > endDate ? existingEndDate : endDate)
+          : (endDate || existingEndDate);
+
+        // Update metadata to include this purchase
+        const existingMetadata = (existingPurchase.metadata as any) || {};
+        const purchaseHistory = Array.isArray(existingMetadata.purchaseHistory) 
+          ? existingMetadata.purchaseHistory 
+          : [];
+        
+        purchaseHistory.push({
+          orderId: pendingOrder.id,
+          packageSku: pendingOrder.packageSku,
+          packageName: pkg.name,
+          amount: pendingOrder.amount,
+          currency: pendingOrder.currency,
+          gatewayOrderId: gatewayOrderId,
+          paymentId: verifiedPaymentId,
+          gatewayProvider: pendingOrder.gatewayProvider,
+          purchasedAt: startDate.toISOString(),
+        });
+
+        // Update the purchase
+        purchase = await db
+          .update(addonPurchases)
+          .set({
+            endDate: finalEndDate,
+            updatedAt: new Date(),
+            metadata: {
+              ...existingMetadata,
+              purchaseHistory,
+              lastPurchaseOrderId: pendingOrder.id,
+              lastPurchaseDate: startDate.toISOString(),
+            },
+          })
+          .where(eq(addonPurchases.id, existingPurchase.id))
+          .returning()
+          .then((result: AddonPurchase[]) => result[0]);
+
+        console.log(`[Train Me] Extended existing purchase. New end date: ${finalEndDate}`);
+      } else {
+        // Create new purchase
+        try {
+          purchase = await billingStorage.createAddonPurchase({
+            userId,
+            addonType: 'train_me',
+            packageSku: pendingOrder.packageSku,
+            billingType: 'one_time',
+            purchaseAmount: pendingOrder.amount,
+            currency: pendingOrder.currency,
+            totalUnits: 0, // Train Me doesn't use units
+            usedUnits: 0,
+            status: 'active',
+            startDate,
+            endDate,
+            gatewayTransactionId: null,
+            metadata: {
+              packageName: pkg.name,
+              gatewayOrderId: gatewayOrderId,
+              paymentId: verifiedPaymentId,
+              gatewayProvider: pendingOrder.gatewayProvider,
+              pendingOrderId: pendingOrder.id,
+              purchaseHistory: [{
+                orderId: pendingOrder.id,
+                packageSku: pendingOrder.packageSku,
+                packageName: pkg.name,
+                amount: pendingOrder.amount,
+                currency: pendingOrder.currency,
+                gatewayOrderId: gatewayOrderId,
+                paymentId: verifiedPaymentId,
+                gatewayProvider: pendingOrder.gatewayProvider,
+                purchasedAt: startDate.toISOString(),
+              }],
+            },
+          });
+          
+          console.log(`[Train Me] Created new purchase`);
+        } catch (error: any) {
+          // Handle race condition
+          if (error?.code === '23505' && error?.constraint === 'unique_active_addon_per_user') {
+            console.log(`[Train Me] Race condition detected - another purchase was created. Retrying with update...`);
+            
+            const retryExistingPurchase = await billingStorage.getActiveAddonPurchase(userId, 'train_me');
+            
+            if (retryExistingPurchase) {
+              const existingEndDate = retryExistingPurchase.endDate;
+              const finalEndDate = existingEndDate && endDate 
+                ? (existingEndDate > endDate ? existingEndDate : endDate)
+                : (endDate || existingEndDate);
+
+              const existingMetadata = (retryExistingPurchase.metadata as any) || {};
+              const purchaseHistory = Array.isArray(existingMetadata.purchaseHistory) 
+                ? existingMetadata.purchaseHistory 
+                : [];
+            
+              purchaseHistory.push({
+                orderId: pendingOrder.id,
+                packageSku: pendingOrder.packageSku,
+                packageName: pkg.name,
+                amount: pendingOrder.amount,
+                currency: pendingOrder.currency,
+                gatewayOrderId: gatewayOrderId,
+                paymentId: verifiedPaymentId,
+                gatewayProvider: pendingOrder.gatewayProvider,
+                purchasedAt: startDate.toISOString(),
+              });
+
+              purchase = await db
+                .update(addonPurchases)
+                .set({
+                  endDate: finalEndDate,
+                  updatedAt: new Date(),
+                  metadata: {
+                    ...existingMetadata,
+                    purchaseHistory,
+                    lastPurchaseOrderId: pendingOrder.id,
+                    lastPurchaseDate: startDate.toISOString(),
+                  },
+                })
+                .where(eq(addonPurchases.id, retryExistingPurchase.id))
+                .returning()
+                .then((result: AddonPurchase[]) => result[0]);
+
+              console.log(`[Train Me] Extended existing purchase (race condition recovery). New end date: ${finalEndDate}`);
+            } else {
+              throw error;
+            }
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      // Mark pending order as completed
+      await billingStorage.updatePendingOrderStatus(orderId, userId, 'completed', new Date());
+
+      // Refresh user entitlements
+      await billingStorage.refreshUserEntitlements(userId);
+
+      res.json({
+        success: true,
+        purchase,
+        message: "Train Me activated successfully",
+      });
+    } catch (error: any) {
+      console.error("Verify Train Me payment error:", error);
+      res.status(500).json({ message: error.message || "Failed to verify payment" });
+    }
+  });
+
+  // Get all available packages (Platform Access + Published Add-ons)
+  app.get("/api/billing/packages", async (req: Request, res: Response) => {
+    try {
+      // Get published subscription plans and add-ons from database
+      const publishedPlans = await billingStorage.getPublishedSubscriptionPlans();
+      const publishedAddons = await billingStorage.getPublishedAddons();
+      
+      // Transform database subscription plans to frontend format
+      const platformAccess = publishedPlans.map(plan => {
+        // Map billingInterval to billingType enum
+        let billingType: 'one_time' | 'monthly' | '6_months' | '12_months' | '36_months' = 'monthly';
+        const interval = plan.billingInterval.toLowerCase();
+        
+        if (interval.includes('month') && !interval.includes('6') && !interval.includes('12') && !interval.includes('36')) {
+          billingType = 'monthly';
+        } else if (interval.includes('6')) {
+          billingType = '6_months';
+        } else if (interval.includes('12') || interval.includes('annual') || interval.includes('year') && !interval.includes('3')) {
+          billingType = '12_months';
+        } else if (interval.includes('36') || interval.includes('3')) {
+          billingType = '36_months';
+        }
+
+        // Extract features array
+        const features = Array.isArray(plan.features) ? plan.features as string[] : [];
+        
+        // Generate description from first feature or use a default
+        const description = features.length > 0 
+          ? features.join(', ')
+          : `${plan.name} subscription`;
+
+        // Calculate validity days from billing type
+        const validityDaysMap: Record<string, number> = {
+          'monthly': 30,
+          '6_months': 180,
+          '12_months': 365,
+          '36_months': 1095,
+        };
+
+        return {
+          sku: plan.id,
+          name: plan.name,
+          price: parseFloat(plan.price),
+          listedPrice: plan.listedPrice ? parseFloat(plan.listedPrice) : null,
+          currency: plan.currency,
+          billingType,
+          validityDays: validityDaysMap[billingType] || 30,
+          description,
+          features,
+        };
+      });
+      
+      res.json({
+        platformAccess,
+        addons: publishedAddons,
+      });
+    } catch (error) {
+      console.error("Get packages error:", error);
+      res.status(500).json({ message: "Failed to get packages" });
+    }
+  });
+
+  // Get package by SKU
+  app.get("/api/billing/packages/:sku", (req: Request, res: Response) => {
+    try {
+      const { sku } = req.params;
+      const pkg = getPackageBySku(sku);
+
+      if (!pkg) {
+        return res.status(404).json({ message: "Package not found" });
+      }
+
+      res.json(pkg);
+    } catch (error) {
+      console.error("Get package error:", error);
+      res.status(500).json({ message: "Failed to get package" });
+    }
+  });
+
+  // ========================================
+  // PLATFORM ACCESS SUBSCRIPTIONS
+  // ========================================
+
+  // Purchase platform access subscription (SECURE: Pending Orders Flow)
+  app.post("/api/billing/platform-access/purchase", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const validation = purchasePlatformAccessSchema.safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid request", errors: validation.error.errors });
+      }
+
+      const { packageSku, paymentGateway } = validation.data;
+      const pkg = getPackageBySku(packageSku);
+
+      if (!pkg || !packageSku.startsWith('RW-PA-')) {
+        return res.status(400).json({ message: "Invalid platform access package" });
+      }
+
+      // Check if user already has an active platform access subscription
+      const existingSubscription = await billingStorage.getActiveAddonPurchase(userId, 'platform_access');
+      if (existingSubscription) {
+        return res.status(400).json({ message: "You already have an active platform access subscription" });
+      }
+
+      // SECURITY FIX: Create pending order FIRST (single source of truth)
+      const pendingOrder = await billingStorage.createPendingOrder({
+        userId,
+        packageSku,
+        addonType: 'platform_access',
+        amount: pkg.price.toString(),
+        currency: pkg.currency,
+        gatewayOrderId: '', // Will be updated after gateway order creation
+        gatewayProvider: paymentGateway,
+        status: 'pending',
+        metadata: {
+          packageName: pkg.name,
+          packageDuration: pkg.validityDays,
+        },
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes expiry
+      });
+
+      // Create payment gateway order
+      const gateway = PaymentGatewayFactory.getGateway(paymentGateway);
+      const baseUrl = getBaseUrl(req);
+      const order = await gateway.createOrder({
+        amount: pkg.price,
+        currency: pkg.currency,
+        receipt: `PA-${pendingOrder.id.substring(0, 32)}`,
+        metadata: {
+          userId,
+          packageSku,
+          addonType: 'platform_access',
+          pendingOrderId: pendingOrder.id,
+          returnUrl: `${baseUrl}/payment/success?orderId=${pendingOrder.id}`,
+          notifyUrl: `${baseUrl}/api/billing/webhook`,
+        },
+      });
+
+      // Update pending order with gateway order ID
+      await billingStorage.updatePendingOrderGatewayId(pendingOrder.id, order.providerOrderId);
+
+      // Log gateway transaction
+      const gatewayProvider = await billingStorage.getGatewayProviderByName(gateway.getProviderName());
+      if (gatewayProvider) {
+        await billingStorage.createGatewayTransaction({
+          providerId: gatewayProvider.id,
+          providerTransactionId: order.providerOrderId,
+          transactionType: 'order',
+          status: order.status,
+          amount: pkg.price.toString(),
+          currency: pkg.currency,
+          userId,
+          relatedEntity: 'pending_order',
+          payload: order.metadata,
+          metadata: { packageSku, pendingOrderId: pendingOrder.id },
+        });
+      }
+
+      res.json({
+        order,
+        package: pkg,
+        pendingOrderId: pendingOrder.id,
+        keyId: paymentGateway === 'razorpay' ? getRazorpayKeyId() : undefined,
+        amount: paymentGateway === 'razorpay' ? order.amount : pkg.price,
+        currency: pkg.currency,
+        orderId: order.providerOrderId,
+      });
+    } catch (error: any) {
+      console.error("Purchase platform access error:", error);
+      res.status(500).json({ message: error.message || "Failed to create purchase order" });
+    }
+  });
+
+  // Verify and complete platform access purchase (SECURE: Validates pending order metadata)
+  app.post("/api/billing/platform-access/verify", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const { orderId, cfPaymentId } = req.body;
+
+      if (!orderId) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // SECURITY FIX: Retrieve and validate pending order (single source of truth)
+      const pendingOrder = await billingStorage.getPendingOrder(orderId);
+
+      if (!pendingOrder) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Validate order belongs to user
+      if (pendingOrder.userId !== userId) {
+        console.error(`Security: User ${userId} attempted to complete order belonging to ${pendingOrder.userId}`);
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Validate order is still pending
+      if (pendingOrder.status !== 'pending') {
+        return res.status(400).json({ message: `Order already ${pendingOrder.status}` });
+      }
+
+      // Validate order not expired
+      if (new Date() > new Date(pendingOrder.expiresAt)) {
+        await billingStorage.updatePendingOrderStatus(orderId, userId, 'expired');
+        return res.status(400).json({ message: "Order has expired" });
+      }
+
+      // Validate addon type matches
+      if (pendingOrder.addonType !== 'platform_access') {
+        console.error(`Security: Addon type mismatch. Expected platform_access, got ${pendingOrder.addonType}`);
+        return res.status(400).json({ message: "Invalid addon type" });
+      }
+
+      // Get package from stored SKU (use pending order data, not client-supplied)
+      const pkg = getPackageBySku(pendingOrder.packageSku);
+      if (!pkg) {
+        return res.status(400).json({ message: "Invalid package in pending order" });
+      }
+
+      // Validate amount matches stored order
+      if (pkg.price.toString() !== pendingOrder.amount) {
+        console.error(`Security: Amount mismatch. Expected ${pendingOrder.amount}, package has ${pkg.price}`);
+        return res.status(400).json({ message: "Amount mismatch" });
+      }
+
+      // Verify payment status with gateway (API-based or signature-based)
+      const gateway = PaymentGatewayFactory.getGateway(pendingOrder.gatewayProvider as PaymentGatewayProvider);
+      const gatewayOrderId = pendingOrder.gatewayOrderId;
+      
+      if (!gatewayOrderId) {
+        return res.status(400).json({ message: "Gateway order ID not found" });
+      }
+
+      let isPaid = false;
+      let paymentId = cfPaymentId;
+
+      if (pendingOrder.gatewayProvider === 'razorpay') {
+        const { razorpayPaymentId, razorpaySignature } = req.body;
+        if (!razorpayPaymentId || !razorpaySignature) {
+          return res.status(400).json({ message: "Missing Razorpay verification data" });
+        }
+        
+        // Step 1: Verify signature using HMAC with stored gateway order ID
+        const signatureValid = gateway.verifyPaymentSignature(gatewayOrderId, razorpayPaymentId, razorpaySignature);
+        console.log(`Razorpay signature verification for order ${gatewayOrderId}: ${signatureValid}`);
+        
+        if (!signatureValid) {
+          return res.status(400).json({ message: "Invalid payment signature" });
+        }
+        
+        // Step 2: Double-check payment status from Razorpay API
+        const paymentStatus = await gateway.getPaymentStatus(razorpayPaymentId);
+        console.log(`Razorpay payment status for ${razorpayPaymentId}:`, paymentStatus.status);
+        
+        isPaid = paymentStatus.status === 'captured' || paymentStatus.status === 'authorized';
+        paymentId = razorpayPaymentId;
+      } else {
+        // Cashfree uses API-based verification
+        const paymentStatus = await gateway.getPaymentStatus(gatewayOrderId);
+        isPaid = paymentStatus.status === 'PAID' || 
+                 paymentStatus.status === 'SUCCESS' || 
+                 paymentStatus.status === 'captured';
+        paymentId = cfPaymentId || paymentStatus.metadata?.cf_payment_id;
+      }
+
+      if (!isPaid) {
+        await billingStorage.updatePendingOrderStatus(orderId, userId, 'failed');
+        return res.status(400).json({ message: "Payment not completed" });
+      }
+
+      // Create addon purchase using validated pending order data
+      const startDate = new Date();
+      const endDate = pkg.validityDays ? calculateEndDate(startDate, pkg.validityDays) : null;
+
+      const purchase = await billingStorage.createAddonPurchase({
+        userId,
+        addonType: 'platform_access',
+        packageSku: pendingOrder.packageSku, // Use stored SKU
+        billingType: pkg.billingType,
+        status: 'active',
+        purchaseAmount: pendingOrder.amount, // Use stored amount
+        currency: pendingOrder.currency, // Use stored currency
+        startDate,
+        endDate,
+        totalUnits: 0, // Platform access doesn't have units
+        autoRenew: false,
+        metadata: {
+          gatewayOrderId: gatewayOrderId,
+          paymentId: paymentId,
+          pendingOrderId: pendingOrder.id,
+          gateway: pendingOrder.gatewayProvider,
+        },
+      });
+
+      // Mark pending order as completed
+      await billingStorage.updatePendingOrderStatus(orderId, userId, 'completed', new Date());
+
+      // Refresh user entitlements
+      await billingStorage.refreshUserEntitlements(userId);
+
+      res.json({
+        success: true,
+        purchase,
+        message: "Platform access activated successfully",
+      });
+    } catch (error: any) {
+      console.error("Verify platform access error:", error);
+      res.status(500).json({ message: error.message || "Failed to verify purchase" });
+    }
+  });
+
+  // Get current platform access status
+  app.get("/api/billing/platform-access/status", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const activeSub = await billingStorage.getActiveAddonPurchase(userId, 'platform_access');
+
+      if (!activeSub) {
+        return res.json({
+          hasAccess: false,
+          subscription: null,
+        });
+      }
+
+      res.json({
+        hasAccess: true,
+        subscription: activeSub,
+      });
+    } catch (error) {
+      console.error("Get platform access status error:", error);
+      res.status(500).json({ message: "Failed to get platform access status" });
+    }
+  });
+
+  // ========================================
+  // USER ENTITLEMENTS
+  // ========================================
+
+  // Get user entitlements (cached)
+  app.get("/api/billing/entitlements", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      let entitlements = await billingStorage.getUserEntitlements(userId);
+
+      // If no cached entitlements, calculate and cache them
+      if (!entitlements) {
+        entitlements = await billingStorage.refreshUserEntitlements(userId);
+      }
+
+      res.json(entitlements);
+    } catch (error) {
+      console.error("Get entitlements error:", error);
+      res.status(500).json({ message: "Failed to get entitlements" });
+    }
+  });
+
+  // Refresh user entitlements (force recalculation)
+  app.post("/api/billing/entitlements/refresh", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const entitlements = await billingStorage.refreshUserEntitlements(userId);
+
+      res.json(entitlements);
+    } catch (error) {
+      console.error("Refresh entitlements error:", error);
+      res.status(500).json({ message: "Failed to refresh entitlements" });
+    }
+  });
+
+  // ========================================
+  // USER PURCHASE HISTORY
+  // ========================================
+
+  // Get user's purchase history
+  app.get("/api/billing/purchases", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const { addonType } = req.query;
+
+      const purchases = await billingStorage.getUserAddonPurchases(userId, addonType as string);
+
+      res.json({ purchases });
+    } catch (error) {
+      console.error("Get purchases error:", error);
+      res.status(500).json({ message: "Failed to get purchase history" });
+    }
+  });
+
+
+  // ========================================
+  // SHOPPING CART (Multi-Item Checkout)
+  // ========================================
+
+  // Check if item is available for purchase
+  app.get("/api/cart/check-availability/:packageSku", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const { packageSku } = req.params;
+
+      const pkg = await getPackageOrAddonBySku(packageSku);
+      if (!pkg) {
+        return res.status(404).json({ message: "Package not found" });
+      }
+
+      const addonType = await getAddonTypeFromSku(packageSku);
+      if (!addonType) {
+        return res.status(400).json({ message: "Invalid package SKU" });
+      }
+
+      const availability = await billingStorage.checkItemAvailability(userId, packageSku, addonType);
+
+      res.json({
+        packageSku,
+        packageName: pkg.name,
+        available: availability.available,
+        reason: availability.reason,
+      });
+    } catch (error) {
+      console.error("Check availability error:", error);
+      res.status(500).json({ message: "Failed to check availability" });
+    }
+  });
+
+  // Add item to cart
+  app.post("/api/cart/add", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const validation = z.object({
+        packageSku: z.string(),
+        quantity: z.number().int().positive().default(1),
+        purchaseMode: z.enum(['user', 'team']).default('user'),
+        teamManagerName: z.string().optional(),
+        teamManagerEmail: z.string().email().optional(),
+        companyName: z.string().optional(),
+      }).safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid request", errors: validation.error.errors });
+      }
+
+      const { packageSku, quantity, purchaseMode, teamManagerName, teamManagerEmail, companyName } = validation.data;
+
+      // Validate team mode requires manager info and company name
+      if (purchaseMode === 'team' && (!teamManagerName || !teamManagerEmail)) {
+        return res.status(400).json({ message: "Team mode requires License Manager name and email" });
+      }
+      
+      if (purchaseMode === 'team' && !companyName) {
+        return res.status(400).json({ message: "Team mode requires company name" });
+      }
+
+      // Get package details
+      const pkg = await getPackageOrAddonBySku(packageSku);
+      if (!pkg) {
+        return res.status(404).json({ message: "Package not found" });
+      }
+
+      const addonType = await getAddonTypeFromSku(packageSku);
+      if (!addonType) {
+        return res.status(400).json({ message: "Invalid package SKU" });
+      }
+
+      // Validate quantity for non-stackable subscriptions (only in user mode)
+      // Team mode allows multiple platform access licenses for bulk purchases
+      if (addonType === 'platform_access' && quantity > 1 && purchaseMode !== 'team') {
+        return res.status(400).json({ message: "Cannot add multiple units of subscription plans. Quantity must be 1." });
+      }
+
+      // Check availability
+      const availability = await billingStorage.checkItemAvailability(userId, packageSku, addonType);
+      if (!availability.available) {
+        return res.status(400).json({ message: availability.reason || "Item not available" });
+      }
+
+      // Check if item already exists in cart
+      const existingCartItems = await billingStorage.getCartItems(userId);
+      const existingItem = existingCartItems.find(item => item.packageSku === packageSku);
+
+      if (existingItem) {
+        return res.status(400).json({ message: "Item already in cart" });
+      }
+
+      // Add to cart
+      const cartItem = await billingStorage.addToCart({
+        userId,
+        packageSku,
+        addonType,
+        packageName: pkg.name,
+        basePrice: pkg.price.toString(),
+        currency: pkg.currency,
+        quantity,
+        purchaseMode: purchaseMode,
+        teamManagerName: purchaseMode === 'team' ? teamManagerName : undefined,
+        teamManagerEmail: purchaseMode === 'team' ? teamManagerEmail : undefined,
+        companyName: purchaseMode === 'team' ? companyName : undefined,
+        metadata: {
+          validityDays: pkg.validityDays,
+          totalUnits: pkg.totalUnits,
+        },
+      });
+
+      res.json({ cartItem, message: "Item added to cart" });
+    } catch (error: any) {
+      console.error("Add to cart error:", error);
+      if (error.code === '23505') { // Unique constraint violation
+        return res.status(400).json({ message: "Item already in cart" });
+      }
+      res.status(500).json({ message: "Failed to add item to cart" });
+    }
+  });
+
+  // Remove item from cart
+  app.delete("/api/cart/remove/:cartItemId", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const { cartItemId } = req.params;
+
+      await billingStorage.removeFromCart(userId, cartItemId);
+
+      res.json({ message: "Item removed from cart" });
+    } catch (error) {
+      console.error("Remove from cart error:", error);
+      res.status(500).json({ message: "Failed to remove item from cart" });
+    }
+  });
+
+  // Get cart items with total calculation
+  app.get("/api/cart", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+
+      const cartTotal = await billingStorage.calculateCartTotal(userId);
+
+      res.json(cartTotal);
+    } catch (error) {
+      console.error("Get cart error:", error);
+      res.status(500).json({ message: "Failed to get cart" });
+    }
+  });
+
+  // Clear entire cart
+  app.delete("/api/cart/clear", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+
+      await billingStorage.clearCart(userId);
+
+      res.json({ message: "Cart cleared" });
+    } catch (error) {
+      console.error("Clear cart error:", error);
+      res.status(500).json({ message: "Failed to clear cart" });
+    }
+  });
+
+  // Apply promo code to cart item
+  app.post("/api/cart/items/:cartItemId/promo", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const { cartItemId } = req.params;
+      const validation = z.object({
+        promoCode: z.string().min(1, "Promo code is required"),
+      }).safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid request", errors: validation.error.errors });
+      }
+
+      const { promoCode } = validation.data;
+
+      const result = await billingStorage.applyPromoCodeToCartItem(userId, cartItemId, promoCode);
+
+      if (!result.success) {
+        return res.status(400).json({ message: result.message });
+      }
+
+      res.json({ message: result.message, cartItem: result.cartItem });
+    } catch (error) {
+      console.error("Apply promo code error:", error);
+      res.status(500).json({ message: "Failed to apply promo code" });
+    }
+  });
+
+  // Remove promo code from cart item
+  app.delete("/api/cart/items/:cartItemId/promo", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const { cartItemId } = req.params;
+
+      const result = await billingStorage.removePromoCodeFromCartItem(userId, cartItemId);
+
+      if (!result.success) {
+        return res.status(400).json({ message: result.message });
+      }
+
+      res.json({ message: result.message });
+    } catch (error) {
+      console.error("Remove promo code error:", error);
+      res.status(500).json({ message: "Failed to remove promo code" });
+    }
+  });
+
+  // Multi-item checkout (create single payment order for entire cart)
+  app.post("/api/cart/checkout", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const validation = z.object({
+        paymentGateway: z.enum(['cashfree', 'stripe', 'razorpay']).optional(),
+      }).safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid request", errors: validation.error.errors });
+      }
+
+      const { paymentGateway: requestedGateway } = validation.data;
+      
+      // Use requested gateway or fall back to configured default
+      const { DEFAULT_PAYMENT_GATEWAY } = await import("./config/payment.config");
+      const paymentGateway = requestedGateway || DEFAULT_PAYMENT_GATEWAY;
+      
+      if (paymentGateway === 'stripe') {
+        return res.status(400).json({ message: "Stripe is not supported yet" });
+      }
+
+      // Get user info for payment gateway customer details
+      const user = await authStorage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Get cart total (per-item promo codes already applied)
+      const cartTotal = await billingStorage.calculateCartTotal(userId);
+
+      if (cartTotal.items.length === 0) {
+        return res.status(400).json({ message: "Cart is empty" });
+      }
+
+      // Keep all payments in USD - no currency conversion
+      let finalCurrency = cartTotal.currency;
+      let conversionRate = 1;
+      let finalAmount = Math.round(cartTotal.total * 100) / 100; // Round to 2 decimal places
+
+      // Minimum transaction amount adjustment
+      const MINIMUM_USD_AMOUNT = 1.00;
+      const MINIMUM_INR_AMOUNT = 1.00;
+      let roundoffAmount = 0;
+      
+      if (finalCurrency === 'USD' && finalAmount < MINIMUM_USD_AMOUNT) {
+        roundoffAmount = Math.round((MINIMUM_USD_AMOUNT - finalAmount) * 100) / 100;
+        finalAmount = MINIMUM_USD_AMOUNT;
+      } else if (finalCurrency === 'INR' && finalAmount < MINIMUM_INR_AMOUNT) {
+        roundoffAmount = Math.round((MINIMUM_INR_AMOUNT - finalAmount) * 100) / 100;
+        finalAmount = MINIMUM_INR_AMOUNT;
+      }
+
+      // Verify all items are still available
+      for (const item of cartTotal.items) {
+        const availability = await billingStorage.checkItemAvailability(userId, item.packageSku, item.addonType);
+        if (!availability.available) {
+          return res.status(400).json({ 
+            message: `Item "${item.packageName}" is no longer available`, 
+            reason: availability.reason 
+          });
+        }
+      }
+
+      // Validate team purchase rules if any item has purchaseMode: 'team'
+      // Note: purchaseMode, teamManagerName, teamManagerEmail are top-level cart item fields
+      const teamItems = cartTotal.items.filter(item => item.purchaseMode === 'team');
+      if (teamItems.length > 0) {
+        // Get team manager info from first team item
+        const teamItem = teamItems[0];
+        const teamManagerName = teamItem.teamManagerName;
+        const teamManagerEmail = teamItem.teamManagerEmail;
+        
+        if (!teamManagerName || !teamManagerEmail) {
+          return res.status(400).json({ 
+            message: "Team purchases require License Manager name and email" 
+          });
+        }
+
+        // Calculate quantities by type
+        const platformAccessQty = cartTotal.items
+          .filter(item => item.addonType === 'platform_access')
+          .reduce((sum, item) => sum + (item.quantity || 1), 0);
+        
+        const sessionMinutesQty = cartTotal.items
+          .filter(item => item.addonType === 'session_minutes')
+          .reduce((sum, item) => sum + (item.quantity || 1), 0);
+        
+        const daiQty = cartTotal.items
+          .filter(item => item.addonType === 'dai')
+          .reduce((sum, item) => sum + (item.quantity || 1), 0);
+        
+        const trainMeQty = cartTotal.items
+          .filter(item => item.addonType === 'train_me')
+          .reduce((sum, item) => sum + (item.quantity || 1), 0);
+
+        // Team mode rule: Platform Access quantity must equal Session Minutes quantity
+        if (platformAccessQty > 0 && sessionMinutesQty > 0 && platformAccessQty !== sessionMinutesQty) {
+          return res.status(400).json({ 
+            message: `Team purchases require Session Minutes quantity (${sessionMinutesQty}) to equal Platform Access quantity (${platformAccessQty})` 
+          });
+        }
+
+        // Team mode rule: DAI/Train Me quantities cannot exceed Platform Access count
+        if (daiQty > platformAccessQty) {
+          return res.status(400).json({ 
+            message: `DAI quantity (${daiQty}) cannot exceed Platform Access quantity (${platformAccessQty})` 
+          });
+        }
+
+        if (trainMeQty > platformAccessQty) {
+          return res.status(400).json({ 
+            message: `Train Me quantity (${trainMeQty}) cannot exceed Platform Access quantity (${platformAccessQty})` 
+          });
+        }
+      }
+
+      // Create a pending order for the cart total (with roundoff if applicable)
+      const pendingOrder = await billingStorage.createPendingOrder({
+        userId,
+        packageSku: 'CART-MULTI-ITEM', // Special SKU for multi-item orders
+        addonType: 'cart_checkout',
+        amount: finalAmount.toFixed(2),
+        currency: finalCurrency,
+        gatewayOrderId: '',
+        gatewayProvider: paymentGateway,
+        status: 'pending',
+        metadata: {
+          itemCount: cartTotal.items.length,
+          items: cartTotal.items.map(item => ({
+            packageSku: item.packageSku,
+            packageName: item.packageName,
+            addonType: item.addonType,
+            basePrice: item.basePrice,
+            currency: item.currency,
+            quantity: item.quantity,
+            metadata: item.metadata,
+            purchaseMode: item.purchaseMode,
+            teamManagerName: item.teamManagerName,
+            teamManagerEmail: item.teamManagerEmail,
+            companyName: item.companyName,
+          })),
+          subtotal: cartTotal.subtotal,
+          gstAmount: cartTotal.gstAmount,
+          discount: cartTotal.discount,
+          total: cartTotal.total,
+          roundoffAmount: roundoffAmount,
+          finalAmount: finalAmount,
+          originalCurrency: cartTotal.currency,
+          finalCurrency: finalCurrency,
+          conversionRate: conversionRate !== 1 ? conversionRate : undefined,
+          perItemPromoCodes: cartTotal.items.map(item => ({
+            cartItemId: item.id,
+            promoCodeId: item.promoCodeId,
+            promoCodeCode: item.promoCodeCode,
+            appliedDiscountAmount: item.appliedDiscountAmount,
+          })),
+        },
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes expiry
+      });
+
+      // Create payment gateway order for final amount (with roundoff adjustment if needed)
+      const gateway = PaymentGatewayFactory.getGateway(paymentGateway);
+      const baseUrl = getBaseUrl(req);
+      const returnUrl = `${baseUrl}/payment/success?orderId=${pendingOrder.id}`;
+      const notifyUrl = `${baseUrl}/api/billing/webhook`;
+      
+      // Determine Cashfree mode for logging and client-side matching
+      // Match the logic in PaymentGatewayFactory for consistency
+      const isLocalhost = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
+      let isCashfreeSandbox = false;
+      if (paymentGateway === 'cashfree') {
+        if (process.env.CASHFREE_ENVIRONMENT === 'SANDBOX') {
+          isCashfreeSandbox = true;
+        } else if (process.env.CASHFREE_ENVIRONMENT === 'PRODUCTION') {
+          isCashfreeSandbox = false;
+        } else {
+          // Auto-detect: Use SANDBOX for localhost/development
+          isCashfreeSandbox = !process.env.APP_URL || 
+            process.env.APP_URL.includes('localhost') || 
+            process.env.APP_URL.includes('127.0.0.1') ||
+            process.env.NODE_ENV === 'development';
+        }
+      }
+      
+      // Debug: Log URLs and mode
+      console.log(`[Checkout] Base URL: ${baseUrl}`);
+      console.log(`[Checkout] Return URL: ${returnUrl}`);
+      console.log(`[Checkout] Notify URL: ${notifyUrl}`);
+      console.log(`[Checkout] Payment Gateway: ${paymentGateway}`);
+      let cashfreeMode: string | undefined;
+      if (paymentGateway === 'cashfree') {
+        cashfreeMode = isCashfreeSandbox ? 'sandbox' : 'production';
+        console.log(`[Checkout] Cashfree Mode: ${cashfreeMode.toUpperCase()}`);
+      }
+      
+      // Validate URLs for Cashfree
+      // Production mode requires HTTPS, but sandbox mode may allow HTTP for localhost
+      if (paymentGateway === 'cashfree') {
+        if (!isCashfreeSandbox && (!returnUrl.startsWith('https://') || !notifyUrl.startsWith('https://'))) {
+          throw new Error(`Cashfree PRODUCTION mode requires HTTPS URLs. Return URL: ${returnUrl}, Notify URL: ${notifyUrl}. ` +
+            `For localhost development, set CASHFREE_ENVIRONMENT=SANDBOX in .env, or set APP_URL to your public HTTPS URL.`);
+        }
+      }
+      
+      // For team purchases, use team manager's details; otherwise use logged-in user's details
+      let customerName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email?.split('@')[0] || 'Customer';
+      let customerEmail = user.email || 'customer@example.com';
+      let customerPhone = user.mobile || '';
+      
+      if (teamItems.length > 0) {
+        const teamItem = teamItems[0];
+        customerName = teamItem.teamManagerName || customerName;
+        customerEmail = teamItem.teamManagerEmail || customerEmail;
+        console.log(`[Team Payment] Using team manager details: ${customerName} (${customerEmail})`);
+      }
+      
+      // Ensure customerEmail is valid (required by payment gateways)
+      if (!customerEmail || customerEmail.trim() === '') {
+        customerEmail = 'customer@example.com';
+        console.warn(`[Payment] No customer email provided, using default: ${customerEmail}`);
+      }
+      
+      const order = await gateway.createOrder({
+        amount: finalAmount,
+        currency: finalCurrency,
+        receipt: `CT-${pendingOrder.id.substring(0, 35)}`,
+        metadata: {
+          userId,
+          pendingOrderId: pendingOrder.id,
+          itemCount: cartTotal.items.length,
+          checkoutType: 'cart',
+          roundoffAmount: roundoffAmount,
+          returnUrl: returnUrl,
+          notifyUrl: notifyUrl,
+        },
+        customerName: customerName,
+        customerEmail: customerEmail,
+        customerPhone: customerPhone || '9999999999',
+      });
+
+      // Update pending order with gateway order ID
+      await billingStorage.updatePendingOrderGatewayId(pendingOrder.id, order.providerOrderId);
+
+      // Log gateway transaction
+      const gatewayProvider = await billingStorage.getGatewayProviderByName(gateway.getProviderName());
+      if (gatewayProvider) {
+        await billingStorage.createGatewayTransaction({
+          providerId: gatewayProvider.id,
+          providerTransactionId: order.providerOrderId,
+          transactionType: 'order',
+          status: order.status,
+          amount: finalAmount.toFixed(2),
+          currency: finalCurrency,
+          metadata: {
+            checkoutType: 'cart',
+            itemCount: cartTotal.items.length,
+            roundoffAmount: roundoffAmount,
+            originalCurrency: cartTotal.currency,
+            conversionRate: conversionRate !== 1 ? conversionRate : undefined,
+          },
+          userId,
+        });
+      }
+
+      const responsePayload = {
+        orderId: pendingOrder.id, // Use Rev Winner order ID for verification
+        paymentSessionId: order.paymentSessionId,
+        gatewayOrderId: order.providerOrderId, // Gateway-specific order ID (Cashfree/Razorpay)
+        amount: finalAmount,
+        currency: finalCurrency,
+        gateway: paymentGateway,
+        // Razorpay-specific: include key ID for frontend SDK
+        keyId: paymentGateway === 'razorpay' ? getRazorpayKeyId() : undefined,
+        // Cashfree-specific: include mode so client can match it
+        cashfreeMode: cashfreeMode,
+        breakdown: {
+          subtotal: cartTotal.subtotal,
+          gstAmount: cartTotal.gstAmount,
+          gstRate: '18%',
+          discount: cartTotal.discount,
+          roundoffAmount: roundoffAmount,
+          total: cartTotal.total,
+          finalAmount: finalAmount,
+          originalCurrency: cartTotal.currency,
+          finalCurrency: finalCurrency,
+          conversionRate: conversionRate !== 1 ? conversionRate : undefined,
+        },
+        items: cartTotal.items,
+        gatewayDetails: order,
+      };
+      
+      console.log(`Cart checkout response - amount: ${finalAmount} ${finalCurrency} roundoff: ${roundoffAmount}`);
+      console.log(`${paymentGateway} order details:`, order);
+      
+      // Validate payment session ID exists before sending response
+      if (!order.paymentSessionId && paymentGateway === 'cashfree') {
+        console.error(`[Checkout] Missing paymentSessionId for Cashfree order:`, order);
+        throw new Error("Payment session ID missing from Cashfree order. Check return_url is HTTPS.");
+      }
+      
+      res.json(responsePayload);
+    } catch (error: any) {
+      console.error("Cart checkout error:", error);
+      
+      // Provide more specific error messages
+      let statusCode = 500;
+      let errorMessage = "Failed to create checkout";
+      
+      if (error.message?.includes("not configured") || error.message?.includes("credentials not provided")) {
+        statusCode = 503; // Service Unavailable
+        errorMessage = "Payment gateway is not configured. Please contact support or try a different payment method.";
+      } else if (error.message?.includes("authentication") || error.message?.includes("Authentication failed")) {
+        statusCode = 503;
+        errorMessage = "Payment gateway authentication failed. Please contact support.";
+      } else if (error.message?.includes("currency")) {
+        statusCode = 400;
+        errorMessage = error.message; // Use the detailed currency error message
+      } else if (error.message?.includes("Cart is empty")) {
+        statusCode = 400;
+        errorMessage = "Your cart is empty";
+      } else if (error.message?.includes("no longer available")) {
+        statusCode = 400;
+        errorMessage = error.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      res.status(statusCode).json({ message: errorMessage });
+    }
+  });
+
+  // Verify cart checkout payment and activate all items
+  app.post("/api/cart/verify", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const validation = z.object({
+        orderId: z.string(), // Rev Winner pending order ID
+        cfPaymentId: z.string().optional(), // Cashfree payment ID (optional for verification)
+        // Razorpay-specific verification fields
+        razorpayPaymentId: z.string().optional(),
+        razorpaySignature: z.string().optional(),
+      }).safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid request", errors: validation.error.errors });
+      }
+
+      const { orderId, cfPaymentId, razorpayPaymentId, razorpaySignature } = validation.data;
+
+      // Get pending order using our order ID
+      const pendingOrder = await billingStorage.getPendingOrder(orderId);
+      if (!pendingOrder) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Security check: Verify user owns this order
+      if (pendingOrder.userId !== userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Check if order already completed
+      if (pendingOrder.status === 'completed') {
+        return res.status(400).json({ message: "Order already completed" });
+      }
+
+      // Get gateway
+      const gateway = PaymentGatewayFactory.getGateway(pendingOrder.gatewayProvider as PaymentGatewayProvider);
+      
+      const gatewayOrderId = pendingOrder.gatewayOrderId;
+      if (!gatewayOrderId) {
+        return res.status(400).json({ message: "Gateway order ID not found" });
+      }
+
+      console.log(`Verifying ${pendingOrder.gatewayProvider} payment for order: ${gatewayOrderId}`);
+      
+      let isPaid = false;
+      let verifiedPaymentId: string | undefined;
+
+      if (pendingOrder.gatewayProvider === 'razorpay') {
+        // Razorpay uses signature-based verification
+        if (!razorpayPaymentId || !razorpaySignature) {
+          return res.status(400).json({ message: "Missing Razorpay verification data" });
+        }
+        
+        // Step 1: Verify signature using HMAC - use the Razorpay order ID stored in pendingOrder
+        const razorpayOrderId = pendingOrder.gatewayOrderId;
+        const signatureValid = gateway.verifyPaymentSignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
+        console.log(`Razorpay signature verification for order ${razorpayOrderId}: ${signatureValid}`);
+        
+        if (!signatureValid) {
+          return res.status(400).json({ message: "Invalid payment signature" });
+        }
+        
+        // Step 2: Double-check payment status from Razorpay API
+        const paymentStatus = await gateway.getPaymentStatus(razorpayPaymentId);
+        console.log(`Razorpay payment status for ${razorpayPaymentId}:`, paymentStatus.status);
+        
+        isPaid = paymentStatus.status === 'captured' || paymentStatus.status === 'authorized';
+        verifiedPaymentId = razorpayPaymentId;
+      } else {
+        // Cashfree uses API-based verification
+        const paymentStatus = await gateway.getPaymentStatus(gatewayOrderId);
+        console.log(`${pendingOrder.gatewayProvider} payment status:`, paymentStatus);
+        
+        isPaid = paymentStatus.status === 'PAID' || 
+                 paymentStatus.status === 'SUCCESS' || 
+                 paymentStatus.status === 'captured' ||
+                 paymentStatus.status === 'authorized';
+        verifiedPaymentId = cfPaymentId || paymentStatus.paymentId;
+      }
+      
+      if (!isPaid) {
+        await billingStorage.updatePendingOrderStatus(orderId, userId, 'failed');
+        return res.status(400).json({ 
+          message: "Payment verification failed"
+        });
+      }
+
+      console.log(`[Cart Verify] Payment verified successfully for order ${orderId}, paymentId: ${verifiedPaymentId}`);
+
+      // Get user's organization ID (if they have an active enterprise license)
+      const organizationId = await authStorage.getUserOrganizationId(userId);
+      
+      // Check if payment record already exists (avoid duplicates)
+      const existingPayment = await authStorage.getPaymentByRazorpayOrderId(pendingOrder.gatewayOrderId || '');
+      
+      if (!existingPayment) {
+        // Create payment record for this cart checkout
+        // Calculate total amount from pending order (amount is stored in dollars/rupees, convert to cents/paise)
+        const totalAmount = parseFloat(pendingOrder.amount || '0');
+        const amountInCents = Math.round(totalAmount * 100); // Convert to smallest currency unit (cents/paise)
+        const currency = pendingOrder.currency || 'USD';
+        
+        // Extract payment ID from gateway
+        let razorpayPaymentId: string | undefined = verifiedPaymentId;
+        let razorpayOrderId: string | undefined = pendingOrder.gatewayOrderId;
+        
+        // Create payment record with amount in cents
+        await authStorage.createPayment({
+          userId,
+          organizationId, // Record customer type at transaction time
+          razorpayOrderId,
+          razorpayPaymentId,
+          amount: amountInCents.toString(), // Store in cents/paise (e.g., 1999 for $19.99)
+          currency,
+          status: 'succeeded',
+          paymentMethod: pendingOrder.gatewayProvider || 'razorpay', // Track payment gateway
+          metadata: {
+            type: 'cart_checkout',
+            orderId: pendingOrder.id,
+            gatewayProvider: pendingOrder.gatewayProvider,
+            items: (pendingOrder.metadata as any)?.items || [],
+            originalAmount: totalAmount, // Keep original amount for reference
+          },
+        });
+        
+        console.log(`[Cart Verify] Payment record created for order ${orderId}, amount: ${totalAmount} ${currency} (${amountInCents} ${currency === 'USD' ? 'cents' : 'paise'})`);
+      } else {
+        // Update existing payment record to succeeded if it was pending
+        if (existingPayment.status === 'pending') {
+          await authStorage.updatePayment(existingPayment.id, {
+            razorpayPaymentId: verifiedPaymentId,
+            status: 'succeeded',
+          });
+          console.log(`[Cart Verify] Payment record updated to succeeded for order ${orderId}`);
+        }
+      }
+
+      // Use the helper function to activate cart items
+      const result = await activateCartCheckout(pendingOrder, verifiedPaymentId, req);
+      
+      if (!result.success) {
+        return res.status(500).json({ message: result.message || "Failed to activate cart items" });
+      }
+
+      const activatedAddons = result.activatedAddons;
+
+      // Extract cart items for team purchase handling
+      const metadata = pendingOrder.metadata as any;
+      const cartItems = metadata?.items as Array<{
+        packageSku: string;
+        packageName: string;
+        addonType: string;
+        basePrice: string;
+        currency: string;
+        quantity: number;
+        metadata: any;
+        purchaseMode?: string;
+        teamManagerName?: string;
+        teamManagerEmail?: string;
+        companyName?: string;
+      }>;
+
+      // Handle team purchases - send License Manager invitation
+      // Note: purchaseMode, teamManagerName, teamManagerEmail are top-level cart item fields
+      let licenseManagerInvitationSent = false;
+      const teamItems = cartItems.filter(item => item.purchaseMode === 'team');
+      
+      if (teamItems.length > 0) {
+        try {
+          const { sendLicenseManagerInvitationEmail } = await import('./services/email');
+          const crypto = await import('crypto');
+          
+          // Get team manager info from the first team item (stored as top-level fields)
+          const teamItem = teamItems[0];
+          const teamManagerName = teamItem.teamManagerName as string;
+          const teamManagerEmail = teamItem.teamManagerEmail as string;
+          
+          if (teamManagerName && teamManagerEmail) {
+            // Get buyer info
+            const buyer = await authStorage.getUserById(userId);
+            const buyerName = buyer ? `${buyer.firstName || ''} ${buyer.lastName || ''}`.trim() || buyer.email : 'A Rev Winner customer';
+            
+            // Calculate purchase quantities
+            const purchaseDetails = {
+              platformAccessCount: cartItems
+                .filter(item => item.addonType === 'platform_access')
+                .reduce((sum, item) => sum + (item.quantity || 1), 0),
+              sessionMinutesCount: cartItems
+                .filter(item => item.addonType === 'session_minutes')
+                .reduce((sum, item) => sum + (item.quantity || 1), 0),
+              daiCount: cartItems
+                .filter(item => item.addonType === 'dai')
+                .reduce((sum, item) => sum + (item.quantity || 1), 0),
+              trainMeCount: cartItems
+                .filter(item => item.addonType === 'train_me')
+                .reduce((sum, item) => sum + (item.quantity || 1), 0),
+              totalAmount: pendingOrder.amount || '0',
+              buyerName,
+            };
+            
+            // Check if license manager user already exists
+            let licenseManager = await authStorage.getUserByEmail(teamManagerEmail);
+            
+            if (!licenseManager) {
+              // Create new license manager user with temporary random password
+              // The user will set their real password via the invitation email link
+              const tempPassword = crypto.randomBytes(32).toString('hex');
+              
+              // Parse name into first/last
+              const nameParts = teamManagerName.trim().split(' ');
+              const firstName = nameParts[0] || teamManagerName;
+              const lastName = nameParts.slice(1).join(' ') || '';
+              
+              // Generate a username from email
+              const username = teamManagerEmail.split('@')[0] + '_' + crypto.randomBytes(4).toString('hex');
+              
+              // createUser expects plaintext password and hashes internally
+              licenseManager = await authStorage.createUser({
+                email: teamManagerEmail,
+                username,
+                password: tempPassword,
+                firstName,
+                lastName,
+                role: 'license_manager',
+              });
+              
+              console.log(`Created License Manager user: ${licenseManager.id} (${teamManagerEmail})`);
+            } else if (licenseManager.role !== 'license_manager') {
+              // Update existing user to be a license manager
+              await authStorage.updateUser(licenseManager.id, { role: 'license_manager' });
+              console.log(`Updated user ${licenseManager.id} role to license_manager`);
+            }
+            
+            // Get company name from cart item
+            const companyName = teamItem.companyName as string || `${teamManagerName}'s Organization`;
+            
+            // Check if license manager already has an organization
+            let organization = await authStorage.getOrganizationByManagerId(licenseManager.id);
+            let isNewOrganization = false;
+            
+            if (!organization) {
+              // Create organization for the license manager
+              organization = await authStorage.createOrganization({
+                companyName,
+                billingEmail: teamManagerEmail,
+                primaryManagerId: licenseManager.id,
+                status: 'active',
+              });
+              isNewOrganization = true;
+              console.log(`Created organization: ${organization.id} (${companyName})`);
+              
+              // Create organization membership for the license manager
+              await authStorage.createOrganizationMembership({
+                organizationId: organization.id,
+                userId: licenseManager.id,
+                role: 'admin',
+                status: 'active',
+              });
+              console.log(`Added license manager to organization membership`);
+            } else {
+              // Organization exists - update company name and manager if needed
+              if (organization.companyName !== companyName || organization.primaryManagerId !== licenseManager.id) {
+                await authStorage.updateOrganization(organization.id, {
+                  companyName,
+                  primaryManagerId: licenseManager.id,
+                  billingEmail: teamManagerEmail,
+                });
+                console.log(`Updated organization: ${organization.id} (${companyName})`);
+              }
+              
+              // Check if license manager has membership for THIS organization, create if not
+              const existingMembership = await authStorage.getUserMembership(licenseManager.id);
+              if (!existingMembership || existingMembership.organizationId !== organization.id) {
+                try {
+                  await authStorage.createOrganizationMembership({
+                    organizationId: organization.id,
+                    userId: licenseManager.id,
+                    role: 'admin',
+                    status: 'active',
+                  });
+                  console.log(`Added license manager to existing organization membership`);
+                } catch (membershipError: any) {
+                  // Handle duplicate membership gracefully
+                  if (membershipError.code !== '23505') {
+                    throw membershipError;
+                  }
+                  console.log(`License manager already has membership for organization`);
+                }
+              }
+            }
+            
+            // Calculate seats from team platform_access items
+            // Note: Current UI design allows only ONE team purchase per cart (one org, one manager)
+            // All team platform_access items in this cart belong to this organization
+            const teamPlatformAccessItems = teamItems.filter(item => item.addonType === 'platform_access');
+            const totalSeats = teamPlatformAccessItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+            
+            if (totalSeats > 0) {
+              // Get the Platform Access package info for pricing from the first team platform access item
+              const platformAccessItem = teamPlatformAccessItems[0];
+              const pricePerSeat = platformAccessItem?.basePrice || '0';
+              const currency = platformAccessItem?.currency || 'USD';
+              
+              // Calculate validity period from the package
+              const pkg = platformAccessItem ? await getPackageOrAddonBySku(platformAccessItem.packageSku) : null;
+              const validityDays = pkg?.validityDays || 365;
+              
+              const startDate = new Date();
+              const endDate = new Date(startDate.getTime() + validityDays * 24 * 60 * 60 * 1000);
+              
+              // Create license package with seats = team Platform Access quantity
+              const licensePackage = await authStorage.createLicensePackage({
+                organizationId: organization.id,
+                packageType: platformAccessItem?.packageSku || 'team-platform-access',
+                totalSeats,
+                pricePerSeat,
+                totalAmount: (parseFloat(pricePerSeat) * totalSeats).toString(),
+                currency,
+                startDate,
+                endDate,
+                status: 'active',
+              });
+              console.log(`Created license package: ${licensePackage.id} with ${totalSeats} seats for organization ${organization.id}`);
+              
+              // Add license package info to purchase details for email
+              (purchaseDetails as any).licensePackageId = licensePackage.id;
+              (purchaseDetails as any).organizationId = organization.id;
+            }
+            
+            // Generate password reset token (24 hour expiry)
+            const resetToken = crypto.randomBytes(32).toString('hex');
+            const resetTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+            
+            await authStorage.createPasswordResetToken(teamManagerEmail, resetToken, resetTokenExpiry);
+            
+            // Send invitation email
+            await sendLicenseManagerInvitationEmail(
+              teamManagerEmail,
+              teamManagerName,
+              resetToken,
+              purchaseDetails
+            );
+            
+            licenseManagerInvitationSent = true;
+            console.log(`License Manager invitation sent to ${teamManagerEmail}`);
+            
+            // Log the team purchase event
+            await eventLogger.log({
+              actorId: userId,
+              action: 'team_purchase.completed',
+              targetType: 'license_manager',
+              targetId: licenseManager.id,
+              metadata: {
+                licenseManagerEmail: teamManagerEmail,
+                licenseManagerName: teamManagerName,
+                purchaseDetails,
+                orderId,
+              },
+              ipAddress: req.ip,
+              userAgent: req.get('user-agent'),
+            });
+          }
+        } catch (emailError) {
+          console.error('Failed to send License Manager invitation:', emailError);
+          // Don't fail the payment verification - log and continue
+        }
+      }
+
+      res.json({
+        success: true,
+        message: "Cart checkout completed successfully",
+        activatedAddons,
+        itemCount: activatedAddons.length,
+        licenseManagerInvitationSent,
+      });
+    } catch (error) {
+      console.error("Verify cart checkout error:", error);
+      res.status(500).json({ message: "Failed to verify payment" });
+    }
+  });
+
+  // ========================================
+  // INVOICE / RECEIPT
+  // ========================================
+
+  // Get invoice/receipt for a completed order
+  // Get invoice/receipt for a completed order with enhanced formatting
+  app.get("/api/billing/invoice", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const { orderId } = req.query;
+
+      if (!orderId || typeof orderId !== 'string') {
+        return res.status(400).json({ message: "Order ID is required" });
+      }
+
+      // Fetch pending order
+      const pendingOrder = await billingStorage.getPendingOrderById(orderId, userId);
+      if (!pendingOrder) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Only allow viewing completed orders
+      if (pendingOrder.status !== 'completed') {
+        return res.status(400).json({ message: "Order is not completed yet" });
+      }
+
+      // Fetch all addon purchases for this cart order
+      const allPurchases = await billingStorage.getUserAddonPurchases(userId);
+      const orderPurchases = allPurchases.filter(
+        (purchase: any) => purchase.metadata && (purchase.metadata as any).cartOrderId === orderId
+      );
+
+      // Get user info
+      const user = await authStorage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Enhanced invoice items formatting with proper GST calculation
+      const items = orderPurchases.map((purchase: any) => {
+        const metadata = purchase.metadata as any || {};
+        
+        // Use actual purchase amount (which includes GST for INR, no GST for USD)
+        const totalWithGst = parseFloat(purchase.purchaseAmount || '0');
+        const currency = purchase.currency || 'USD';
+        
+        let baseAmount: number;
+        let gstAmount: number;
+        let gstRate: number;
+        
+        if (currency === 'INR') {
+          // For INR, calculate GST (18% of base amount)
+          // If total = base + (base * 0.18), then base = total / 1.18
+          gstRate = 18;
+          baseAmount = totalWithGst / 1.18;
+          gstAmount = totalWithGst - baseAmount;
+        } else {
+          // For USD and other currencies, no GST
+          gstRate = 0;
+          baseAmount = totalWithGst;
+          gstAmount = 0;
+        }
+        
+        const quantity = metadata.quantity || 1;
+        const unitPrice = baseAmount / quantity;
+
+        return {
+          packageSku: purchase.packageSku,
+          packageName: metadata.packageName || purchase.packageSku,
+          addonType: purchase.addonType,
+          quantity,
+          unitPrice: unitPrice.toFixed(2),
+          basePrice: unitPrice.toFixed(2),
+          totalAmount: baseAmount.toFixed(2), // Subtotal without GST
+          gstRate: gstRate,
+          gstAmount: gstAmount.toFixed(2),
+          totalWithGst: totalWithGst.toFixed(2),
+          currency: currency,
+          startDate: purchase.startDate?.toISOString() || new Date().toISOString(),
+          endDate: purchase.endDate ? purchase.endDate.toISOString() : null,
+          description: getItemDescription(purchase.addonType, metadata),
+        };
+      });
+
+      // Calculate totals from actual data
+      const subtotal = items.reduce((sum: number, item: any) => sum + parseFloat(item.totalAmount), 0);
+      const totalGst = items.reduce((sum: number, item: any) => sum + parseFloat(item.gstAmount), 0);
+      const grandTotal = subtotal + totalGst;
+      const currency = items[0]?.currency || 'USD';
+
+      // Enhanced invoice data with professional formatting
+      const invoiceData = {
+        // Invoice Header
+        invoiceNumber: `INV-${orderId.slice(-8).toUpperCase()}`,
+        orderId: pendingOrder.gatewayOrderId || orderId,
+        invoiceDate: new Date().toISOString(),
+        dueDate: new Date().toISOString(), // Immediate payment
+        
+        // Company Information
+        company: {
+          name: "Rev Winner",
+          address: "Digital Sales Assistant Platform",
+          email: "support@revwinner.com",
+          website: "https://revwinner.com",
+          gstNumber: currency === 'INR' ? "GST123456789" : null, // Add actual GST number if available
+        },
+        
+        // Customer Information
+        customer: {
+          id: userId,
+          name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Customer',
+          email: user.email,
+          mobile: user.mobile || null,
+          organization: user.organization || null,
+        },
+        
+        // Payment Information
+        payment: {
+          method: pendingOrder.gatewayProvider || 'razorpay',
+          status: pendingOrder.status,
+          transactionId: pendingOrder.gatewayOrderId,
+          paymentDate: pendingOrder.createdAt?.toISOString() || new Date().toISOString(),
+        },
+        
+        // Line Items
+        items,
+        
+        // Financial Summary
+        summary: {
+          subtotal: parseFloat(subtotal.toFixed(2)),
+          gst: parseFloat(totalGst.toFixed(2)),
+          gstRate: currency === 'INR' ? 18 : 0,
+          total: parseFloat(grandTotal.toFixed(2)),
+          currency: currency,
+          amountInWords: convertAmountToWords(grandTotal, currency),
+        },
+        
+        // Metadata
+        createdAt: pendingOrder.createdAt?.toISOString() || new Date().toISOString(),
+        generatedAt: new Date().toISOString(),
+        
+        // Terms and Conditions
+        terms: [
+          "This is a computer-generated invoice and does not require a signature.",
+          "Payment has been processed successfully via secure payment gateway.",
+          "For support queries, contact support@revwinner.com",
+          currency === 'INR' ? "GST is applicable as per Indian tax regulations." : "No GST applicable for international transactions.",
+        ],
+      };
+
+      res.json(invoiceData);
+    } catch (error) {
+      console.error("Get invoice error:", error);
+      res.status(500).json({ message: "Failed to get invoice" });
+    }
+  });
+
+  // Helper function to get item description
+  function getItemDescription(addonType: string, metadata: any): string {
+    switch (addonType) {
+      case 'session_minutes':
+        return `Session Minutes Package - ${metadata.packageName || 'Standard Package'}`;
+      case 'train_me':
+        return 'Train Me Add-on - 30 Days Access to AI Training Features';
+      case 'enterprise_license':
+        return `Enterprise License - ${metadata.seats || 1} seats`;
+      default:
+        return metadata.packageName || addonType;
+    }
+  }
+
+  // Helper function to convert amount to words (basic implementation)
+  function convertAmountToWords(amount: number, currency: string): string {
+    const currencyName = currency === 'INR' ? 'Rupees' : 'Dollars';
+    const wholePart = Math.floor(amount);
+    const decimalPart = Math.round((amount - wholePart) * 100);
+    
+    // Basic number to words conversion (you can enhance this)
+    if (wholePart === 0) {
+      return `Zero ${currencyName} Only`;
+    } else if (wholePart < 100) {
+      return `${wholePart} ${currencyName} ${decimalPart > 0 ? `and ${decimalPart} cents` : ''} Only`;
+    } else {
+      return `${wholePart} ${currencyName} ${decimalPart > 0 ? `and ${decimalPart} cents` : ''} Only`;
+    }
+  }
+
+  // ========================================
+  // CASHFREE WEBHOOKS
+  // ========================================
+
+  // Cashfree webhook handler (NO AUTH - Cashfree calls this)
+  // Use raw body middleware for signature verification
+  app.post("/api/billing/cashfree-webhook", captureRawBody, async (req: Request, res: Response) => {
+    try {
+      const crypto = await import("crypto");
+      const { 
+        activateIndividualSubscription,
+        activateEnterpriseLicense 
+      } = await import("./services/subscription-lifecycle");
+
+      // Verify webhook signature using HMAC-SHA256
+      const webhookSecret = process.env.CASHFREE_WEBHOOK_SECRET;
+      if (!webhookSecret) {
+        console.error("❌ CASHFREE_WEBHOOK_SECRET not configured");
+        return res.status(500).json({ message: "Webhook secret not configured" });
+      }
+
+      const signature = req.headers["x-webhook-signature"] as string;
+      const timestamp = req.headers["x-webhook-timestamp"] as string;
+      
+      // CRITICAL: Use raw body for signature verification (not parsed JSON)
+      const rawBody = req.rawBody || JSON.stringify(req.body);
+
+      // Cashfree signature format: timestamp + rawBody
+      const signatureData = timestamp + rawBody;
+      const expectedSignature = crypto
+        .createHmac("sha256", webhookSecret)
+        .update(signatureData)
+        .digest("base64");
+
+      if (signature !== expectedSignature) {
+        console.error("❌ Invalid Cashfree webhook signature");
+        return res.status(400).json({ message: "Invalid signature" });
+      }
+
+      const eventType = req.body.type;
+      const data = req.body.data;
+
+      console.log(`📨 Cashfree webhook received: ${eventType}`);
+
+      // Handle PAYMENT_SUCCESS event
+      if (eventType === "PAYMENT_SUCCESS" || eventType === "PAYMENT_CAPTURED") {
+        const order = data.order;
+        const payment = data.payment;
+        const orderId = order.order_id;
+        const paymentId = payment.cf_payment_id;
+        const amount = parseFloat(order.order_amount);
+        const currency = order.order_currency;
+
+        console.log(`💰 Payment success: ${paymentId} for order ${orderId}, amount: ${amount} ${currency}`);
+
+        // Find pending order by gateway order ID
+        const pendingOrder = await billingStorage.getPendingOrder(orderId);
+        
+        if (!pendingOrder) {
+          console.error(`❌ Pending order not found for gateway order: ${orderId}`);
+          return res.status(404).json({ message: "Pending order not found" });
+        }
+
+        if (pendingOrder.status !== "pending") {
+          console.log(`⚠️ Order ${orderId} already processed (status: ${pendingOrder.status})`);
+          return res.json({ status: "acknowledged", message: "Already processed" });
+        }
+
+        // Check if this is a cart checkout order
+        const isCartCheckout = pendingOrder.addonType === 'cart_checkout' || 
+                               pendingOrder.packageSku === 'CART-MULTI-ITEM';
+
+        if (isCartCheckout) {
+          // Handle cart checkout activation
+          console.log(`🛒 Processing cart checkout order: ${orderId}`);
+          const result = await activateCartCheckout(pendingOrder, paymentId, req);
+          
+          if (result.success) {
+            console.log(`✅ Cart checkout activated: ${result.activatedAddons.length} items`);
+            return res.json({ status: "success", message: "Cart checkout processed", itemCount: result.activatedAddons.length });
+          } else {
+            console.error(`❌ Failed to activate cart checkout: ${result.message}`);
+            return res.status(500).json({ status: "error", message: result.message || "Failed to process cart checkout" });
+          }
+        }
+
+        // Determine if this is individual subscription or enterprise license
+        const isEnterprise = pendingOrder.packageSku.includes("enterprise") || 
+                            pendingOrder.addonType.includes("enterprise");
+
+        if (isEnterprise) {
+          // Handle enterprise license activation
+          const metadata = pendingOrder.metadata as any;
+          const organizationId = metadata.organizationId;
+          const totalSeats = metadata.totalSeats || 1;
+          const packageType = metadata.packageType || "1-year-enterprise";
+
+          const result = await activateEnterpriseLicense(
+            organizationId,
+            packageType,
+            totalSeats,
+            {
+              cashfreeOrderId: orderId,
+              cashfreePaymentId: paymentId,
+              amount,
+              currency,
+            },
+            pendingOrder.userId
+          );
+
+          if (result.success) {
+            console.log(`✅ Enterprise license activated: ${result.licensePackageId}`);
+          } else {
+            console.error(`❌ Failed to activate enterprise license: ${result.message}`);
+          }
+        } else {
+          // Handle individual subscription activation
+          const metadata = pendingOrder.metadata as any;
+          const planId = metadata.planId || pendingOrder.packageSku;
+
+          const result = await activateIndividualSubscription(
+            pendingOrder.userId,
+            planId,
+            {
+              cashfreeOrderId: orderId,
+              cashfreePaymentId: paymentId,
+              amount,
+              currency,
+            }
+          );
+
+          if (result.success) {
+            console.log(`✅ Individual subscription activated: ${result.subscriptionId}`);
+          } else {
+            console.error(`❌ Failed to activate subscription: ${result.message}`);
+          }
+        }
+
+        return res.json({ status: "success", message: "Payment processed" });
+      }
+
+      // Handle PAYMENT_FAILED event
+      if (eventType === "PAYMENT_FAILED" || eventType === "PAYMENT_USER_DROPPED") {
+        const order = data.order;
+        const payment = data.payment;
+        const orderId = order.order_id;
+        const paymentId = payment?.cf_payment_id || "unknown";
+
+        console.log(`❌ Payment failed: ${paymentId} for order ${orderId}`);
+
+        // Update pending order status
+        const pendingOrder = await billingStorage.getPendingOrder(orderId);
+        if (pendingOrder) {
+          await billingStorage.updatePendingOrderStatus(orderId, pendingOrder.userId, "failed");
+        }
+
+        return res.json({ status: "acknowledged", message: "Payment failure recorded" });
+      }
+
+      // Acknowledge other events
+      console.log(`ℹ️ Webhook event ${eventType} acknowledged but not processed`);
+      res.json({ status: "acknowledged" });
+
+    } catch (error: any) {
+      console.error("❌ Cashfree webhook processing error:", error);
+      res.status(500).json({ message: "Webhook processing failed", error: error.message });
+    }
+  });
+
+  // ========================================
+  // REFUND MANAGEMENT
+  // ========================================
+
+  // Get refund environment info
+  app.get("/api/refunds/environment", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const { refundService } = await import("./services/refund-service");
+      const envInfo = refundService.getEnvironmentInfo();
+      
+      res.json({
+        ...envInfo,
+        message: envInfo.isProduction 
+          ? "⚠️ PRODUCTION MODE - Real refunds will be processed" 
+          : "✅ TEST MODE - Test refunds will be processed"
+      });
+    } catch (error: any) {
+      console.error("Get refund environment error:", error);
+      res.status(500).json({ message: "Failed to get environment info", error: error.message });
+    }
+  });
+
+  // Process refund for a payment (Admin only)
+  app.post("/api/refunds/process", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      
+      // Check if user is admin
+      const user = await authStorage.getUserById(userId);
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const validation = z.object({
+        paymentId: z.string(),
+        amount: z.number().positive().optional(),
+        reason: z.string().min(1),
+        notes: z.record(z.string()).optional(),
+      }).safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid request", 
+          errors: validation.error.errors 
+        });
+      }
+
+      const { paymentId, amount, reason, notes } = validation.data;
+
+      // Process refund
+      const { refundService } = await import("./services/refund-service");
+      const result = await refundService.processRefund({
+        paymentId,
+        amount,
+        reason,
+        refundedBy: userId,
+        notes,
+      });
+
+      if (result.success) {
+        res.json({
+          success: true,
+          message: result.message,
+          refundId: result.refundId,
+          gatewayRefundId: result.gatewayRefundId,
+          amount: result.amount,
+          currency: result.currency,
+          status: result.status,
+          isTestMode: result.isTestMode,
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+          isTestMode: result.isTestMode,
+        });
+      }
+    } catch (error: any) {
+      console.error("Process refund error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to process refund", 
+        error: error.message 
+      });
+    }
+  });
+
+  // Process refund for an addon purchase (Admin only)
+  app.post("/api/refunds/addon", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      
+      // Check if user is admin
+      const user = await authStorage.getUserById(userId);
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const validation = z.object({
+        addonPurchaseId: z.string(),
+        paymentId: z.string().optional(), // Optional: specify which payment to refund from purchase history
+        amount: z.number().positive().optional(),
+        reason: z.string().min(1),
+        notes: z.record(z.string()).optional(),
+      }).safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid request", 
+          errors: validation.error.errors 
+        });
+      }
+
+      const { addonPurchaseId, paymentId, amount, reason, notes } = validation.data;
+
+      // Process addon refund
+      const { refundService } = await import("./services/refund-service");
+      const result = await refundService.processAddonRefund({
+        addonPurchaseId,
+        ...(paymentId && { paymentId }),
+        amount, 
+        reason,
+        refundedBy: userId,
+        notes,
+      });
+
+      if (result.success) {
+        res.json({
+          success: true,
+          message: result.message,
+          refundId: result.refundId,
+          gatewayRefundId: result.gatewayRefundId,
+          amount: result.amount,
+          currency: result.currency,
+          status: result.status,
+          isTestMode: result.isTestMode,
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+          metadata: result.metadata, // Include available payments if applicable
+          isTestMode: result.isTestMode,
+        });
+      }
+    } catch (error: any) {
+      console.error("Process addon refund error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to process addon refund", 
+        error: error.message 
+      });
+    }
+  });
+
+  // Get user refunds
+  app.get("/api/refunds/user/:userId", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const requestingUserId = req.jwtUser!.userId;
+      const targetUserId = req.params.userId;
+
+      // Check if user is admin or requesting their own refunds
+      const user = await authStorage.getUserById(requestingUserId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (user.role !== 'admin' && requestingUserId !== targetUserId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const refunds = await authStorage.getRefundsByUserId(targetUserId);
+      
+      res.json({
+        refunds,
+        count: refunds.length,
+      });
+    } catch (error: any) {
+      console.error("Get user refunds error:", error);
+      res.status(500).json({ 
+        message: "Failed to get refunds", 
+        error: error.message 
+      });
+    }
+  });
+
+  // Test refund endpoint (for testing in dev environment)
+  app.post("/api/refunds/test", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      
+      // Check if user is admin
+      const user = await authStorage.getUserById(userId);
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Get environment info
+      const { refundService } = await import("./services/refund-service");
+      const envInfo = refundService.getEnvironmentInfo();
+
+      // Only allow in test mode
+      if (envInfo.isProduction) {
+        return res.status(403).json({ 
+          message: "Test refund endpoint is only available in DEV environment",
+          currentEnvironment: envInfo.environment,
+        });
+      }
+
+      const validation = z.object({
+        paymentId: z.string(),
+        amount: z.number().positive().optional(),
+        reason: z.string().default("Test refund"),
+      }).safeParse(req.body);
+
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid request", 
+          errors: validation.error.errors 
+        });
+      }
+
+      const { paymentId, amount, reason } = validation.data;
+
+      // Process test refund
+      const result = await refundService.processRefund({
+        paymentId,
+        amount,
+        reason: `[TEST] ${reason}`,
+        refundedBy: userId,
+        notes: { test: "true", environment: envInfo.environment },
+      });
+
+      res.json({
+        ...result,
+        environment: envInfo,
+        note: "This is a test refund in DEV environment",
+      });
+    } catch (error: any) {
+      console.error("Test refund error:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to process test refund", 
+        error: error.message 
+      });
+    }
+  });
+}

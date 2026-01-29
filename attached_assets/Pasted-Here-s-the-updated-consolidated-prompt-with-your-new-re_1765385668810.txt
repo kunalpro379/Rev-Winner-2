@@ -1,0 +1,111 @@
+Here’s the updated, consolidated prompt with your new requirement added:
+
+
+---
+
+Detailed Game Creation Prompt for Replit:
+
+Project Overview:
+Create a fun, interactive web-based game for lead generation on the Rev Winner platform. This game will engage users by quizzing them with dynamic questions related to their own industry and product domain, ultimately encouraging them to book a demo.
+
+> Important Routing Requirement:
+Create this game as a separate page with its own unique URL/link that can be shared directly with users.
+Do NOT add this lead-generation game link to any navigation menu or visible section inside the main Rev Winner web app.
+It must be accessible only via the shareable link.
+
+
+
+
+---
+
+Game Flow:
+
+1. Lead Capture Before Play:
+Before starting the game, the user must fill out a form with their name, company name, email address, and phone number.
+
+
+2. Dynamic Question Generation:
+Once the user starts the game, the system uses the company name they provided to generate 10 dynamic questions related to that company’s industry, products, or services.
+
+
+3. Gameplay Mechanics:
+
+The user sees a cartoon-style customer on a video call asking questions in a speech bubble.
+
+Each question is unique and related to the user’s industry.
+
+The user (player) must type an answer to each question. Questions should be tricky and somewhat challenging.
+
+
+
+4. Scoring System:
+
+For each correct answer, the user scores 1 point.
+
+For an incorrect or missed answer, they score 0.
+
+There are a total of 10 questions.
+
+
+
+5. Result and Recommendation:
+
+After all 10 questions, show the user their final score.
+
+If they score 7 or more, display:
+
+> “Great job! Keep your top performance consistent with Rev Winner. Book your free demo to stay ahead!”
+
+
+
+If they score less than 7, display:
+
+> “You can boost your ability to answer more customer questions with Rev Winner. Book your free demo now!”
+
+
+
+
+
+6. Call to Action:
+
+Regardless of the score, provide a “Book a Free Demo” button at the end.
+
+On clicking, the user’s information (name, company, email, phone) and their score should be sent to sales@revwinner.com for lead capture (via email API or backend form handler).
+
+
+
+
+
+---
+
+Technical Requirements:
+
+Build the game using HTML/CSS/JavaScript.
+
+Ensure it is fully mobile responsive.
+
+Use a cartoon-style avatar for the customer.
+
+Generate questions dynamically based on the company name input.
+
+Implement simple, reliable scoring logic and result display.
+
+Integrate an email service / API or backend endpoint to send lead details and score to sales@revwinner.com.
+
+The game must be hosted at a unique, shareable URL, not exposed in the main app menu or navigation.
+
+
+
+---
+
+Branding & Visual Theme:
+
+Use the attached Rev Winner owl mascot theme as visual inspiration.
+
+Maintain a clean, modern SaaS look with Rev Winner colors (purple/pink gradients, white backgrounds, soft shadows).
+
+The overall feel should be fun, professional, and on-brand with Rev Winner.
+
+
+
+---

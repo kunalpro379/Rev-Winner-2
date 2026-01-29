@@ -1,0 +1,29 @@
+Please modify the existing Conversation Analysis section of the Rev Winner application without altering any other features or functionalities. The goal is to enhance the layout and usability by introducing a tab-based format. Each tab will focus on both preempting and analyzing the current conversation, ensuring the responses are concise yet sufficient for successful call outcomes.
+
+**Details:**
+1. **Discovery Questions Tab:**
+   - When the user clicks on "Analyze All," this tab should not only preemptively suggest discovery questions but also analyze the current conversation from the live transcript. It should provide a balanced set of questions that are neither too lengthy nor too short—just enough to guide the rep towards a productive conversation flow.
+
+2. **Objection Handling Tab:**
+   - This tab should both preempt potential objections and identify any objections already raised in the conversation. It should recommend responses that are concise and directly address customer concerns to help achieve the best outcome.
+
+3. **Next Steps Tab:**
+   - In this tab, combine preemptive suggestions with a real-time analysis of the conversation. It should recommend logical next steps (e.g., scheduling a demo, setting up follow-up meetings, or moving towards closure) based on the current state of the call.
+
+4. **Competitor Analysis Tab:**
+   - If a competitor is mentioned, this tab should equip the rep with key talking points to address it. If no competitor is mentioned, it should preemptively suggest possible competitive differentiators the rep might highlight.
+
+5. **Create Urgency Tab:**
+   - This tab should help the rep subtly create a sense of urgency by offering a ready-to-read script or bullet points that emphasize the value proposition in a non-pushy way, encouraging the customer to move forward.
+
+6. **Regenerate Button:**
+   - At the top of the Conversation Analysis section, include a “Regenerate” button so that as the conversation continues, the rep can refresh the analysis and keep all tabs updated with the latest insights.
+
+7. **Sales Assistant Q&A (Manual Query Chat Section):**
+   - Modify the existing “Sales Assistant Q&A” section so that when a manual query is typed by the rep, the AI provides a clean, easy-to-read, and concise response that is sufficient to address the customer's concern in real-time. It should be neither too lengthy nor too short, ensuring it helps the rep guide the conversation effectively.
+
+**Additional Enhancements:**
+- Ensure the tab-based layout is intuitive, easy to navigate, and quick to load.
+- The analysis must be real-time and provide actionable insights that empower the sales representative to achieve the best possible call outcomes.
+
+This prompt will guide the enhancement of the Conversation Analysis section, blending preemptive suggestions with real-time analysis and making it a highly effective tool for sales reps.

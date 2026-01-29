@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rev Winner - Flows & Technical Documentation</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 20mm;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            color: #1f2937;
+            max-width: 100%;
+            margin: 0;
+            padding: 20px;
+            background: white;
+        }
+        
+        h1 {
+            color: #C026D3;
+            border-bottom: 3px solid #C026D3;
+            padding-bottom: 10px;
+            page-break-before: always;
+        }
+        
+        h1:first-of-type {
+            page-break-before: auto;
+        }
+        
+        h2 {
+            color: #1E3A8A;
+            margin-top: 30px;
+            border-left: 4px solid #C026D3;
+            padding-left: 15px;
+        }
+        
+        h3 {
+            color: #7C3AED;
+            margin-top: 20px;
+        }
+        
+        .toc {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .toc ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .toc li {
+            margin: 8px 0;
+        }
+        
+        .toc a {
+            color: #7C3AED;
+            text-decoration: none;
+        }
+        
+        .flow-diagram {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 2px solid #e5e7eb;
+        }
+        
+        .flow-step {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 4px solid #C026D3;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .flow-step-number {
+            display: inline-block;
+            background: linear-gradient(135deg, #C026D3, #7C3AED);
+            color: white;
+            width: 30px;
+            height: 30px;
+            line-height: 30px;
+            text-align: center;
+            border-radius: 50%;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin: 15px 0;
+            page-break-inside: avoid;
+        }
+        
+        .code-title {
+            background: #C026D3;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 8px 8px 0 0;
+            font-weight: bold;
+            margin-bottom: 0;
+        }
+        
+        .schema-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .schema-table th {
+            background: linear-gradient(135deg, #C026D3, #7C3AED);
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+        
+        .schema-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .schema-table tr:hover {
+            background: #f9fafb;
+        }
+        
+        .highlight {
+            background: #fef3c7;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        
+        .warning {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .info {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .success {
+            background: #f0fdf4;
+            border-left: 4px solid #22c55e;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .screenshot-placeholder {
+            background: #f3f4f6;
+            border: 2px dashed #9ca3af;
+            padding: 40px;
+            text-align: center;
+            border-radius: 8px;
+            margin: 20px 0;
+            color: #6b7280;
+        }
+        
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 0 5px;
+        }
+        
+        .badge-new {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .badge-important {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .page-break {
+            page-break-after: always;
+        }
+    </style>
+</head>
+<body>
+
+<!-- COVER PAGE -->
+<div style="text-align: center; padding: 100px 0;">
+    <h1 style="font-size: 48px; border: none; background: linear-gradient(135deg, #C026D3, #1E3A8A); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+        Rev Winner Platform
+    </h1>
+    <h2 style="font-size: 32px; color: #6b7280; border: none; padding: 0;">
+        Flows & Technical Documentation
+    </h2>
+    <div style="margin-top: 60px; font-size: 18px; color: #9ca3af;">
+        <p>New User Registration Flow with Email Notifications</p>
+        <p>Train Me Add-on Purchase Flow</p>
+        <p>Session Minutes Purchase Flow</p>
+        <p>Database Schemas & Code Snippets</p>
+    </div>
+    <div style="margin-top: 100px; font-size: 14px; color: #9ca3af;">
+        Generated: <script>document.write(new Date().toLocaleDateString())</script>
+    </div>
+</div>
+
+<div class="page-break"></div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc">
+    <h2 style="margin-top: 0;">Table of Contents</h2>
+    <ul>
+        <li><a href="#flow-1">1. New User Registration Flow (with Email Notification)</a></li>
+        <li><a href="#flow-2">2. Train Me Add-on Purchase Flow</a></li>
+        <li><a href="#flow-3">3. Session Minutes Purchase Flow</a></li>
+        <li><a href="#flow-4">4. Payment Verification Flow</a></li>
+        <li><a href="#schemas">5. Database Schemas</a></li>
+        <li><a href="#code">6. Code Snippets</a></li>
+        <li><a href="#screenshots">7. Screenshots</a></li>
+    </ul>
+</div>
+
+<!-- FLOW 1: USER REGISTRATION -->
+<h1 id="flow-1">1. New User Registration Flow (with Email Notification)</h1>
+
+<div class="info">
+    <strong>Purpose:</strong> When a new user registers on Rev Winner, an automated email notification is sent to sales@revwinner.com with user details.
+    <span class="badge badge-new">NEW FEATURE</span>
+</div>
+
+<div class="flow-diagram">
+    <h3>Registration Flow Steps:</h3>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">1</span>
+        <strong>User submits registration form</strong><br>
+        Frontend: /register page → POST /api/auth/register<br>
+        Data: email, password, firstName, lastName, username, organization
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">2</span>
+        <strong>Backend validates user data</strong><br>
+        File: server/routes-auth.ts → registerUserSchema.parse(req.body)<br>
+        Checks: Email uniqueness, Username uniqueness, Valid format
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">3</span>
+        <strong>Create pending user in database</strong><br>
+        Status: "pending" (awaiting email verification)<br>
+        Session version: 0 (for single-device access tracking)
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">4</span>
+        <strong>Generate & send OTP email to user</strong><br>
+        6-digit code, 10-minute expiry<br>
+        Function: sendOTPEmail(email, code, firstName)
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">5</span>
+        <strong>Send registration notification to sales team</strong><br>
+        <span class="badge badge-new">NEW</span><br>
+        To: sales@revwinner.com<br>
+        Function: sendNewRegistrationNotification() - Non-blocking<br>
+        Includes: User details, company, trial plan info
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">6</span>
+        <strong>Log audit trail</strong><br>
+        Action: 'user.registered'<br>
+        Metadata: email, username, IP address, user agent
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">7</span>
+        <strong>Return success response to user</strong><br>
+        Message: "Registration successful. Please check your email for verification code."<br>
+        User is redirected to OTP verification page
+    </div>
+</div>
+
+<div class="success">
+    <strong>✅ Email Notification Details:</strong><br>
+    • Sent asynchronously (non-blocking) to avoid delaying registration<br>
+    • Professional HTML email with Rev Winner branding<br>
+    • Includes: Full name, email, username, company, registration date, trial plan<br>
+    • Dev mode: Logs to console when Gmail SMTP not configured<br>
+    • Production: Uses Gmail SMTP (nodemailer)
+</div>
+
+<div class="page-break"></div>
+
+<!-- FLOW 2: TRAIN ME PURCHASE -->
+<h1 id="flow-2">2. Train Me Add-on Purchase Flow</h1>
+
+<div class="info">
+    <strong>Product:</strong> Train Me Add-on - $15 for 30 days<br>
+    <strong>Features:</strong> Up to 5 domain profiles, 100 documents per domain, AI training with custom knowledge
+</div>
+
+<div class="flow-diagram">
+    <h3>Purchase Flow Steps:</h3>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">1</span>
+        <strong>User clicks "Purchase Train Me" button</strong><br>
+        Location: /subscribe page, /profile page, or /manage-subscription page<br>
+        Button: data-testid="button-purchase-trainme-addon"
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">2</span>
+        <strong>Frontend: Check authentication & Razorpay loaded</strong><br>
+        Validate accessToken in localStorage<br>
+        Verify window.Razorpay is available<br>
+        Set loading state: isPurchasingTrainMe = true
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">3</span>
+        <strong>Create Razorpay order</strong><br>
+        POST /api/train-me/create-order<br>
+        Headers: Authorization: Bearer {accessToken}<br>
+        Response: { orderId, amount, currency, keyId }
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">4</span>
+        <strong>Fetch user details for prefill</strong><br>
+        GET /api/auth/me<br>
+        Used to prefill name and email in Razorpay checkout
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">5</span>
+        <strong>Open Razorpay payment modal</strong><br>
+        Configuration:<br>
+        • Amount: $15 (1500 cents)<br>
+        • Currency: USD<br>
+        • Description: "Train Me Add-on (30 days)"<br>
+        • Theme color: #C026D3 (Rev Winner purple)<br>
+        • Test mode detection: Shows test card info if rzp_test_*
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">6</span>
+        <strong>User completes payment in Razorpay</strong><br>
+        Razorpay returns: razorpay_order_id, razorpay_payment_id, razorpay_signature
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">7</span>
+        <strong>Verify payment on backend</strong><br>
+        POST /api/train-me/verify-payment<br>
+        Body: { razorpay_order_id, razorpay_payment_id, razorpay_signature }<br>
+        Backend validates signature using Razorpay secret
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">8</span>
+        <strong>Activate Train Me subscription</strong><br>
+        Update auth_users.trainMeSubscriptionDate = NOW()<br>
+        30-day validity calculated on backend<br>
+        User can now access Train Me features
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">9</span>
+        <strong>Show success message & refresh UI</strong><br>
+        Toast: "Train Me Activated! You now have 30 days of access to Train Me features."<br>
+        Invalidate queries: queryClient.invalidateQueries("/api/train-me/status")
+    </div>
+</div>
+
+<div class="warning">
+    <strong>⚠️ Important Notes:</strong><br>
+    • Payment is non-blocking - modal dismissal is handled gracefully<br>
+    • Test mode automatically shows Razorpay test card instructions<br>
+    • All errors are displayed as user-friendly toasts<br>
+    • Purchase fails if user already has active Train Me subscription
+</div>
+
+<div class="page-break"></div>
+
+<!-- FLOW 3: SESSION MINUTES PURCHASE -->
+<h1 id="flow-3">3. Session Minutes Purchase Flow</h1>
+
+<div class="info">
+    <strong>Available Packages:</strong> 12 packages from $6 (500 min) to $108 (9000 min)<br>
+    <strong>Validity:</strong> 30 days from purchase OR until exhausted<br>
+    <strong>Consumption:</strong> FIFO (First In First Out) - oldest packages used first
+</div>
+
+<div class="flow-diagram">
+    <h3>Purchase Flow Steps:</h3>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">1</span>
+        <strong>User selects a package</strong><br>
+        Location: /subscribe, /profile, or /manage-subscription<br>
+        12 packages displayed in responsive grid (1-4 columns)<br>
+        Each shows: minutes, price, validity, cost per minute
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">2</span>
+        <strong>Click "Purchase" button</strong><br>
+        Function: purchaseSessionMinutes(packageId)<br>
+        State updates: isPurchasingMinutes = true, selectedPackageId = packageId
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">3</span>
+        <strong>Create Razorpay order</strong><br>
+        POST /api/session-minutes/create-order<br>
+        Body: { packageId } (e.g., "500_min", "1000_min")<br>
+        Response: { orderId, amount, currency, keyId, packageName }
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">4</span>
+        <strong>Open Razorpay checkout</strong><br>
+        Description: Package name (e.g., "500 Minutes Package")<br>
+        Amount: Varies by package ($6 - $108)<br>
+        Theme: Purple gradient (#C026D3)
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">5</span>
+        <strong>Payment completion</strong><br>
+        Razorpay returns payment credentials<br>
+        Automatically proceeds to verification
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">6</span>
+        <strong>Verify payment</strong><br>
+        POST /api/session-minutes/verify-payment<br>
+        Backend validates signature with Razorpay secret
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">7</span>
+        <strong>Create session minutes record in database</strong><br>
+        Table: session_minutes_purchases<br>
+        Fields:<br>
+        • minutesPurchased: Package amount<br>
+        • minutesUsed: 0<br>
+        • minutesRemaining: Full amount<br>
+        • expiryDate: NOW() + 30 days<br>
+        • status: 'active'<br>
+        • razorpayOrderId, razorpayPaymentId, amountPaid
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">8</span>
+        <strong>Success confirmation</strong><br>
+        Toast: "Session Minutes Purchased! Successfully purchased {packageName}. Your minutes are now available."<br>
+        Cache invalidated: /api/session-minutes/status<br>
+        UI updates to show new balance
+    </div>
+</div>
+
+<div class="success">
+    <strong>✅ Session Minutes Features:</strong><br>
+    • FIFO consumption: Oldest packages used first<br>
+    • Automatic expiry: Status updates to 'expired' after 30 days<br>
+    • Exhaustion tracking: Status becomes 'exhausted' when minutesRemaining = 0<br>
+    • Trial user overage: Only charged for Math.max(0, minutesUsed - minutesLimit)<br>
+    • Multiple packages: Users can purchase multiple packages simultaneously
+</div>
+
+<div class="page-break"></div>
+
+<!-- FLOW 4: PAYMENT VERIFICATION -->
+<h1 id="flow-4">4. Payment Verification Flow (Razorpay)</h1>
+
+<div class="info">
+    <strong>Security:</strong> All payments verified using HMAC SHA256 signature validation<br>
+    <strong>Provider:</strong> Razorpay Payment Gateway
+</div>
+
+<div class="flow-diagram">
+    <h3>Verification Process:</h3>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">1</span>
+        <strong>Razorpay payment handler receives credentials</strong><br>
+        Data from Razorpay:<br>
+        • razorpay_order_id<br>
+        • razorpay_payment_id<br>
+        • razorpay_signature (HMAC SHA256 hash)
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">2</span>
+        <strong>Frontend sends verification request</strong><br>
+        Endpoint: /api/train-me/verify-payment OR /api/session-minutes/verify-payment<br>
+        Method: POST<br>
+        Headers: Authorization: Bearer {accessToken}<br>
+        Body: Payment credentials from step 1
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">3</span>
+        <strong>Backend retrieves Razorpay secret key</strong><br>
+        Environment: RAZORPAY_KEY_SECRET<br>
+        Security: Never exposed to frontend
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">4</span>
+        <strong>Generate expected signature</strong><br>
+        Algorithm: HMAC SHA256<br>
+        Message: razorpay_order_id + "|" + razorpay_payment_id<br>
+        Secret: RAZORPAY_KEY_SECRET<br>
+        Output: Expected signature hash
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">5</span>
+        <strong>Compare signatures</strong><br>
+        Expected signature (from step 4) === razorpay_signature (from Razorpay)<br>
+        Uses constant-time comparison to prevent timing attacks
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">6a</span>
+        <strong>If signatures match: Payment VERIFIED ✅</strong><br>
+        • Update database (activate subscription or add minutes)<br>
+        • Return success response to frontend<br>
+        • Frontend shows success toast and refreshes data
+    </div>
+    
+    <div class="flow-step">
+        <span class="flow-step-number">6b</span>
+        <strong>If signatures don't match: Payment REJECTED ❌</strong><br>
+        • Log security event<br>
+        • Return 400 error to frontend<br>
+        • Frontend shows error toast<br>
+        • No database changes made
+    </div>
+</div>
+
+<div class="warning">
+    <strong>⚠️ Security Considerations:</strong><br>
+    • Signature validation prevents payment tampering<br>
+    • Order ID uniqueness prevents duplicate processing<br>
+    • Authentication required for all verification requests<br>
+    • Server-side secret never exposed to client<br>
+    • Failed verifications are logged for security monitoring
+</div>
+
+<div class="page-break"></div>
+
+<!-- DATABASE SCHEMAS -->
+<h1 id="schemas">5. Database Schemas</h1>
+
+<h2>5.1 Train Me Add-on Schema</h2>
+
+<h3>auth_users (Train Me field)</h3>
+<table class="schema-table">
+    <thead>
+        <tr>
+            <th>Column Name</th>
+            <th>Data Type</th>
+            <th>Description</th>
+            <th>Default</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>trainMeSubscriptionDate</td>
+            <td>timestamp</td>
+            <td>Date when user purchased Train Me add-on (30-day validity)</td>
+            <td>NULL</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="info">
+    <strong>Validity Check:</strong> Train Me is active if trainMeSubscriptionDate + 30 days > NOW()
+</div>
+
+<h3>domain_expertise</h3>
+<table class="schema-table">
+    <thead>
+        <tr>
+            <th>Column Name</th>
+            <th>Data Type</th>
+            <th>Constraints</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>id</td>
+            <td>varchar</td>
+            <td>PRIMARY KEY, UUID</td>
+            <td>Unique domain profile ID</td>
+        </tr>
+        <tr>
+            <td>userId</td>
+            <td>varchar</td>
+            <td>FOREIGN KEY → auth_users.id, NOT NULL</td>
+            <td>Owner of this domain expertise</td>
+        </tr>
+        <tr>
+            <td>name</td>
+            <td>varchar(100)</td>
+            <td>NOT NULL</td>
+            <td>Domain name (e.g., "SaaS Products", "Healthcare")</td>
+        </tr>
+        <tr>
+            <td>description</td>
+            <td>text</td>
+            <td></td>
+            <td>Optional description of domain</td>
+        </tr>
+        <tr>
+            <td>isActive</td>
+            <td>boolean</td>
+            <td>DEFAULT true</td>
+            <td>Whether domain is currently active</td>
+        </tr>
+        <tr>
+            <td>createdAt</td>
+            <td>timestamp</td>
+            <td>DEFAULT NOW()</td>
+            <td>Creation timestamp</td>
+        </tr>
+        <tr>
+            <td>updatedAt</td>
+            <td>timestamp</td>
+            <td>DEFAULT NOW()</td>
+            <td>Last update timestamp</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="success">
+    <strong>Limit:</strong> Users can create up to 5 domain expertise profiles
+</div>
+
+<h3>training_documents</h3>
+<table class="schema-table">
+    <thead>
+        <tr>
+            <th>Column Name</th>
+            <th>Data Type</th>
+            <th>Constraints</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>id</td>
+            <td>varchar</td>
+            <td>PRIMARY KEY, UUID</td>
+            <td>Unique document ID</td>
+        </tr>
+        <tr>
+            <td>domainExpertiseId</td>
+            <td>varchar</td>
+            <td>FOREIGN KEY → domain_expertise.id, NOT NULL</td>
+            <td>Associated domain profile</td>
+        </tr>
+        <tr>
+            <td>userId</td>
+            <td>varchar</td>
+            <td>FOREIGN KEY → auth_users.id, NOT NULL</td>
+            <td>Document owner</td>
+        </tr>
+        <tr>
+            <td>fileName</td>
+            <td>varchar(255)</td>
+            <td>NOT NULL</td>
+            <td>Original file name</td>
+        </tr>
+        <tr>
+            <td>fileType</td>
+            <td>varchar(20)</td>
+            <td>NOT NULL</td>
+            <td>pdf, doc, docx, txt, xls, xlsx, ppt, pptx, url</td>
+        </tr>
+        <tr>
+            <td>fileUrl</td>
+            <td>text</td>
+            <td>NOT NULL</td>
+            <td>Object storage URL or web URL</td>
+        </tr>
+        <tr>
+            <td>content</td>
+            <td>text</td>
+            <td></td>
+            <td>Extracted text content from document</td>
+        </tr>
+        <tr>
+            <td>summary</td>
+            <td>jsonb</td>
+            <td></td>
+            <td>AI-generated summary bullets (array of strings)</td>
+        </tr>
+        <tr>
+            <td>summaryStatus</td>
+            <td>varchar(20)</td>
+            <td>DEFAULT 'not_generated'</td>
+            <td>not_generated, generating, completed, failed</td>
+        </tr>
+        <tr>
+            <td>summaryError</td>
+            <td>text</td>
+            <td></td>
+            <td>Error message if summary generation failed</td>
+        </tr>
+        <tr>
+            <td>lastSummarizedAt</td>
+            <td>timestamp</td>
+            <td></td>
+            <td>When summary was last generated</td>
+        </tr>
+        <tr>
+            <td>metadata</td>
+            <td>jsonb</td>
+            <td>DEFAULT {}</td>
+            <td>fileSize, mimeType, etc.</td>
+        </tr>
+        <tr>
+            <td>processingStatus</td>
+            <td>varchar(20)</td>
+            <td>NOT NULL, DEFAULT 'pending'</td>
+            <td>pending, processing, completed, failed</td>
+        </tr>
+        <tr>
+            <td>processingError</td>
+            <td>text</td>
+            <td></td>
+            <td>Error message if processing failed</td>
+        </tr>
+        <tr>
+            <td>uploadedAt</td>
+            <td>timestamp</td>
+            <td>DEFAULT NOW()</td>
+            <td>Upload timestamp</td>
+        </tr>
+        <tr>
+            <td>updatedAt</td>
+            <td>timestamp</td>
+            <td>DEFAULT NOW()</td>
+            <td>Last update timestamp</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="success">
+    <strong>Limit:</strong> Up to 100 documents + URLs per domain expertise profile
+</div>
+
+<div class="page-break"></div>
+
+<h2>5.2 Session Minutes Schema</h2>
+
+<h3>session_minutes_purchases</h3>
+<table class="schema-table">
+    <thead>
+        <tr>
+            <th>Column Name</th>
+            <th>Data Type</th>
+            <th>Constraints</th>
+            <th>Description</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>id</td>
+            <td>varchar</td>
+            <td>PRIMARY KEY, UUID</td>
+            <td>Unique purchase ID</td>
+        </tr>
+        <tr>
+            <td>userId</td>
+            <td>varchar</td>
+            <td>FOREIGN KEY → auth_users.id, NOT NULL</td>
+            <td>User who purchased minutes</td>
+        </tr>
+        <tr>
+            <td>minutesPurchased</td>
+            <td>integer</td>
+            <td>NOT NULL</td>
+            <td>Total minutes in package (500-9000)</td>
+        </tr>
+        <tr>
+            <td>minutesUsed</td>
+            <td>integer</td>
+            <td>NOT NULL, DEFAULT 0</td>
+            <td>Minutes consumed so far</td>
+        </tr>
+        <tr>
+            <td>minutesRemaining</td>
+            <td>integer</td>
+            <td>NOT NULL</td>
+            <td>minutesPurchased - minutesUsed</td>
+        </tr>
+        <tr>
+            <td>purchaseDate</td>
+            <td>timestamp</td>
+            <td>NOT NULL, DEFAULT NOW()</td>
+            <td>When package was purchased</td>
+        </tr>
+        <tr>
+            <td>expiryDate</td>
+            <td>timestamp</td>
+            <td>NOT NULL</td>
+            <td>purchaseDate + 30 days</td>
+        </tr>
+        <tr>
+            <td>status</td>
+            <td>varchar(20)</td>
+            <td>NOT NULL, DEFAULT 'active'</td>
+            <td>'active', 'expired', 'exhausted'</td>
+        </tr>
+        <tr>
+            <td>razorpayOrderId</td>
+            <td>varchar(255)</td>
+            <td></td>
+            <td>Razorpay order identifier</td>
+        </tr>
+        <tr>
+            <td>razorpayPaymentId</td>
+            <td>varchar(255)</td>
+            <td></td>
+            <td>Razorpay payment identifier</td>
+        </tr>
+        <tr>
+            <td>amountPaid</td>
+            <td>varchar(20)</td>
+            <td>NOT NULL</td>
+            <td>Amount paid in dollars ($6 - $108)</td>
+        </tr>
+        <tr>
+            <td>currency</td>
+            <td>varchar(10)</td>
+            <td>NOT NULL, DEFAULT 'USD'</td>
+            <td>Payment currency</td>
+        </tr>
+        <tr>
+            <td>createdAt</td>
+            <td>timestamp</td>
+            <td>DEFAULT NOW()</td>
+            <td>Record creation timestamp</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="info">
+    <strong>Package Options:</strong><br>
+    500 min ($6), 750 min ($8), 1000 min ($12), 1500 min ($17), 2000 min ($23), 2500 min ($28),<br>
+    3000 min ($33), 4000 min ($43), 5000 min ($53), 6000 min ($63), 7500 min ($78), 9000 min ($108)
+</div>
+
+<div class="success">
+    <strong>✅ Consumption Logic:</strong><br>
+    • FIFO: Oldest packages (earliest purchaseDate) consumed first<br>
+    • Automatic status updates: 'expired' after 30 days, 'exhausted' when minutesRemaining = 0<br>
+    • Trial user protection: Only charged for overage beyond trial limits
+</div>
+
+<div class="page-break"></div>
+
+<!-- CODE SNIPPETS -->
+<h1 id="code">6. Code Snippets (Sanitized)</h1>
+
+<h2>6.1 Registration Email Notification</h2>
+
+<div class="code-title">server/services/email.ts - sendNewRegistrationNotification()</div>
+<div class="code-block"><pre>
+export async function sendNewRegistrationNotification(
+  userData: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    username: string;
+    company?: string;
+  }
+): Promise&lt;void&gt; {
+  if (!transporter) {
+    console.log(`\n====== NEW REGISTRATION NOTIFICATION (DEV MODE) ======`);
+    console.log(`New User Registered:`);
+    console.log(`Name: ${userData.firstName} ${userData.lastName}`);
+    console.log(`Email: ${userData.email}`);
+    console.log(`Username: ${userData.username}`);
+    console.log(`Company: ${userData.company || 'N/A'}`);
+    console.log(`Time: ${new Date().toLocaleString()}`);
+    console.log(`=======================================================\n`);
+    return;
+  }
+
+  const mailOptions = {
+    from: `"Rev Winner Notifications" &lt;${GMAIL_USER}&gt;`,
+    to: 'sales@revwinner.com',
+    subject: '🎉 New User Registration - Rev Winner',
+    html: `
+      &lt;!DOCTYPE html&gt;
+      &lt;html&gt;
+      &lt;head&gt;
+        &lt;meta charset="utf-8"&gt;
+        &lt;!-- Professional email styling --&gt;
+      &lt;/head&gt;
+      &lt;body&gt;
+        &lt;div class="container"&gt;
+          &lt;div class="header"&gt;
+            &lt;h1&gt;🎉 New User Registration&lt;/h1&gt;
+          &lt;/div&gt;
+          &lt;div class="content"&gt;
+            &lt;p&gt;A new user has successfully registered on the Rev Winner platform:&lt;/p&gt;
+            
+            &lt;div class="info-card"&gt;
+              &lt;div class="field"&gt;
+                &lt;div class="label"&gt;Full Name&lt;/div&gt;
+                &lt;div class="value"&gt;${userData.firstName} ${userData.lastName}&lt;/div&gt;
+              &lt;/div&gt;
+              &lt;div class="field"&gt;
+                &lt;div class="label"&gt;Email Address&lt;/div&gt;
+                &lt;div class="value"&gt;${userData.email}&lt;/div&gt;
+              &lt;/div&gt;
+              &lt;div class="field"&gt;
+                &lt;div class="label"&gt;Username&lt;/div&gt;
+                &lt;div class="value"&gt;${userData.username}&lt;/div&gt;
+              &lt;/div&gt;
+              ${userData.company ? `
+                &lt;div class="field"&gt;
+                  &lt;div class="label"&gt;Company&lt;/div&gt;
+                  &lt;div class="value"&gt;${userData.company}&lt;/div&gt;
+                &lt;/div&gt;
+              ` : ''}
+              &lt;div class="field"&gt;
+                &lt;div class="label"&gt;Trial Plan&lt;/div&gt;
+                &lt;div class="value"&gt;3 sessions (max 60 minutes each)&lt;/div&gt;
+              &lt;/div&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/body&gt;
+      &lt;/html&gt;
+    `,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`New registration notification sent to sales@revwinner.com`);
+  } catch (error) {
+    console.error('Error sending registration notification email:', error);
+  }
+}
+</pre></div>
+
+<div class="code-title">server/routes-auth.ts - Registration Integration</div>
+<div class="code-block"><pre>
+app.post("/api/auth/register", async (req: Request, res: Response) =&gt; {
+  try {
+    const data = registerUserSchema.parse(req.body);
+    
+    // Validate email and username uniqueness
+    const existingEmail = await authStorage.getUserByEmail(data.email);
+    if (existingEmail) {
+      return res.status(400).json({ message: "Email already registered" });
+    }
+    
+    const existingUsername = await authStorage.getUserByUsername(data.username);
+    if (existingUsername) {
+      return res.status(400).json({ message: "Username already taken" });
+    }
+    
+    // Create pending user
+    const user = await authStorage.createUser(data);
+    
+    // Generate and send OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    
+    await authStorage.createOTP(data.email, otpCode, expiresAt);
+    await sendOTPEmail(data.email, otpCode, data.firstName);
+    
+    // <span class="highlight">Send registration notification to sales team (non-blocking)</span>
+    sendNewRegistrationNotification({
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      username: data.username,
+      company: data.organization,
+    }).catch(err =&gt; console.error('Failed to send registration notification:', err));
+    
+    // Log audit
+    await authStorage.createAuditLog({
+      actorId: user.id,
+      action: 'user.registered',
+      targetType: 'user',
+      targetId: user.id,
+      metadata: { email: data.email, username: data.username },
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+    
+    res.status(201).json({
+      message: "Registration successful. Please check your email for verification code.",
+      userId: user.id,
+      email: user.email,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    console.error("Registration error:", error);
+    res.status(500).json({ message: "Registration failed" });
+  }
+});
+</pre></div>
+
+<div class="page-break"></div>
+
+<h2>6.2 Train Me Add-on Purchase</h2>
+
+<div class="code-title">client/src/pages/subscribe.tsx - purchaseTrainMe()</div>
+<div class="code-block"><pre>
+async function purchaseTrainMe() {
+  try {
+    setIsPurchasingTrainMe(true);
+    
+    // Validate Razorpay loaded
+    if (typeof window.Razorpay === 'undefined') {
+      toast({
+        title: "Payment Gateway Unavailable",
+        description: "Please refresh the page and try again.",
+        variant: "destructive",
+      });
+      setIsPurchasingTrainMe(false);
+      return;
+    }
+    
+    // Check authentication
+    const accessToken = localStorage.getItem("accessToken");
+    if (!accessToken) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to purchase Train Me.",
+        variant: "destructive",
+      });
+      setLocation("/login");
+      setIsPurchasingTrainMe(false);
+      return;
+    }
+
+    // Create Razorpay order
+    const orderResponse = await fetch("/api/train-me/create-order", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!orderResponse.ok) {
+      const error = await orderResponse.json();
+      throw new Error(error.message || "Failed to create order");
+    }
+
+    const { orderId, amount, currency, keyId } = await orderResponse.json();
+
+    // Fetch user details for prefill
+    const userResponse = await fetch("/api/auth/me", {
+      headers: { "Authorization": `Bearer ${accessToken}` },
+    });
+    const userData = await userResponse.json();
+
+    // Test mode detection
+    const isTestMode = keyId.startsWith('rzp_test_');
+    if (isTestMode) {
+      toast({
+        title: "Test Mode Active",
+        description: "Using Razorpay test mode. Use test card: 4111 1111 1111 1111",
+        duration: 10000,
+      });
+    }
+
+    // Razorpay configuration
+    const options = {
+      key: keyId, // <span class="highlight">API key from backend (NEVER hardcoded)</span>
+      amount: amount,
+      currency: currency,
+      name: "Rev Winner",
+      description: "Train Me Add-on (30 days)",
+      order_id: orderId,
+      handler: async function (response: any) {
+        try {
+          // Verify payment on backend
+          const verifyResponse = await fetch("/api/train-me/verify-payment", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+
+          const verifyData = await verifyResponse.json();
+
+          if (verifyResponse.ok) {
+            queryClient.invalidateQueries({ queryKey: ["/api/train-me/status"] });
+            toast({
+              title: "Train Me Activated!",
+              description: "You now have 30 days of access to Train Me features.",
+            });
+          } else {
+            toast({
+              title: "Verification Failed",
+              description: verifyData.message || "Payment verification failed.",
+              variant: "destructive",
+            });
+          }
+        } catch (error: any) {
+          toast({
+            title: "Verification Error",
+            description: error.message || "Failed to verify payment.",
+            variant: "destructive",
+          });
+        }
+      },
+      prefill: {
+        name: userData.user?.firstName ? 
+          `${userData.user.firstName} ${userData.user.lastName}` : "",
+        email: userData.user?.email || "",
+      },
+      theme: { color: "#C026D3" }, // Rev Winner purple
+      modal: {
+        ondismiss: function() {
+          toast({ 
+            title: "Payment Cancelled", 
+            description: "You cancelled the payment process." 
+          });
+        },
+      },
+    };
+
+    const razorpay = new window.Razorpay(options);
+    razorpay.open();
+    setIsPurchasingTrainMe(false);
+  } catch (error: any) {
+    toast({
+      title: "Purchase Failed",
+      description: error.message || "Failed to initiate payment. Please try again.",
+      variant: "destructive",
+    });
+    setIsPurchasingTrainMe(false);
+  }
+}
+</pre></div>
+
+<div class="page-break"></div>
+
+<h2>6.3 Session Minutes Purchase</h2>
+
+<div class="code-title">client/src/pages/subscribe.tsx - purchaseSessionMinutes(packageId)</div>
+<div class="code-block"><pre>
+async function purchaseSessionMinutes(packageId: string) {
+  try {
+    setIsPurchasingMinutes(true);
+    setSelectedPackageId(packageId);
+
+    // Razorpay validation
+    if (typeof window.Razorpay === 'undefined') {
+      toast({
+        title: "Payment Gateway Unavailable",
+        description: "Please refresh the page and try again.",
+        variant: "destructive",
+      });
+      setIsPurchasingMinutes(false);
+      setSelectedPackageId(null);
+      return;
+    }
+
+    // Authentication check
+    const accessToken = localStorage.getItem("accessToken");
+    if (!accessToken) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to purchase session minutes.",
+        variant: "destructive",
+      });
+      setLocation("/login");
+      setIsPurchasingMinutes(false);
+      setSelectedPackageId(null);
+      return;
+    }
+
+    // Create order with specific package
+    const orderResponse = await fetch("/api/session-minutes/create-order", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ packageId }), // <span class="highlight">e.g., "500_min", "1000_min"</span>
+    });
+
+    if (!orderResponse.ok) {
+      const error = await orderResponse.json();
+      throw new Error(error.message || "Failed to create order");
+    }
+
+    const { orderId, amount, currency, keyId, packageName } = await orderResponse.json();
+
+    // Fetch user data
+    const userResponse = await fetch("/api/auth/me", {
+      headers: { "Authorization": `Bearer ${accessToken}` },
+    });
+    const userData = await userResponse.json();
+
+    // Test mode handling
+    const isTestMode = keyId.startsWith('rzp_test_');
+    if (isTestMode) {
+      toast({
+        title: "Test Mode Active",
+        description: "Using Razorpay test mode. Use test card: 4111 1111 1111 1111",
+        duration: 10000,
+      });
+    }
+
+    // Razorpay options
+    const options = {
+      key: keyId,
+      amount: amount,
+      currency: currency,
+      name: "Rev Winner",
+      description: packageName, // <span class="highlight">e.g., "500 Minutes Package"</span>
+      order_id: orderId,
+      handler: async function (response: any) {
+        try {
+          // Backend payment verification
+          const verifyResponse = await fetch("/api/session-minutes/verify-payment", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+
+          const verifyData = await verifyResponse.json();
+
+          if (verifyResponse.ok) {
+            queryClient.invalidateQueries({ queryKey: ["/api/session-minutes/status"] });
+            toast({
+              title: "Session Minutes Purchased!",
+              description: `Successfully purchased ${packageName}. Your minutes are now available.`,
+            });
+          } else {
+            toast({
+              title: "Verification Failed",
+              description: verifyData.message || "Payment verification failed.",
+              variant: "destructive",
+            });
+          }
+        } catch (error: any) {
+          toast({
+            title: "Verification Error",
+            description: error.message || "Failed to verify payment.",
+            variant: "destructive",
+          });
+        }
+      },
+      prefill: {
+        name: userData.user?.firstName ? 
+          `${userData.user.firstName} ${userData.user.lastName}` : "",
+        email: userData.user?.email || "",
+      },
+      theme: { color: "#C026D3" },
+      modal: {
+        ondismiss: function() {
+          toast({ 
+            title: "Payment Cancelled", 
+            description: "You cancelled the payment process." 
+          });
+        },
+      },
+    };
+
+    const razorpay = new window.Razorpay(options);
+    razorpay.open();
+    setIsPurchasingMinutes(false);
+    setSelectedPackageId(null);
+  } catch (error: any) {
+    toast({
+      title: "Purchase Failed",
+      description: error.message || "Failed to initiate payment. Please try again.",
+      variant: "destructive",
+    });
+    setIsPurchasingMinutes(false);
+    setSelectedPackageId(null);
+  }
+}
+</pre></div>
+
+<div class="page-break"></div>
+
+<!-- SCREENSHOTS SECTION -->
+<h1 id="screenshots">7. Screenshots</h1>
+
+<h2>7.1 Subscribe Page - Add-ons Section</h2>
+<div class="screenshot-placeholder">
+    <h3>Screenshot: Full Subscribe Page View</h3>
+    <p>Shows Train Me add-on card and Session Minutes packages grid</p>
+    <p style="margin-top: 20px; font-size: 14px;">
+        <strong>Location:</strong> /subscribe page<br>
+        <strong>Layout:</strong> Landscape orientation<br>
+        <strong>Sections:</strong><br>
+        1. Header: "Enhance Your Experience"<br>
+        2. Train Me add-on (full-width card)<br>
+        3. Session Minutes packages (responsive grid: 1-4 columns)
+    </p>
+</div>
+
+<h2>7.2 Train Me Add-on Card</h2>
+<div class="screenshot-placeholder">
+    <h3>Screenshot: Train Me Add-on Card</h3>
+    <p>Full-width card showing $15 pricing and all features</p>
+    <p style="margin-top: 20px; font-size: 14px;">
+        <strong>Features Displayed:</strong><br>
+        ✓ Create up to 5 domain expertise profiles<br>
+        ✓ Upload up to 100 documents per domain<br>
+        ✓ Support for PDF, DOC, DOCX, XLS, XLSX, CSV, PPT, PPTX, TXT<br>
+        ✓ Train AI with specific product knowledge<br>
+        ✓ Get domain-specific answers during sales calls<br>
+        <br>
+        <strong>UI Elements:</strong><br>
+        • Purple gradient icon (GraduationCap)<br>
+        • $15 pricing (30 days)<br>
+        • "Purchase Train Me" button with purple gradient<br>
+        • data-testid="button-purchase-trainme-addon"
+    </p>
+</div>
+
+<h2>7.3 Session Minutes Packages Grid</h2>
+<div class="screenshot-placeholder">
+    <h3>Screenshot: Session Minutes Packages (All 12)</h3>
+    <p>Responsive grid showing all packages from $6 to $108</p>
+    <p style="margin-top: 20px; font-size: 14px;">
+        <strong>Packages Displayed:</strong><br>
+        500 min ($6) • 750 min ($8) • 1000 min ($12) • 1500 min ($17)<br>
+        2000 min ($23) • 2500 min ($28) • 3000 min ($33) • 4000 min ($43)<br>
+        5000 min ($53) • 6000 min ($63) • 7500 min ($78) • 9000 min ($108)<br>
+        <br>
+        <strong>Card Layout (Each Package):</strong><br>
+        • Minutes badge (purple background)<br>
+        • Price (bold, large font)<br>
+        • Package name<br>
+        • Features: Minutes, 30-day validity, cost per minute<br>
+        • "Purchase" button (purple gradient)<br>
+        • Hover effect: Border color changes<br>
+        <br>
+        <strong>Grid Responsiveness:</strong><br>
+        • Mobile: 1 column<br>
+        • Tablet (sm): 2 columns<br>
+        • Desktop (md): 3 columns<br>
+        • Large (lg): 4 columns
+    </p>
+</div>
+
+<h2>7.4 Email Notification Sample</h2>
+<div class="screenshot-placeholder">
+    <h3>Screenshot: New Registration Email to sales@revwinner.com</h3>
+    <p>Professional HTML email with Rev Winner branding</p>
+    <p style="margin-top: 20px; font-size: 14px;">
+        <strong>Email Structure:</strong><br>
+        • Header: Purple-blue gradient with "🎉 New User Registration"<br>
+        • Badge: "Rev Winner Platform"<br>
+        • Info Card with fields:<br>
+        &nbsp;&nbsp;- Full Name<br>
+        &nbsp;&nbsp;- Email Address (clickable mailto link)<br>
+        &nbsp;&nbsp;- Username<br>
+        &nbsp;&nbsp;- Company (if provided)<br>
+        &nbsp;&nbsp;- Registration Date<br>
+        &nbsp;&nbsp;- Account Status: "✅ Email verification pending"<br>
+        &nbsp;&nbsp;- Trial Plan: "3 sessions (max 60 minutes each)"<br>
+        • Footer: "📊 User Activity: Monitor their trial usage..."<br>
+        <br>
+        <strong>Recipient:</strong> sales@revwinner.com<br>
+        <strong>Subject:</strong> 🎉 New User Registration - Rev Winner
+    </p>
+</div>
+
+<h2>7.5 Purchase Flow - Loading States</h2>
+<div class="screenshot-placeholder">
+    <h3>Screenshot: Purchase Button Loading States</h3>
+    <p>Shows different states of purchase buttons</p>
+    <p style="margin-top: 20px; font-size: 14px;">
+        <strong>States:</strong><br>
+        1. <strong>Idle State:</strong> "Purchase Train Me - $15" or "Purchase" (Session Minutes)<br>
+        2. <strong>Loading State:</strong> Spinner + "Processing..." or "Purchasing..."<br>
+        3. <strong>Disabled State:</strong> Button grayed out during processing<br>
+        <br>
+        <strong>UI Features:</strong><br>
+        • Smooth transitions between states<br>
+        • Purple gradient background<br>
+        • White text<br>
+        • Spinner animation (Loader2 icon from lucide-react)<br>
+        • Prevents double-clicks during processing
+    </p>
+</div>
+
+<div class="page-break"></div>
+
+<!-- SUMMARY -->
+<h1>Summary</h1>
+
+<div class="success">
+    <h3>✅ Implementation Complete</h3>
+    <p>This documentation covers all implemented flows for Rev Winner:</p>
+    <ul>
+        <li><strong>New User Registration:</strong> Automated email notifications to sales@revwinner.com</li>
+        <li><strong>Train Me Add-on:</strong> $15/month subscription with Razorpay integration</li>
+        <li><strong>Session Minutes:</strong> 12 packages ($6-$108) with FIFO consumption and auto-expiry</li>
+        <li><strong>Payment Verification:</strong> Secure HMAC SHA256 signature validation</li>
+    </ul>
+</div>
+
+<div class="info">
+    <h3>📊 Key Features</h3>
+    <ul>
+        <li><strong>Security:</strong> All payments verified server-side with Razorpay signature validation</li>
+        <li><strong>User Experience:</strong> Professional UI with loading states and error handling</li>
+        <li><strong>Email Notifications:</strong> Automated, non-blocking notifications to sales team</li>
+        <li><strong>Database Design:</strong> Normalized schemas with proper foreign keys and constraints</li>
+        <li><strong>Testing:</strong> All interactive elements have data-testid attributes</li>
+    </ul>
+</div>
+
+<div class="warning">
+    <h3>⚠️ Security Notes</h3>
+    <ul>
+        <li>API keys and secrets are NEVER exposed to frontend</li>
+        <li>All payment verification happens server-side</li>
+        <li>JWT authentication required for all purchases</li>
+        <li>Non-blocking email sends prevent registration delays</li>
+        <li>FIFO consumption prevents minute balance manipulation</li>
+    </ul>
+</div>
+
+<div style="text-align: center; margin-top: 60px; padding: 40px; background: #f9fafb; border-radius: 8px;">
+    <h2 style="color: #C026D3;">Rev Winner Platform</h2>
+    <p style="color: #6b7280;">Domain-Agnostic Sales Assistant</p>
+    <p style="font-size: 14px; color: #9ca3af; margin-top: 20px;">
+        For questions or support, contact: <a href="mailto:sales@revwinner.com" style="color: #7C3AED;">sales@revwinner.com</a>
+    </p>
+</div>
+
+</body>
+</html>

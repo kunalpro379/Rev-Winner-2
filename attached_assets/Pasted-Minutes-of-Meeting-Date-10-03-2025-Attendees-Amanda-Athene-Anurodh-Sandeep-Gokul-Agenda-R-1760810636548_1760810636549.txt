@@ -1,0 +1,34 @@
+Minutes of Meeting
+Date: 10/03/2025
+Attendees: Amanda (Athene), Anurodh, Sandeep, Gokul
+Agenda
+Review scope of work for Software Automation.
+Discuss Change Management Managed Services proposal.
+Key Discussions & Outcomes
+1. Software Automation Scope & Pricing
+Amanda raised concern over pricing ($14.4K for 4 weeks, ~ $51/hr average) being higher than current rates.
+She suggested capping cost at $10,000; otherwise, she may shift the requirement to IdentityIQ.
+Team discussed possibility of optimizing resource allocation (removing PM/BPC/QA overhead).
+Amanda open to a T&M (Time & Material) model for transparency but firm on $10K budget cap.
+Action: Team to optimize cost and reframe proposal within Amanda’s budget range.
+2. Technical Clarification (Software Automation)
+Amanda explained current ServiceNow software catalog, SCCM/Intune provisioning, and AD-based entitlement logic.
+Requested update to PowerShell script to support user-based vs computer-based entitlement.
+Team confirmed scope is aligned with Amanda’s explanation.
+3. Change Management Managed Services
+inMorphis presented scope (CAB mgmt, compliance, reporting, training, support) and proposed team structure (Change Manager nearshore, Coordinator/Analyst offshore).
+Amanda feedback:
+2 FTEs dedicated full-time would be sufficient, with a 3rd resource for backup/flex.
+Resource availability required until 4:00 PM CST.
+Team should operate independently, enforcing process without her intervention.
+Documentation exists, but judgment calls will require time and training.
+Amanda has yet to finalize budget guidance for Change Management; will revert.
+Agreed Next Steps
+Software Automation Proposal → Optimize commercials to fit $10K cap. Reworked and sent the new SOW for signature.
+Change Management Proposal → Amanda to provide budgetary reference; inMorphis to refine commercials accordingly.
+Follow-up → inMorphis to resend documents post pricing reference,
+Meeting Close
+Amanda emphasized transparency on costs and her preference for proposals aligned with real budget limits.
+inMorphis committed to work on the pricing proposal and supporting Athene’s requirements flexibly.
+
+Best Regards,

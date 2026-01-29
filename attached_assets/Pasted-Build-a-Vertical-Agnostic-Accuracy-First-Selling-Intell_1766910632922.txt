@@ -1,0 +1,170 @@
+Build a Vertical-Agnostic Accuracy-First Selling Intelligence Engine for Rev Winner. This is a modifcation needed in Present to Win Section. 
+that assists sellers across ALL industries, products, and services.
+
+Rev Winner must support:
+- Technology & SaaS sales
+- Financial products & services
+- Consulting, implementation, and professional services
+- Managed services
+- Healthcare, education, logistics, manufacturing
+- Any B2B or B2C selling context
+
+CORE OBJECTIVE:
+Enable sellers to communicate clear, credible, and accurate differentiation
+without exaggeration, misinformation, or industry-specific compliance risk.
+
+--------------------------------------------------
+1. DOMAIN-AWARE CONTEXT DETECTION
+--------------------------------------------------
+Before generating any content, Rev Winner must:
+- Identify the selling domain (tech, finance, services, healthcare, etc.)
+- Detect deal type (product, subscription, service, advisory, outcome-based)
+- Adjust tone, claims, and compliance sensitivity accordingly
+
+If domain cannot be confidently detected:
+→ Default to conservative, neutral positioning language
+
+--------------------------------------------------
+2. SOURCE-OF-TRUTH HIERARCHY (MANDATORY)
+--------------------------------------------------
+All generated insights must follow this priority order:
+
+1) Customer-provided "Train Me" data
+   (documents, recordings, pricing sheets, policies, proposals)
+
+2) Official, publicly available sources
+   (vendor websites, brochures, regulatory disclosures)
+
+3) Industry-standard practices and norms
+   (used cautiously, never as absolute facts)
+
+4) General selling principles
+   (used only when domain-specific data is unavailable)
+
+If information is uncertain:
+→ Clearly label as "Positioning Insight" or "Typical Market Observation"
+
+--------------------------------------------------
+3. CLAIM SAFETY & CLASSIFICATION
+--------------------------------------------------
+Every generated statement must be internally classified as one of:
+
+- Verified Fact
+- Positioning Advantage
+- Use-Case Strength
+- Typical Market Practice
+- Trade-Off / Consideration
+- Opinion (Seller Framing)
+
+Disallowed across all verticals:
+- Absolute claims (best, only, guaranteed, fastest, cheapest)
+- Unverified performance numbers
+- Regulatory or financial guarantees
+- Medical, legal, or financial advice language
+
+--------------------------------------------------
+4. DIFFERENTIATION FRAMEWORK (UNIVERSAL)
+--------------------------------------------------
+Differentiation must be framed using one or more of:
+
+- Problem-fit (what problem this is designed for)
+- Approach & methodology
+- Delivery model & effort required
+- Risk profile & predictability
+- Customization vs standardization
+- Time-to-value
+- Cost transparency
+- Trust & accountability
+
+NOT:
+- Feature checklists alone
+- Aggressive competitor takedowns
+- Binary yes/no superiority tables
+
+--------------------------------------------------
+5. COMPETITOR & ALTERNATIVE HANDLING
+--------------------------------------------------
+When alternatives exist (competitors, in-house teams, status quo):
+
+- Acknowledge strengths of alternatives
+- Clearly state scenarios where alternatives are a better fit
+- Position Rev Winner's supported offering honestly
+
+Example:
+"Option A works well when [condition].
+This approach is more suitable when [different condition]."
+
+--------------------------------------------------
+6. BATTLE CARD GENERATION RULES
+--------------------------------------------------
+Each Battle Card must include:
+
+- Buyer Context & Intent
+- Common Buyer Concerns
+- Differentiation Talking Points (safe & accurate)
+- When This Offering Fits Well
+- When This Offering May Not Fit
+- Objection Handling (fact-based, calm)
+- Language to Avoid (risk phrases)
+
+--------------------------------------------------
+7. PITCH DECK GENERATION RULES
+--------------------------------------------------
+Pitch decks must:
+
+- Adapt structure by vertical
+- Emphasize outcomes over features
+- Avoid misleading comparisons
+- Use scenario-based storytelling
+- Include disclaimers where required (finance, healthcare, legal)
+
+--------------------------------------------------
+8. CASE STUDY GENERATION RULES
+--------------------------------------------------
+Case studies must be explicitly tagged as:
+
+- Real (verified)
+- Anonymized (real but identity hidden)
+- Illustrative (hypothetical example)
+
+Rules:
+- No fabricated customer names or logos
+- No invented metrics
+- Focus on problem → approach → outcome
+- Avoid exaggerated ROI claims
+
+--------------------------------------------------
+9. LIVE-CONVERSATION RESPONSE BEHAVIOR
+--------------------------------------------------
+During live sales conversations:
+
+- Prefer trust preservation over persuasion
+- Use probabilistic language where needed
+- If confidence is low, respond with:
+  “In similar situations, sellers typically see…”
+  “Based on available information…”
+
+--------------------------------------------------
+10. COMPLIANCE-AWARE ADAPTATION
+--------------------------------------------------
+For regulated industries (finance, healthcare, legal):
+
+- Automatically soften claims
+- Avoid advice-giving language
+- Encourage consultation with licensed professionals
+- Surface disclaimers silently (non-intrusive)
+
+--------------------------------------------------
+11. AUDITABILITY & TRACEABILITY
+--------------------------------------------------
+For every generated insight, log:
+- Source category used
+- Confidence level (High / Medium / Low)
+- Domain detected
+- Timestamp of generation
+
+--------------------------------------------------
+END GOAL:
+Rev Winner should act as a universal selling co-pilot
+that increases seller confidence, protects credibility,
+and improves buyer trust across every industry.

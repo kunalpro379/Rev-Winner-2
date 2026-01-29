@@ -1,0 +1,838 @@
+ENHANCE REV WINNER LICENSING + ENTERPRISE + BILLING
+
+> ⚠️ IMPORTANT:
+You are modifying an existing production SaaS app called Rev Winner.
+The app already has: authentication, web assistance, AI features, basic admin/license manager logic, Razorpay integration, etc.
+Do NOT break or replace existing flows. Only extend and enhance them.
+
+
+
+
+---
+
+🧩 0. CORE RULES
+
+1. Do NOT change:
+
+Existing Web Assistance behavior
+
+Existing AI response logic
+
+Existing meeting/transcription flows
+
+Existing user login flow, except for the new activation/password setup for enterprise invites
+
+
+
+2. Do NOT remove or destroy data.
+Only add new tables/columns in a backwards-compatible way.
+
+
+3. Existing License Manager & Admin Panel UI should remain, but be extended with new tabs/sections, not redesigned from scratch.
+
+
+4. Tech stack: React (frontend) + Express/Node (backend) + PostgreSQL + Drizzle ORM + Razorpay.
+Follow existing structure and patterns.
+
+
+
+
+---
+
+🎯 1. HIGH-LEVEL GOAL
+
+Extend Rev Winner into a full featured, flexible licensing + billing + enterprise management system, with:
+
+Individual subscriptions (Platform Access + Add-Ons)
+
+Enterprise accounts with multi-license management
+
+Train Me Add-On with per-user control
+
+Rev Winner DAI Add-On (OpenAI-powered internal API)
+
+Session Minutes management
+
+Clean, support-friendly Admin Panel
+
+Minimal changes to existing app behavior
+
+
+
+---
+
+💳 2. SUBSCRIPTION & PACKAGES (INDIVIDUAL USERS)
+
+2.1 Platform Access (Required)
+
+Platform Access gives the user the right to use the platform at all.
+Implement these products/plans:
+
+1. Month-to-Month (M2M)
+
+Price: $40 per user / 30 days
+
+After 30 days, if not renewed:
+
+User can still sign in
+
+Immediately show blocking popup:
+
+> “Your subscription has expired. Please renew to continue using Rev Winner.”
+
+
+
+Prevent access to core app until they renew
+
+
+
+
+2. Long-Term Access (One-Time Non-Renewing Plans)
+
+6 Months → $200
+
+12 Months → $399
+
+36 Months → $499
+
+Store start_date and end_date for each subscription
+
+When end_date < now → treat as expired just like M2M
+
+
+
+
+> Implementation:
+
+Create/extend a subscriptions table to include: user_id, plan_type (m2m, 6m, 12m, 36m), start_date, end_date, status, and razorpay_subscription_id or razorpay_order_id.
+
+At login and on each main app load, check status and end_date.
+
+
+
+
+
+---
+
+⏱ 3. MANDATORY ADD-ON: SESSION MINUTES
+
+All users (individual or enterprise) need session minutes to use AI features in the web assistance (TTS/AI processing).
+
+Price: $8 per 500 minutes
+
+Tiers: 500, 1000, 1500, 2000, 3000, 5000 minutes
+
+Validity: 31 days from purchase
+
+No rollover across periods
+
+
+Logic:
+
+Track minutes_purchased, minutes_used, purchase_date, expiry_date per user (and/or per enterprise where applicable)
+
+When minutes_used >= minutes_purchased OR expiry_date < now:
+
+Block AI features
+
+Show message:
+
+> “Your Session Minutes are exhausted. Please purchase an add-on to continue.”
+
+
+
+
+Allow buying any tier at any time; new purchase can either:
+
+Extend validity from current date, and
+
+Add minutes to remaining pool or reset (choose the simpler, well-structured model and implement consistently; document in code)
+
+
+
+> Create/extend session_minutes table with id, user_id (or enterprise_id if pooled), minutes_purchased, minutes_used, purchase_date, expiry_date.
+
+
+
+
+---
+
+📚 4. OPTIONAL ADD-ON: TRAIN ME
+
+Train Me lets users / enterprises upload internal content for personalized responses.
+
+Pricing
+
+$20 per user per month (or enterprise-wide with per-user toggles)
+
+
+Restrictions
+
+Max 100 documents per user (or per enterprise, but with per-user domain mapping)
+
+Supported formats: pdf, docx, xlsx, csv, txt, URLs, jpg, png
+
+Up to 5 domain categories (e.g., “Product”, “Pricing”, “Processes”, etc.)
+
+
+Behavior
+
+AI should:
+
+1. First query Train Me docs
+
+
+2. If inadequate, fall back to global web/LLM knowledge
+
+
+3. Prioritize Train Me’s knowledge in responses
+
+
+
+
+UI/Access Logic
+
+If Train Me Add-On not purchased:
+
+Train Me toggles in License Manager / user settings should be disabled
+
+Tooltip:
+
+> “Train Me Add-On not purchased. Please ask your License Manager to upgrade.”
+
+
+
+
+If Train Me purchased:
+
+License Manager can enable/disable Train Me per user
+
+If disabled for a user → that user shouldn’t see Train Me tab / upload options
+
+
+
+> DB:
+
+train_me_addon table: id, user_id or enterprise_id, active, renewal_date, file_count, domain_categories (JSON), metadata.
+
+Separate table for documents if not already: train_me_documents.
+
+
+
+
+
+---
+
+🤖 5. OPTIONAL ADD-ON: REV WINNER DAI (INTERNAL OPENAI ENGINE)
+
+Rev Winner DAI is for users who do NOT want to bring their own API key.
+
+Packages (with ~30% margin already baked in)
+
+Monthly recurring plans:
+
+Lite → 1M tokens → $10/month
+
+Moderate → 3M tokens → $24/month
+
+Professional → 6M tokens → $45/month
+
+Power → 12M tokens → $78/month
+
+Enterprise → 25M tokens → $156/month
+
+
+Refill one-time packs:
+
+1M → $10
+
+3M → $24
+
+6M → $45
+
+
+Behavior
+
+1. On DAI purchase:
+
+Generate a unique internal OpenAI API key or token mapping for that user or enterprise
+
+Store securely (encrypted) in DB
+
+Mark user/enterprise as using DAI instead of “Bring Your Own Key”
+
+
+
+2. When tokens are exhausted OR 30 days pass:
+
+Individual Users:
+
+Show message:
+
+> “Your Rev Winner DAI tokens have expired. Renew your DAI Add-On or add your own API key under Settings.”
+
+
+
+In settings:
+
+DAI option stays visible but disabled until renewed
+
+Provide field to paste own API key as alternative
+
+
+
+Enterprise Users:
+
+Show message:
+
+> “Your organization’s DAI tokens are exhausted. Please contact your License Manager to renew DAI.”
+
+
+
+
+
+
+3. If DAI is not purchased and user chooses “Rev Winner DAI” in settings:
+
+Show popup/toast:
+
+> “Rev Winner DAI is not part of your current plan. Please purchase the DAI Add-On or contact your License Manager.”
+
+
+
+
+
+
+Settings UI – AI Engine Section
+
+Option 1: “Use My Own API Key”
+
+Input field for key
+
+
+Option 2: “Use Rev Winner DAI”
+
+Enabled only if DAI Add-On is active
+
+
+
+> DB:
+
+dai_packages: id, user_id or enterprise_id, tokens_total, tokens_used, package_name, billing_type (monthly/refill), start_date, expiry_date.
+
+ai_usage_logs table for logging usage per user and per feature.
+
+
+
+
+
+---
+
+🏢 6. ENTERPRISE ACCOUNTS & LICENSE MANAGER
+
+We already have some License Manager & Admin logic – do not replace it, only extend.
+
+6.1 Enterprise Structure
+
+Entities:
+
+enterprise_accounts
+
+license_manager (one or more per enterprise)
+
+enterprise_user_map (mapping user → enterprise & license status)
+
+
+6.2 License Manager Capabilities (Extend Existing Panel)
+
+Add/extend tabs:
+
+1. Users & Licenses
+
+
+2. Train Me Access
+
+
+3. DAI & API Settings
+
+
+4. Session Minutes & Usage
+
+
+5. Billing & Subscriptions
+
+
+6. Audit & Logs (read-only for LM)
+
+
+7. Support Tools (lightweight actions)
+
+
+
+6.2.1 Assign License to User
+
+Flow:
+
+1. License Manager clicks “Assign License”.
+
+
+2. Inputs:
+
+User name
+
+User email
+
+
+
+3. System creates enterprise_user_map row with status pending_activation.
+
+
+4. System sends email to the user:
+
+Subject: “Your Rev Winner License Has Been Assigned”
+
+Body includes:
+
+“You’ve been granted access to Rev Winner under [Org Name]. Click below to activate your account.”
+
+Button: [Activate My Account] with token link
+
+
+
+
+5. Activation link opens a page:
+
+Validate token & expiration
+
+Force user to set a new password (even if email already exists with no password)
+
+After password setup → mark status active
+
+Grant access to platform, subject to subscription & add-ons
+
+
+
+
+6.2.2 Swap Licenses Between Users
+
+License Manager can select User A → “Revoke License” and assign that freed seat to User B.
+
+User A → inactive (cannot log in).
+
+User B → new activation email & flow.
+
+
+6.2.3 Enable / Disable Access
+
+Toggle switch:
+
+Disable → user cannot log in, show “Access disabled by your organization” if they try.
+
+Enable → restore login.
+
+
+
+6.2.4 Train Me Control
+
+If Train Me Add-On is purchased at enterprise level:
+
+Per-user toggle: “Train Me Access”
+
+ON → show Train Me section in user UI
+
+OFF → hide it & disallow document usage for that user
+
+
+If not purchased:
+
+All toggles greyed out with tooltip:
+“Train Me is not enabled for your organization.”
+
+
+
+6.2.5 DAI Control
+
+License Manager can see:
+
+DAI status: Active / Inactive
+
+Tokens remaining
+
+Renewal date
+
+Button: “Renew DAI” (takes them to billing/payment)
+
+
+For DAI-active enterprises:
+
+All users automatically use enterprise DAI unless they explicitly set “My Own API Key” in settings.
+
+
+For DAI-inactive enterprises:
+
+“Rev Winner DAI” option appears but disabled with message: “Your organization has not enabled DAI. Talk to your License Manager.”
+
+
+
+
+---
+
+🛠 7. ADMIN PANEL (REV WINNER INTERNAL) – VERY DETAILED
+
+The Admin Panel is for Rev Winner internal support & operations.
+Extend it carefully (do not remove current features), adding new sections:
+
+7.1 Admin Overview Dashboard
+
+Show high-level metrics:
+
+Total active users
+
+Total enterprise accounts
+
+Number of expired subscriptions
+
+Number of users with 0 session minutes
+
+Number of enterprises with DAI expiring soon
+
+Tiles like:
+
+“At-Risk Accounts” (expiring within 7 days)
+
+“No Minutes + Active Plan”
+
+“DAI Tokens < 10%”
+
+
+
+7.2 Enterprise Management Section
+
+For each enterprise:
+
+View:
+
+Enterprise name
+
+Primary License Manager(s)
+
+Total licenses purchased
+
+Licenses used / free
+
+Train Me status (on/off, expiry, usage)
+
+DAI status (tokens, expiry)
+
+Session Minutes: current pool, usage
+
+
+Actions:
+
+Add / remove License Manager
+
+Increase licenses (cannot decrease)
+
+Adjust subscription expiry in exceptional cases (with comment)
+
+Force disable an enterprise (suspend)
+
+Note / comment field for internal support notes
+
+
+
+7.3 User Management Section
+
+Search and filter by:
+
+Email / Domain / Enterprise
+
+Status (active, pending, disabled)
+
+Subscription status
+
+Minutes left
+
+DAI usage
+
+
+For each user, allow:
+
+View profile & roles
+
+View activation status
+
+Resend activation email
+
+Force password reset (email the link)
+
+View assigned add-ons (Train Me, DAI)
+
+View AI usage and last accessed time
+
+Impersonation (optional, view-only mode):
+
+Admin can “View as user” to debug UI without performing destructive actions
+
+
+
+7.4 Billing & Razorpay Integration View
+
+For each account (individual and enterprise):
+
+Show:
+
+Current subscriptions (Platform Access, Train Me, DAI, Session Minutes)
+
+Billing cycle
+
+Payment statues from Razorpay
+
+Last payment date, amount, product
+
+Invoice IDs and links to Razorpay dashboard
+
+
+Tools:
+
+“Sync with Razorpay” button → re-fetch subscription/payment status
+
+Flags to mark refunds/credits (logical flags; real refund to be done in Razorpay)
+
+Tag accounts as “Payment dispute” or “Grace period”
+
+
+
+7.5 Logs & Audit Section
+
+Admin must see:
+
+License assignment history:
+
+Who assigned what to whom, when
+
+
+License swaps
+
+Add-On purchases and expiries
+
+DAI token consumption trends (per account)
+
+Train Me usage: how many docs uploaded, last upload time
+
+Session minute usage peaks
+
+
+Include filters by:
+
+Account
+
+Date range
+
+Action type
+
+
+7.6 Support Shortcuts
+
+For common support tasks:
+
+Button: “Fix common issues” with small automation templates, e.g.:
+
+Recalculate expiry based on last successful payment
+
+Clear stuck pending_activation and send new link
+
+Reset usage counters if obviously wrong (only with admin comment)
+
+
+
+All these actions must require:
+
+Confirmation modal
+
+Reason comment
+
+Logging to admin_actions_log
+
+
+
+---
+
+💰 8. BILLING & RAZORPAY
+
+Add/ensure SKUs:
+
+Platform Access:
+
+RW-PA-M2M, RW-PA-6M, RW-PA-12M, RW-PA-36M
+
+
+Session Minutes:
+
+RW-SM-500, RW-SM-1000, RW-SM-1500, RW-SM-2000, RW-SM-3000, RW-SM-5000
+
+
+Train Me:
+
+RW-TM-1 (monthly)
+
+
+DAI Monthly:
+
+RW-DAI-1, RW-DAI-3, RW-DAI-6, RW-DAI-12, RW-DAI-25
+
+
+DAI Refills:
+
+RW-DAI-R1, RW-DAI-R3, RW-DAI-R6
+
+
+Enterprise License Packs (if needed):
+
+RW-ENT-5, RW-ENT-10, RW-ENT-25, RW-ENT-50, RW-ENT-100+
+
+
+
+On successful payment webhook:
+
+Identify product by SKU
+
+Update:
+
+subscriptions for platform access
+
+session_minutes for minutes
+
+train_me_addon for Train Me
+
+dai_packages for DAI
+
+enterprise_accounts for additional licenses
+
+
+Log transaction and sync to Admin Panel Billing view
+
+
+
+---
+
+🧱 9. DB & BACKEND IMPLEMENTATION NOTES
+
+Use Drizzle ORM to:
+
+Add new tables (if not present yet):
+
+subscriptions
+
+session_minutes
+
+train_me_addon
+
+dai_packages
+
+enterprise_accounts
+
+enterprise_user_map
+
+activation_tokens
+
+admin_actions_log
+
+ai_usage_logs
+
+
+Add indices on:
+
+user_id
+
+enterprise_id
+
+status
+
+expiry_date
+
+
+
+Ensure all changes are non-breaking and compatible with existing schema.
+
+
+---
+
+🧩 10. FRONTEND (REACT) – KEY SCREENS TO UPDATE
+
+1. User Settings
+
+Add “AI Engine” section
+
+Add Train Me visibility based on toggles
+
+Show DAI/Own API key options
+
+
+
+2. License Manager Panel
+
+Extend with tabs:
+
+Users & Licenses
+
+Train Me
+
+DAI
+
+Usage
+
+Billing
+
+
+Implement flows from sections above exactly
+
+
+
+3. Admin Panel
+
+Add Overview dashboard
+
+Add Enterprise Management
+
+Add User Management
+
+Add Billing & Razorpay
+
+Add Logs & Audit
+
+Add Support Shortcuts
+
+
+
+4. Global Message Handling
+
+Implement standardized popups/toasts for:
+
+Subscription expired
+
+Session minutes exhausted
+
+DAI tokens exhausted
+
+Train Me not available
+
+Contact License Manager messages
+
+
+
+
+
+Use existing design system/styling where possible.
+
+
+---
+
+✅ Final Reminder
+
+Preserve ALL existing Rev Winner functionality.
+
+Only extend — do not refactor core flows aggressively.
+
+Keep code modular, well-commented, and future-proof for more add-ons later.
+

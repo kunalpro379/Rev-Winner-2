@@ -1,0 +1,353 @@
+{
+  "products": [
+    {
+      "id": "revwinner-core",
+      "name": "Rev Winner Core Platform",
+      "category": "Sales Intelligence",
+      "description": "AI-powered sales assistant for real-time conversation intelligence and coaching",
+      "keywords": ["sales", "AI", "coaching", "transcription", "discovery", "conversation intelligence", "real-time"],
+      "painPoints": [
+        "sales reps struggle with discovery calls",
+        "missing important buying signals",
+        "poor conversation flow",
+        "lack of real-time guidance",
+        "inconsistent sales methodology",
+        "forgot key qualification questions"
+      ],
+      "useCases": [
+        "Live sales call coaching",
+        "Discovery call management",
+        "BANT qualification tracking",
+        "Meeting documentation",
+        "Sales methodology implementation"
+      ],
+      "targetIndustries": ["SaaS", "Technology", "IT Services", "Cybersecurity", "Consulting"],
+      "competitorTriggers": ["Gong", "Chorus", "Avoma", "Otter.ai", "Fireflies"],
+      "relatedProducts": ["revwinner-training", "revwinner-analytics"],
+      "upsellBundles": [
+        {
+          "name": "Sales Excellence Bundle",
+          "products": ["revwinner-core", "revwinner-training", "revwinner-analytics"],
+          "valueProposition": "Complete sales transformation with AI coaching, custom training, and performance analytics",
+          "pricing": "discounted"
+        }
+      ],
+      "crossSellOpportunities": [
+        {
+          "trigger": "team mentions training needs",
+          "recommendProduct": "revwinner-training",
+          "pitch": "Your team would benefit from our Custom AI Training feature - it learns from your best sales calls and product documentation"
+        },
+        {
+          "trigger": "manager asks about performance tracking",
+          "recommendProduct": "revwinner-analytics",
+          "pitch": "For team-wide insights, our Advanced Analytics add-on provides manager dashboards with win/loss analysis and rep benchmarking"
+        }
+      ],
+      "battleCard": {
+        "strengths": [
+          "Only platform with sub-3-second real-time AI coaching",
+          "Multi-AI provider support (6 providers)",
+          "Hybrid sales methodology framework (SPIN, MEDDIC, Challenger, BANT, NLP, GAP)",
+          "Domain-agnostic - works for any industry"
+        ],
+        "weaknesses": [
+          "Newer platform compared to Gong",
+          "Smaller market share"
+        ],
+        "vsGong": "Rev Winner offers real-time coaching during calls, while Gong focuses on post-call analysis. We're also 70% more affordable.",
+        "vsChorus": "Unlike Chorus, we support 6 AI providers and work domain-agnostic across any industry.",
+        "vsAvoma": "Rev Winner's hybrid methodology framework provides deeper sales coaching than Avoma's basic transcription."
+      },
+      "caseStudies": ["cybersecurity-sales", "saas-discovery", "it-services"]
+    },
+    {
+      "id": "revwinner-training",
+      "name": "Custom AI Training (Train Me Add-On)",
+      "category": "AI Customization",
+      "description": "Upload your sales playbooks, product docs, and winning calls to create a personalized AI coach",
+      "keywords": ["training", "customization", "playbook", "documentation", "knowledge base", "personalized AI"],
+      "painPoints": [
+        "generic AI responses don't match our product",
+        "need AI to understand our specific solutions",
+        "want AI trained on our best sales calls",
+        "require company-specific knowledge integration",
+        "AI doesn't know our competitive positioning"
+      ],
+      "useCases": [
+        "Product documentation training",
+        "Sales playbook integration",
+        "Competitive intelligence embedding",
+        "Best practice capture",
+        "Custom messaging alignment"
+      ],
+      "targetIndustries": ["Enterprise SaaS", "Complex B2B", "Technical Solutions", "Regulated Industries"],
+      "competitorTriggers": ["Gong Reality Platform", "Sales Loft", "Outreach"],
+      "relatedProducts": ["revwinner-core"],
+      "upsellBundles": [
+        {
+          "name": "Elite Sales Team Package",
+          "products": ["revwinner-core", "revwinner-training", "revwinner-analytics", "revwinner-dai-premium"],
+          "valueProposition": "Full-stack sales intelligence with custom AI, analytics, and dedicated support",
+          "pricing": "enterprise"
+        }
+      ],
+      "crossSellOpportunities": [
+        {
+          "trigger": "user mentions specific product features",
+          "recommendProduct": "revwinner-analytics",
+          "pitch": "Once your AI is trained, our Analytics add-on shows which messaging drives the highest win rates"
+        }
+      ],
+      "battleCard": {
+        "strengths": [
+          "Unlimited document uploads",
+          "Multi-format support (PDF, DOC, PPT, Excel, URLs)",
+          "Priority AI context - your docs referenced first",
+          "OCR for images and scanned documents"
+        ],
+        "weaknesses": [
+          "Requires time to upload and organize documents",
+          "Processing time for large files"
+        ],
+        "vsGong": "Gong charges per seat for knowledge integration. Rev Winner's Train Me is a one-time add-on for unlimited uploads.",
+        "differentiators": "Your sales playbooks become the AI's primary knowledge source - no generic responses"
+      },
+      "caseStudies": ["enterprise-customization"]
+    },
+    {
+      "id": "revwinner-analytics",
+      "name": "Advanced Analytics Dashboard",
+      "category": "Performance Analytics",
+      "description": "Team-wide insights, win/loss analysis, rep benchmarking, and conversation intelligence metrics",
+      "keywords": ["analytics", "dashboard", "metrics", "performance", "win rate", "team insights", "manager tools"],
+      "painPoints": [
+        "no visibility into team performance",
+        "can't identify top performers",
+        "missing win/loss patterns",
+        "need conversation quality metrics",
+        "want coaching effectiveness tracking",
+        "require forecast accuracy improvement"
+      ],
+      "useCases": [
+        "Sales manager dashboards",
+        "Win/loss analysis",
+        "Rep performance benchmarking",
+        "Conversation quality scoring",
+        "Forecast accuracy tracking",
+        "Coaching ROI measurement"
+      ],
+      "targetIndustries": ["Enterprise Sales", "SaaS", "Technology", "Financial Services"],
+      "competitorTriggers": ["Gong Analytics", "Clari", "People.ai"],
+      "relatedProducts": ["revwinner-core", "revwinner-training"],
+      "upsellBundles": [
+        {
+          "name": "Manager Excellence Suite",
+          "products": ["revwinner-core", "revwinner-analytics", "revwinner-dai-premium"],
+          "valueProposition": "Complete sales leadership platform with team analytics and premium AI support",
+          "pricing": "manager-tier"
+        }
+      ],
+      "crossSellOpportunities": [
+        {
+          "trigger": "multiple team members mentioned",
+          "recommendProduct": "revwinner-analytics",
+          "pitch": "For managing multiple reps, our Analytics Dashboard gives you team-wide visibility and performance trends"
+        }
+      ],
+      "battleCard": {
+        "strengths": [
+          "Real-time conversation quality scores",
+          "AI-powered win/loss prediction",
+          "Methodology adherence tracking (SPIN, MEDDIC, etc.)",
+          "Automated coaching recommendations"
+        ],
+        "weaknesses": [
+          "Requires Core Platform subscription",
+          "Best with 5+ team members"
+        ],
+        "vsGong": "Rev Winner Analytics is an add-on, not a separate expensive platform. We're 60% more affordable than Gong for analytics features.",
+        "vsClari": "Unlike Clari's complex setup, Rev Winner Analytics integrates automatically with your existing conversations - zero configuration."
+      },
+      "caseStudies": ["sales-team-transformation"]
+    },
+    {
+      "id": "revwinner-dai-premium",
+      "name": "Dedicated AI Infrastructure (Premium DAI)",
+      "category": "Enterprise Infrastructure",
+      "description": "Dedicated AI processing, priority queues, SLA guarantees, and premium support",
+      "keywords": ["dedicated", "enterprise", "SLA", "infrastructure", "priority", "premium support", "guaranteed uptime"],
+      "painPoints": [
+        "concerned about AI response times during peak hours",
+        "need guaranteed SLA for enterprise compliance",
+        "require dedicated support team",
+        "want priority processing for critical deals",
+        "enterprise security requirements",
+        "need custom infrastructure"
+      ],
+      "useCases": [
+        "Enterprise deployments",
+        "High-volume teams (50+ users)",
+        "Mission-critical sales operations",
+        "Regulated industries requiring SLAs",
+        "Custom AI infrastructure needs"
+      ],
+      "targetIndustries": ["Enterprise", "Financial Services", "Healthcare", "Government", "Fortune 500"],
+      "competitorTriggers": ["Salesforce Einstein", "Microsoft Dynamics", "SAP Sales Cloud"],
+      "relatedProducts": ["revwinner-core", "revwinner-analytics", "revwinner-training"],
+      "upsellBundles": [
+        {
+          "name": "Enterprise Command Center",
+          "products": ["revwinner-core", "revwinner-training", "revwinner-analytics", "revwinner-dai-premium"],
+          "valueProposition": "Complete enterprise-grade sales intelligence with dedicated infrastructure and premium support",
+          "pricing": "enterprise-custom"
+        }
+      ],
+      "crossSellOpportunities": [
+        {
+          "trigger": "mention of large team or enterprise deployment",
+          "recommendProduct": "revwinner-dai-premium",
+          "pitch": "For enterprise scale, our Premium DAI ensures sub-2-second response times even with 100+ concurrent users, backed by 99.9% uptime SLA"
+        }
+      ],
+      "battleCard": {
+        "strengths": [
+          "99.9% uptime SLA guarantee",
+          "Sub-2-second AI response times (guaranteed)",
+          "Dedicated account manager and support team",
+          "Priority feature requests",
+          "Custom AI model tuning"
+        ],
+        "weaknesses": [
+          "Higher price point",
+          "Requires annual commitment"
+        ],
+        "vsCompetitors": "Unlike Salesforce Einstein's rigid infrastructure, Rev Winner DAI is flexible and customizable to your exact needs",
+        "differentiators": "Only sales intelligence platform offering dedicated AI infrastructure at this price point"
+      },
+      "caseStudies": ["enterprise-deployment"]
+    },
+    {
+      "id": "session-minutes-packages",
+      "name": "Session Minutes Add-Ons",
+      "category": "Capacity Expansion",
+      "description": "Additional conversation minutes for power users and high-volume sales teams",
+      "keywords": ["minutes", "capacity", "add-on", "usage", "high-volume", "power user"],
+      "painPoints": [
+        "running out of monthly minutes",
+        "team needs more conversation capacity",
+        "high-volume sales activity",
+        "multiple daily calls",
+        "want unlimited usage"
+      ],
+      "useCases": [
+        "High-volume sales teams",
+        "Enterprise account executives",
+        "Sales development teams",
+        "Customer success using for calls",
+        "Training and onboarding"
+      ],
+      "targetIndustries": ["All"],
+      "relatedProducts": ["revwinner-core"],
+      "packages": [
+        {
+          "name": "Session Minutes 600",
+          "minutes": 600,
+          "price": "$10/month",
+          "bestFor": "Individual power users"
+        },
+        {
+          "name": "Session Minutes 1800",
+          "minutes": 1800,
+          "price": "$25/month",
+          "bestFor": "Small teams or heavy users"
+        },
+        {
+          "name": "Session Minutes 4500",
+          "minutes": 4500,
+          "price": "$60/month",
+          "bestFor": "Sales teams with daily calls"
+        },
+        {
+          "name": "Session Minutes 9000",
+          "minutes": 9000,
+          "price": "$100/month",
+          "bestFor": "Large teams or enterprise use"
+        }
+      ],
+      "crossSellOpportunities": [
+        {
+          "trigger": "user mentions running low on minutes",
+          "recommendProduct": "session-minutes-packages",
+          "pitch": "Based on your usage pattern, the 1800-minute package would give you 3x more capacity for just $25/month"
+        }
+      ]
+    }
+  ],
+  "productRelationships": {
+    "foundationProducts": ["revwinner-core"],
+    "essentialAddOns": ["revwinner-training", "session-minutes-packages"],
+    "managerTools": ["revwinner-analytics"],
+    "enterpriseUpgrades": ["revwinner-dai-premium"],
+    "commonBundles": [
+      {
+        "name": "Starter Pack",
+        "products": ["revwinner-core", "session-minutes-1800"],
+        "pitch": "Get started with Core Platform plus extra minutes for heavy usage",
+        "discount": "10%"
+      },
+      {
+        "name": "Professional Suite",
+        "products": ["revwinner-core", "revwinner-training", "session-minutes-1800"],
+        "pitch": "Core Platform + Custom AI Training + Extra Minutes - everything you need for advanced selling",
+        "discount": "15%"
+      },
+      {
+        "name": "Team Leader Bundle",
+        "products": ["revwinner-core", "revwinner-analytics", "session-minutes-4500"],
+        "pitch": "Perfect for sales managers - Core Platform + Team Analytics + High-Volume Minutes",
+        "discount": "20%"
+      },
+      {
+        "name": "Enterprise Package",
+        "products": ["revwinner-core", "revwinner-training", "revwinner-analytics", "revwinner-dai-premium"],
+        "pitch": "Complete enterprise solution - Custom AI, Team Analytics, Dedicated Infrastructure",
+        "discount": "25%"
+      }
+    ]
+  },
+  "detectionRules": {
+    "multiProductScenarios": [
+      {
+        "scenario": "New customer with small team (2-5 reps)",
+        "recommendProducts": ["revwinner-core", "session-minutes-600"],
+        "reasoning": "Start with core platform and basic extra capacity"
+      },
+      {
+        "scenario": "Customer mentions training needs or specific products",
+        "recommendProducts": ["revwinner-core", "revwinner-training"],
+        "reasoning": "Custom AI training ensures product-specific responses"
+      },
+      {
+        "scenario": "Sales manager or team lead buyer",
+        "recommendProducts": ["revwinner-core", "revwinner-analytics", "session-minutes-1800"],
+        "reasoning": "Managers need team visibility and capacity for multiple reps"
+      },
+      {
+        "scenario": "Enterprise with 20+ users or security/SLA requirements",
+        "recommendProducts": ["revwinner-core", "revwinner-training", "revwinner-analytics", "revwinner-dai-premium"],
+        "reasoning": "Full enterprise stack with dedicated infrastructure"
+      },
+      {
+        "scenario": "Customer running low on minutes mid-call",
+        "recommendProducts": ["session-minutes-packages"],
+        "reasoning": "Immediate capacity need - upsell minutes package"
+      },
+      {
+        "scenario": "Customer mentions competitors (Gong, Clari, Chorus)",
+        "recommendProducts": ["revwinner-core", "revwinner-analytics"],
+        "reasoning": "Position against enterprise competitors with analytics capabilities"
+      }
+    ]
+  }
+}

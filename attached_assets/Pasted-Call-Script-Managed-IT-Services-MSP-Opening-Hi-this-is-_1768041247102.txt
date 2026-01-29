@@ -1,0 +1,82 @@
+Call Script – Managed IT Services (MSP)
+Opening
+“Hi, this is Sandeep from Swift-Tech. We help businesses reduce IT risk, downtime, and surprise costs. I just need 2–3 minutes to understand if this is even relevant for you.”
+Discovery Questions
+Who manages your IT today—internal team or an MSP?
+Have you faced any downtime, security incidents, or data loss in the last six months?
+Is your IT spend predictable, or do you get surprise bills?
+When was your backup and disaster recovery last tested?
+If a ransomware attack happened tomorrow, how fast could you recover?
+Does IT enable your growth—or slow it down?
+Pre-Empted Objections
+“We already have an IT vendor.”
+“Perfect. Most of our clients did too. They came to us because things were working, but not working optimally. We typically uncover 15–30% hidden risk in the first audit.”
+“Our budget is tight.”
+“Understood. That’s exactly why the MSP model works—fixed monthly cost, no surprises, and prevention always costs less than recovery.”
+“We’re small—we’re not a target.”
+“Over 80% of attacks hit SMBs because they’re softer targets. Size doesn’t protect you—preparation does.”
+Why We’re Better – 10 Points
+Proactive monitoring, not reactive fixing
+Fixed monthly cost—no surprises
+Enterprise-grade security at SMB pricing
+24/7 monitoring and response
+Automated patching and updates
+Tested backup and recovery drills
+Single point of accountability
+Compliance-ready frameworks
+Faster resolution with SLAs
+Business-first IT, not tool-first IT
+Next Steps
+“The best next step is a free risk assessment. We’ll scan your environment and give you a simple report:
+What’s working
+What’s risky
+What can be improved
+No commitment—purely informational.”
+Recommended Action Items
+Schedule a 30-minute Risk Assessment
+Share basic IT inventory
+Identify an internal stakeholder
+Review findings within 48 hours
+🔹 Call Script – Microsoft Solutions (M365, Azure, Security, Copilot)
+Opening
+“Hi, this is Sandeep. We help companies unlock real ROI from Microsoft—beyond just email and Teams. Quick question to see if this is relevant.”
+Discovery Questions
+Are you using Microsoft 365 mainly for email and Teams?
+Is your data security on default settings or customized?
+Do teams use tools outside Microsoft (shadow IT)?
+Any challenges with remote or hybrid work?
+Do you have a real backup for M365—or is it assumed?
+Are users trained on security and productivity features?
+Pre-Empted Objections
+“We already use Microsoft.”
+“Most companies do—but only 30–40% of its real capability. The gap between license and leverage is huge.”
+“Microsoft is complex.”
+“That’s exactly where we help—by simplifying, configuring, and optimizing it for your business use cases.”
+Why Our Microsoft Practice Is Better – 10 Points
+Business-aligned architecture
+Security-first deployments
+Custom policies, not defaults
+Zero-trust implementation
+M365 + Azure optimization
+Data Loss Prevention (DLP)
+Identity and access control
+Backup beyond Microsoft
+User adoption programs
+ROI-driven roadmap
+Next Steps
+“Let’s start with a Microsoft Environment Review. We’ll map:
+Usage gaps
+Security risks
+Cost leakages
+Automation opportunities”
+Recommended Action Items
+Book a 30-minute assessment
+Grant read-only access
+Share current licenses
+Review roadmap and savings
+These scripts are structured to:
+Ask the right discovery questions
+Handle objections in advance
+Clearly differentiate your value
+Define a strong next step
+Move the deal forward with clarity and control

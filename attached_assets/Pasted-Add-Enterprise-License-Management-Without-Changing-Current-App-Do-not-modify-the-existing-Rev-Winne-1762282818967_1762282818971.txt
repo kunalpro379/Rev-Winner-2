@@ -1,0 +1,158 @@
+Add Enterprise License Management Without Changing Current App
+
+Do not modify the existing Rev Winner app functionality or UI flow.
+
+Add a new Enterprise Subscription Management module that exists as an additional section, not replacing current app behavior.
+
+Requirements:
+
+1. Admin Subscription Dashboard
+
+Create a separate page/menu item called "Enterprise Admin Panel" where customer-side Admins can:
+
+View subscription details (plan, renewal date, total seats, used seats, remaining seats)
+
+Manage licenses and team access
+
+View and download invoices & payment history
+
+Update payment method (credit card / billing info)
+
+
+
+---
+
+2. License Management System
+
+Admin capabilities:
+
+Add Seats / Licenses
+
+Admin selects # of additional seats
+
+System charges automatically (pro-rated)
+
+Update total seat count
+
+
+Assign Seats
+
+Send email invites with activation link
+
+Enter email → generate access link
+
+When user activates link, seat count decreases
+
+
+Re-Assign Seats
+
+Admin can revoke access
+
+Reassign seat to another team member
+
+
+Monitor Seats
+
+Display list of active users and pending invites
+
+
+
+
+---
+
+3. Activation Flow
+
+Team member receives activation link → creates account → license seat consumed.
+
+Seat gets freed if revoked.
+
+
+---
+
+4. Pricing & Billing
+
+No billing changes to existing app
+
+Only add enterprise billing capability
+
+Support:
+
+One-time initial license purchase
+
+Add-seats billing
+
+Subscription renewal
+
+
+Renewal cycle does not reset when adding seats — seats are pro-rated
+
+
+
+---
+
+5. Access Control
+
+Only the Enterprise Admin can access this panel
+
+Team users cannot see or manage seats
+
+Enforce secure authentication & role-based access
+
+
+
+---
+
+UI Requirements
+
+Add a new menu tab/button:
+
+> Enterprise License Manager
+
+
+
+Inside it, include:
+
+Subscription Summary
+
+License Management
+
+Add Seats Button
+
+Invite Team
+
+Manage Users
+
+Billing & Invoices
+
+
+
+---
+
+Data + Records
+
+Store:
+
+total_seats
+
+used_seats
+
+remaining_seats
+
+invite status
+
+activated user list
+
+payment + invoice logs
+
+
+
+---
+
+Success Criteria
+
+✅ Current Rev Winner flow remains unchanged
+✅ Enterprise Admins can self-manage licenses
+✅ Ability to add seats anytime
+✅ Invite / revoke / reassign seats
+✅ Billing + invoices included
+✅ Secure & access-controlled admin panel

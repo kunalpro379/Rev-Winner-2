@@ -1,0 +1,119 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+  "packageName": "com.servicenow.salesassistant",
+  "developer": {
+    "name": "ServiceNow Sales Team",
+    "websiteUrl": "https://servicenow.com",
+    "privacyUrl": "https://servicenow.com/privacy",
+    "termsOfUseUrl": "https://servicenow.com/terms"
+  },
+  "icons": {
+    "color": "color-icon.png",
+    "outline": "outline-icon.png"
+  },
+  "name": {
+    "short": "Sales Assistant",
+    "full": "ServiceNow Sales Discovery Assistant"
+  },
+  "description": {
+    "short": "AI-powered sales discovery assistant for ServiceNow solutions",
+    "full": "Professional sales assistant that helps conduct discovery calls, identify client pain points, and recommend appropriate ServiceNow modules through AI-powered conversation analysis."
+  },
+  "accentColor": "#1f2937",
+  "isFullScreen": false,
+  "staticTabs": [
+    {
+      "entityId": "salesAssistant",
+      "name": "Sales Assistant",
+      "contentUrl": "https://{baseUrl}",
+      "websiteUrl": "https://{baseUrl}",
+      "scopes": [
+        "personal"
+      ]
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "bots": [
+    {
+      "botId": "b2c3d4e5-f678-9012-3456-789012bcdef0",
+      "scopes": [
+        "personal",
+        "team",
+        "groupchat"
+      ],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "supportsCalling": true,
+      "supportsVideo": true
+    }
+  ],
+  "composeExtensions": [],
+  "configurableTabs": [],
+  "meetingExtensionDefinition": {
+    "scenes": [
+      {
+        "id": "salesAssistantScene",
+        "name": "Sales Assistant",
+        "file": "scenes/salesAssistant.json",
+        "preview": "scenes/salesAssistant.png",
+        "maxAudience": 50,
+        "seatsReservedForOrganizersOrPresenters": 0
+      }
+    ],
+    "supportsStreaming": true
+  },
+  "validDomains": [
+    "{baseUrl}"
+  ],
+  "webApplicationInfo": {
+    "id": "b2c3d4e5-f678-9012-3456-789012bcdef0",
+    "resource": "https://{baseUrl}"
+  },
+  "authorization": {
+    "permissions": {
+      "resourceSpecific": [
+        {
+          "name": "OnlineMeeting.ReadBasic.Chat",
+          "type": "Application"
+        },
+        {
+          "name": "ChatMessage.Read.Chat",
+          "type": "Application"
+        },
+        {
+          "name": "Calls.AccessMedia.All",
+          "type": "Application"
+        },
+        {
+          "name": "Calls.JoinGroupCall.All", 
+          "type": "Application"
+        },
+        {
+          "name": "OnlineMeetings.Read.All",
+          "type": "Application"
+        },
+        {
+          "name": "OnlineMeetings.ReadWrite.All",
+          "type": "Application"
+        }
+      ]
+    }
+  },
+  "meetingExtensionDefinition": {
+    "scenes": [
+      {
+        "id": "salesAssistantMeeting",
+        "name": "Sales Assistant",
+        "file": "scenes/salesAssistant.json",
+        "preview": "scenes/salesAssistant.png"
+      }
+    ],
+    "supportsStreaming": true
+  }
+}

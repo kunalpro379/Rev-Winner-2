@@ -1,0 +1,131 @@
+Problem Statement
+
+Currently, the Shift Gears and Customer Query Pitches sections are incorrectly generating responses from the Train Me add-on (Netskope documents) even when the selected Domain Expertise in the Rev Winner web app is set to Integris / Integrisit.
+
+This behavior is incorrect and must be fixed.
+
+Core Objective
+
+Ensure strict domain awareness and domain isolation across:
+
+Rev Winner Assistant App
+
+Train Me Add-On
+
+Shift Gears
+
+Customer Query Pitches
+
+Case Study Generation
+
+Responses must always align with the active Domain Expertise selected in the web app.
+
+Mandatory Rules to Implement
+1. Domain Matching Logic (Highest Priority)
+
+Every session has one active Domain Expertise (e.g., Integris, Netskope, Salesforce, etc.).
+
+Every Train Me knowledge base is mapped to one specific domain.
+
+👉 If Domain Expertise (Web App) == Domain (Train Me Add-On):
+
+Use uploaded Train Me documents as FIRST priority
+
+Generate responses strictly from those documents
+
+Apply this rule to:
+
+Shift Gears
+
+Customer Query Pitches
+
+Conversation Analysis
+
+Objection Handling
+
+Case Studies
+
+2. Domain Mismatch Handling (Critical Fix)
+
+👉 If Domain Expertise (Web App) ≠ Domain (Train Me Add-On):
+
+DO NOT use Train Me documents
+
+Completely ignore uploaded documents from other domains
+
+Generate responses using the Universal Knowledge Base only
+
+Ensure content is:
+
+Relevant to the selected Domain Expertise
+
+Accurate, neutral, and enterprise-grade
+
+Not contaminated by unrelated domain data
+
+📌 Example:
+
+Web App Domain = Integris
+
+Train Me Docs = Netskope
+➡️ Response must come from Universal Knowledge Base, NOT Netskope docs.
+
+3. Case Study Generation Rules
+
+If Domain matches:
+
+Generate case study from Train Me documents
+
+If Domain does NOT match:
+
+Generate a high-quality, domain-relevant case study from the Universal Knowledge Base
+
+The case study should:
+
+Reflect real-world success patterns
+
+Be aligned with the selected domain
+
+Be sales-ready and credible
+
+4. Conversation Awareness (Sales Context)
+
+All responses must behave as if:
+
+You are a sales professional in a live customer conversation
+
+Your goal is to:
+
+Answer confidently
+
+Ask intelligent follow-up questions
+
+Handle objections
+
+Move the deal closer to winning or next steps
+
+Responses should:
+
+Be contextual to the conversation
+
+Avoid generic AI tone
+
+Support deal progression (demo, pilot, evaluation, close)
+
+5. Absolute Prohibitions
+
+❌ No cross-domain leakage
+
+❌ No accidental use of unrelated Train Me documents
+
+❌ No mixing Netskope content when Integris is selected (or vice-versa)
+
+Expected Outcome
+
+Clean domain isolation
+
+Accurate, trustworthy responses
+
+Predictable behavior for enterprise integrations
+
+Sales-ready AI that respects domain context and knowledge ownership

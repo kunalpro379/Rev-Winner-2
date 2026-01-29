@@ -1,0 +1,199 @@
+The following is only to enhance and make the tech Environment functional, no other changes needed. Also change the name of the section from Tech Environment to Map/Flow
+
+Objective:
+Generate a visual Tech Environment Mind Map / Workflow that helps a seller clearly understand the customer’s IT stack, infrastructure, workflows, dependencies, gaps, and pain points, even when the customer provides partial, vague, or non-technical information during a sales conversation.
+Context Awareness Rules:
+•	Analyze the live conversation or provided transcript
+•	Always remain aware of the user’s domain expertise in the rev winner web app.
+•	Prioritize train me addon information for generating a response, if no relevant information found generate information from universal knowledge base of the AI currently in use.
+•	If repeat scenario, use previous responses instead of utilizing excessive tokens through AI.
+•	Fast response needed, 
+•	Infer missing components using industry intelligence and best practices
+•	Stay strictly contextual to what the customer is discussing
+•	Never overwhelm—prioritize clarity over completeness
+________________________________________
+🔹 Input Signals
+•	Live conversation transcript (if available)
+•	Seller-selected Domain Expertise (e.g., IT Infra, Cybersecurity, Cloud, IT Development, MSP, SaaS, Microsoft, Cisco, NetApp, Dell etc.)
+•	Optional seller intent:
+o	“Understand current environment”
+o	“Identify pain points”
+o	“Prepare solution recommendation”
+o	“Compare current vs future state”
+________________________________________
+🔹 Output Requirements
+A. Dynamic Visual Mind Map / Workflow
+Generate a structured visual map with:
+•	Layers (expandable / collapsible)
+•	Logical flow (left → right or top → bottom)
+•	Clear separation of:
+o	Users
+o	Infrastructure
+o	Applications
+o	Data
+o	Security
+o	Operations
+B. Inference Engine (Critical)
+If the customer does not explicitly mention components:
+•	Use domain intelligence to infer likely systems
+•	Mark inferred items as:
+o	🟡 Assumed
+o	🔵 Confirmed
+•	Continuously refine assumptions as conversation evolves
+________________________________________
+🔹 Core Sections to Generate in the Mind Map
+1.	Users & Access
+o	Employees
+o	Remote users
+o	Third parties / vendors
+o	Access methods (VPN, ZTNA, local, cloud)
+2.	Endpoints
+o	Laptops / desktops
+o	Servers (on-prem / cloud)
+o	Mobile & IoT devices
+3.	Network & Infrastructure
+o	Internet / ISPs
+o	Firewalls
+o	Switches
+o	Wi-Fi
+o	Cloud connectivity
+4.	Applications & Workloads
+o	Business apps
+o	Custom applications
+o	SaaS tools
+o	Dev / Test / Prod environments
+5.	Data Flow
+o	Where data is created
+o	Where it is stored
+o	How it moves
+o	Who accesses it
+6.	Security Controls
+o	Endpoint security
+o	Network security
+o	Identity & access
+o	Backup & DR
+o	Monitoring & logging
+7.	Operations & Management
+o	IT team size
+o	Tools used
+o	Manual vs automated processes
+o	Alerting & response
+________________________________________
+🔹 Pain Point Detection (Auto)
+Automatically identify and tag:
+•	🔴 Security risks
+•	🟠 Operational inefficiencies
+•	🟡 Scalability limitations
+•	🔵 Cost inefficiencies
+Each pain point must include:
+•	What is happening
+•	Why it matters
+•	What breaks if ignored
+________________________________________
+🔹 Hover Intelligence (UX Requirement)
+Every node in the mind map or workflow must support hover text with:
+•	One-line, non-technical explanation
+•	Example:
+“Firewall: Controls what traffic is allowed in or out of the network.”
+________________________________________
+🔹 Adaptive Mode (Very Important)
+If a conversation IS active
+•	Generate a context-specific environment
+•	Continuously update the map as new info appears
+If a conversation HAS NOT started
+•	Generate a “Typical Environment” based on the selected Domain Expertise
+•	Clearly label it as:
+“Reference architecture based on similar customers”
+________________________________________
+🔹 Output Tone & Style
+•	Business-friendly
+•	Visually intuitive
+•	Zero jargon unless necessary
+•	Designed for sales confidence, not engineering depth
+________________________________________
+2️⃣ SITUATIONAL INTELLIGENCE
+(What sellers ACTUALLY face in tech sales)
+Your prompt should handle these real-world scenarios automatically 👇
+🔹 Situation 1: Customer is Non-Technical
+•	Translate vague statements like:
+o	“Things are slow”
+o	“Security is a concern”
+•	Into:
+o	Likely bandwidth issues
+o	Missing monitoring
+o	Poor endpoint visibility
+________________________________________
+🔹 Situation 2: Partial Disclosure
+Customer mentions:
+“We use cloud and some on-prem stuff.”
+AI should infer:
+•	Hybrid architecture
+•	Connectivity challenges
+•	Identity fragmentation
+•	Backup complexity
+________________________________________
+🔹 Situation 3: Cybersecurity Sales
+Detect:
+•	Missing MFA
+•	Flat network
+•	No incident response
+•	No visibility
+Auto-generate:
+•	Attack paths
+•	Risk hotspots
+•	Compliance gaps
+________________________________________
+🔹 Situation 4: IT Infra / MSP Sales
+Detect:
+•	Manual patching
+•	Tool sprawl
+•	Reactive support
+•	Lack of standardization
+Generate:
+•	Operational flow
+•	Bottlenecks
+•	Automation opportunities
+________________________________________
+🔹 Situation 5: IT Development / SaaS Sales
+Detect:
+•	Dev / Test / Prod confusion
+•	Manual deployments
+•	Weak CI/CD
+•	Security ignored in SDLC
+Generate:
+•	App lifecycle flow
+•	Data dependencies
+•	Failure points
+________________________________________
+3️⃣ ADVANCED ENHANCEMENTS (Game-Changing)
+🔥 Enhancement 1: Current vs Ideal State Toggle
+•	Show:
+o	Current environment
+o	Optimized future state
+•	Visually highlight what changes
+________________________________________
+🔥 Enhancement 2: Seller Confidence Layer
+Add a “Why this matters” insight per section:
+•	Helps seller explain value
+•	Builds authority instantly
+________________________________________
+🔥 Enhancement 3: Recommendation Bridge
+Each pain point should optionally connect to:
+•	Possible solution category
+•	Next discovery question
+•	Risk of inaction
+(No pitching. Just intelligence.)
+________________________________________
+🔥 Enhancement 4: Downloadable Visual
+Allow seller to:
+•	Download mind map as image/PDF
+•	Share during or after call
+________________________________________
+🔥 Enhancement 5: Progressive Disclosure
+•	Start simple
+•	Expand only when seller clicks
+•	Prevent cognitive overload
+________________________________________
+🔑 ONE-LINE PRODUCT VISION (Optional)
+This system turns live customer conversations into a living visual map of their IT environment—so sellers can see what the customer can’t explain.
+Do not limit response generation to above stated situation but for every potential situation for industries like, Insurance, IT, Technology, Healthcare and more.

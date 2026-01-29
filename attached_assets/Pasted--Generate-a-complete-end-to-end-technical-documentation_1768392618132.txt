@@ -1,0 +1,107 @@
+“Generate a complete, end-to-end technical documentation of the Rev Winner platform in a professional PDF format. This document must be detailed enough that if someone asks me any technical question about Rev Winner, I can answer it confidently from this single file.
+Cover the entire ecosystem, including:
+Web App
+Admin Panel
+License Manager
+Marketing Add-on
+TrainMe Add-on
+The document must explain:
+System Architecture Overview
+High-level platform architecture
+How the Web App, Admin Panel, License Manager, Marketing Add-on, and TrainMe Add-on interact
+API flow between components
+Role of backend services, workers, queues, and schedulers
+Module-by-Module Breakdown
+For each of the following modules, explain purpose, inputs, outputs, internal flow, and dependencies:
+Live Transcript
+Shift Gears
+Query Pitches
+Conversation Analysis
+Products & Services
+Product & Service Recommendations
+Meeting Minutes
+Relationship Builders
+Present to Win (Battle Cards, Case Studies, Pitch Decks)
+Data Storage & Folder Structure
+Explain what data is stored where
+Folder structure for:
+Live transcripts
+Session data
+User profiles
+Domain knowledge
+TrainMe uploads
+Generated assets (minutes, decks, cards, etc.)
+How tenant isolation works (per-company, per-domain)
+What is stored in databases vs file/object storage
+Database Design
+Describe all major tables/collections:
+Users
+Companies / Tenants
+Sessions
+Transcripts
+AI Requests
+Token Usage Logs
+Products & Services
+Knowledge Base Entries
+Licenses & Plans
+Explain relationships between tables
+Show how session data flows into analytics and AI pipelines
+LLM & AI Processing Pipeline
+Step-by-step flow of how a user’s voice becomes:
+Live Transcript
+Context
+AI Prompt
+LLM Response
+UI Output
+Explain how:
+Shift Gears uses LLM
+Conversation Analysis uses LLM
+Meeting Minutes are generated
+Query Pitches are generated
+Present-to-Win assets are created
+Token Utilization & Cost Logic
+For each module, estimate:
+Average input tokens
+Average output tokens
+Frequency of calls
+Cost impact per session
+Specifically include:
+Shift Gears token usage per response
+Meeting Minutes token usage
+Conversation Analysis token usage
+Live Transcript processing cost
+Show how token usage is tracked and logged per user, per session, and per tenant
+TrainMe Add-on Workflow
+What happens when a user uploads:
+PDF
+PPT
+DOC
+Audio
+Where each file is stored
+How it is parsed, chunked, embedded, and indexed
+How it becomes part of the tenant’s knowledge base
+How LLM queries reference this knowledge during live calls
+Admin Panel & License Manager
+User management
+Role and permission control
+License allocation
+Usage tracking
+Billing hooks
+Feature gating by plan
+Marketing Add-on
+How conversation data feeds marketing content generation
+What data is reused
+How AI generates posts, emails, and campaigns
+Visual Diagrams (Must Be Included in the PDF)
+High-level system architecture diagram
+Module interaction workflow
+Database ER diagram
+LLM processing pipeline diagram
+TrainMe ingestion workflow
+Live call → Transcript → AI → UI flow
+The output must be:
+Structured like a professional technical whitepaper
+Written in clear, precise engineering language
+Contain labeled diagrams (ASCII or markdown-style)
+Suitable for conversion into a polished PDF
+This document should become the single source of truth for how Rev Winner works internally.”

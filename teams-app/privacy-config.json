@@ -1,0 +1,35 @@
+{
+  "appSettings": {
+    "privacy": {
+      "mode": "personal",
+      "visibility": "private",
+      "meetingPresence": "hidden",
+      "notifications": "disabled",
+      "activityFeed": "hidden"
+    },
+    "audio": {
+      "source": "device",
+      "meetingAudio": "disabled",
+      "backgroundMode": true
+    },
+    "ui": {
+      "discreteMode": true,
+      "minimizeOnMeetingJoin": false,
+      "showInMeetingBar": false,
+      "position": "sidebar"
+    },
+    "features": {
+      "speechRecognition": true,
+      "aiAssistant": true,
+      "discoveryInsights": true,
+      "callSummary": true,
+      "teamsIntegration": true
+    }
+  },
+  "security": {
+    "dataStorage": "local",
+    "apiCalls": "encrypted",
+    "userTracking": "disabled",
+    "analytics": "minimal"
+  }
+}

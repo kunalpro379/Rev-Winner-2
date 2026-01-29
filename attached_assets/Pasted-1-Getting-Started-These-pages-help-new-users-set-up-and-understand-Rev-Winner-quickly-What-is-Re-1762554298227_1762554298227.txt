@@ -1,0 +1,110 @@
+1. Getting Started
+
+These pages help new users set up and understand Rev Winner quickly.
+
+What is Rev Winner? – Overview of the platform, its purpose, and how it helps sales professionals.
+
+System Requirements – Browser compatibility, microphone permissions, network settings.
+
+Creating an Account – Step-by-step guide to sign up, verify email, and log in.
+
+Dashboard Overview – Walkthrough of the main interface (Home, Meetings, Train Me, Settings, etc.).
+
+First Call Setup – How to connect Zoom/Teams/Google Meet and start your first transcription session.
+
+⚙️ 2. Configuration & Settings
+
+To help users personalize their workspace and AI setup.
+
+AI Engine Selection – Explains OpenAI, Claude, Gemini, DeepSeek, Grok options and when to use each.
+
+Domain Expertise Setup – How to define and manage product or industry knowledge areas.
+
+Train Me Module Guide – Uploading, updating, or replacing docs (PDF/DOC/TXT/XLS/PPT) and URLs for training.
+
+Profile & Subscription Details – How to view and edit user info, invoices, and billing details.
+
+Notifications & Preferences – Adjust alerts, transcription notifications, and email settings.
+
+🎙️ 3. Using Rev Winner During Calls
+
+The most important section for active sales reps.
+
+Starting a Call Session – Connecting microphone, speaker diarization, background noise suppression.
+
+Real-Time Transcription Guide – How live speech-to-text works and how to pause/resume sessions.
+
+Analyzing Conversations – How the “Analyze” and “Win the Deal” sections generate insights.
+
+Present to Win Section – Using auto-generated Pitch Deck, Case Study, and Battle Card.
+
+Meeting Minutes & Summaries – Accessing and exporting auto-generated minutes post-call.
+
+📚 4. Advanced Features
+
+For power users and enterprise customers.
+
+Multiple AI Models Comparison – Strengths and use cases of each model.
+
+Enterprise License Management – How admins can add, re-assign, and manage user licenses.
+
+Multi-Domain Training – Managing up to 100 documents per domain expertise.
+
+Data Privacy & Security – Encryption policies, session data handling, and storage practices.
+
+Integrations & APIs – Connecting Rev Winner with CRM, email, and calendar apps (if applicable).
+
+💳 5. Billing & Subscriptions
+
+Self-service and transparency for users.
+
+Pricing Plans & Features – Details of Free Trial, Monthly, Annual, and Enterprise plans.
+
+Payment Methods – Accepted cards, Razorpay support, and currency options.
+
+Invoices & Receipts – How to download or view past invoices.
+
+GST & Taxes – How tax is calculated and displayed.
+
+Cancellation & Refund Policy – Step-by-step guide and conditions.
+
+🧠 6. Troubleshooting & FAQs
+
+To reduce support tickets and help users fix issues themselves.
+
+Microphone Not Detected – Permissions and browser fixes.
+
+Transcription Delay or Latency – Common reasons and solutions.
+
+Call Recording Not Starting – Checklist for connectivity and permissions.
+
+Upload Errors in Train Me – File formats and size limits.
+
+Billing Issues or Declined Payments – Steps to resolve payment failures.
+
+General FAQ – Covers popular topics like AI accuracy, usage minutes, data privacy.
+
+🏢 7. Policies & Legal
+
+Required for compliance and transparency.
+
+Terms & Conditions
+
+Privacy Policy
+
+Cancellation & Refund Policy
+
+Shipping Policy (if digital licenses emailed manually)
+
+Security Disclosure & Data Use Policy
+
+💬 8. Contact & Support
+
+To make human help easily reachable.
+
+Contact Support – Chat, email (support@revwinner.com
+), and response time SLA.
+
+Community & Feedback Portal – Feature requests and bug reports.
+
+Status Page – System uptime and maintenance notifications.

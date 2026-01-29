@@ -1,0 +1,340 @@
+Rev Winner Sales Challenge Game
+
+Objective
+
+Build an interactive, animated sales quiz game for lead generation and engagement. The game should be hosted inside the Rev Winner website and accessible as a dedicated menu item called “Sales Challenge.”
+The Sales Challenge page must display both:
+
+1. The existing game
+
+
+2. This new Rev Winner Sales Challenge game
+
+
+
+Users should be able to select which game they want to play.
+
+
+---
+
+1. Entry Flow and Lead Generation Form
+
+When a user clicks on Sales Challenge from the main website menu:
+
+1. The user first lands on the Sales Challenge page.
+
+
+2. This page shows:
+
+The earlier existing game
+
+The new Rev Winner Sales Challenge game
+
+
+
+3. When the user clicks on the new Sales Challenge game, they are shown a lead capture form.
+
+
+
+Lead Capture Form Fields
+
+Full Name
+
+Company Name
+
+Email Address
+
+
+This form is mandatory before entering the game.
+All submitted data should be stored securely for lead generation.
+
+After form submission, the user enters the game.
+
+
+---
+
+2. Main Game Concept
+
+The user plays as a sales professional represented by a 3D animated Owl character in a professional suit.
+
+The owl must open 10 sequential doors by answering 10 customer-style questions correctly.
+
+Each door represents one stage of a real-world sales conversation.
+
+
+---
+
+3. Visual Layout and UI Placement
+
+Screen Structure
+
+Center Left:
+The 3D animated Owl sales character standing confidently in front of a door.
+
+Top Center or Top Right:
+A Customer Avatar or Customer Box, visually shown as:
+
+A business professional figure
+
+Displayed in a dialogue bubble style
+
+This customer visually asks each question.
+
+
+Middle of Screen:
+The Question Text Area
+
+Displays one question at a time
+
+Styled like a real sales conversation
+
+
+Bottom Section:
+The Answer Options Panel
+
+Four answer options shown as clickable buttons
+
+Clearly spaced and visually highlighted
+
+
+Top Corner:
+Live Score Indicator
+
+Shows:
+
+Current Score
+
+Question Number out of 10
+
+
+
+
+
+---
+
+4. Question Logic and Personalization
+
+All questions must be dynamically generated based on the company name entered in the form.
+
+Question Types
+
+Product-based questions
+
+Service-based questions
+
+Technical capability questions
+
+Sales discovery and objection-handling questions
+
+
+Sample Question Logic
+
+If Company = ServiceNow
+Question:
+"What does ITSM stand for in ServiceNow?"
+
+Options:
+
+Information Technology Service Management ✅
+
+International Technology Sales Model ❌
+
+Integrated Technical Support Machine ❌
+
+Infrastructure Tracking Service Method ❌
+
+
+If Company = Microsoft Azure
+Question:
+"Which service is used to host virtual machines in Azure?"
+
+Options:
+
+Azure Virtual Machines ✅
+
+Azure DevOps ❌
+
+Azure Logic Apps ❌
+
+Azure Functions ❌
+
+
+
+---
+
+5. Answer Behavior and Animation
+
+If Answer is Correct
+
+Owl character:
+
+Shows confident body movement
+
+Slight victory gesture
+
+Door opens smoothly with animation
+
+
+Score increases
+
+Next question loads immediately
+
+
+If Answer is Incorrect
+
+Owl character:
+
+Shows mild disappointment animation
+
+
+Display message: "No worries. Sales is always a learning process."
+
+Show Rev Winner Demo Booking Button
+
+End the game immediately
+
+
+
+---
+
+6. Final Winning Scene
+
+If all 10 questions are answered correctly:
+
+Final door opens with a grand animation
+
+The owl lifts a gold trophy
+
+Confetti animation plays
+
+The user sees:
+
+Final Score
+
+Certificate Download Button
+
+Book Rev Winner Demo Button
+
+
+
+
+---
+
+7. Scoring System
+
+Each correct answer = +10 points
+
+Maximum score = 100 points
+
+Live score updates after every question
+
+Final score displayed at the end
+
+
+
+---
+
+8. Animation Style
+
+Clean, premium, semi-realistic 3D animation style
+
+Smooth character movement
+
+Soft professional lighting
+
+Doors open with mechanical slide animation
+
+Trophy scene includes celebration movement and subtle glow effects
+
+
+
+---
+
+9. Customer Visual Representation
+
+Customer must appear as:
+
+A neutral business person avatar
+
+Inside a floating dialogue box
+
+Placed at top of the screen
+
+
+Customer appears as the source of each question
+
+
+
+---
+
+10. Game Completion Actions
+
+At the end of every game, whether win or lose:
+
+Always show:
+
+Book a Rev Winner Demo Button
+
+Rev Winner Website Redirect Button
+
+
+All leads must be tagged as:
+
+Attempted
+
+Completed
+
+Won or Lost
+
+
+
+
+---
+
+11. Menu & Page Instructions
+
+Add a new permanent menu item titled: Sales Challenge
+
+On clicking this:
+
+Display:
+
+The old existing game
+
+The new Rev Winner Sales Challenge game
+
+
+
+Do NOT remove or replace the old game
+
+Both games must coexist
+
+
+
+---
+
+12. Technical Notes
+
+Use the existing URLs only
+
+Do NOT create new admin panels
+
+Do NOT break current live functionality
+
+All logic should be modular and expandable
+
+Ensure mobile and desktop responsiveness
+
+
+
+---
+
+Optional Enhancements (If Feasible)
+
+Leaderboard system
+
+Social share button for final score
+
+Email automation after submission
+
+Certificate auto-generation with user name

@@ -1,0 +1,85 @@
+“Present to Win” Section
+
+Add a collapsible section titled “Present to Win” above the Minutes of Meeting section on the main Assistant page where the system analyzes conversations between the customer and the sales representative.
+
+User Options (Selection Menu)
+
+The section will display three options for the user to choose from:
+
+1. Pitch Deck
+
+
+2. Case Study
+
+
+3. Battle Card
+
+
+
+
+---
+
+1. Pitch Deck
+
+When the user selects Pitch Deck, generate a 5-slide mini deck that the user can slide left or right.
+
+The deck should contain short, powerful text that directly aligns with the conversation context, helping the rep make a persuasive pitch.
+
+The content should:
+
+Reflect the solution the customer is looking for.
+
+Endorse the product or service from the user’s selected Domain Expertise.
+
+Be auto-generated instantly based on the conversation insights.
+
+
+Purpose: Help the rep confidently demonstrate a contextual, relevant pitch to close the deal.
+
+
+
+---
+
+2. Case Study
+
+When the user selects Case Study, generate a 2-slide visual summary automatically.
+
+Each case study should include:
+
+Problem/Challenge: A clear pain point identified in the conversation.
+
+Solution: A detailed explanation showing how the proposed service or product addresses it.
+
+Outcome: A measurable, positive result (e.g., improved ROI, faster deployment, reduced cost).
+
+
+Goal: Provide a credible, contextual case study the rep can present instantly during or after the meeting.
+
+
+
+---
+
+3. Battle Card
+
+When the user selects Battle Card, auto-generate a comparison table (maximum 2 slides).
+
+The table should:
+
+Compare the selected Domain Expertise solution/service with up to two nearest competitors.
+
+Highlight key differentiators and competitive advantages.
+
+If the customer mentions a specific competitor, ensure that competitor appears in the comparison and is clearly outperformed.
+
+
+Goal: Help the rep handle objections effectively and position the product as the superior choice.
+
+
+
+---
+
+Performance & Experience
+
+All three content types should be generated automatically, fast, and contextually relevant using conversation analytics.
+
+Keep design minimal and easy to navigate, with an expand/collapse toggle for “Present to Win”.

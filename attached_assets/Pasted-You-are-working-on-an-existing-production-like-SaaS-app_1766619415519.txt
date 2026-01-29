@@ -1,0 +1,75 @@
+You are working on an existing production-like SaaS app called “Rev Winner” (React + TS + Vite + TanStack Query v5 frontend, Node/Express + TS backend, Drizzle ORM + Postgres Neon, WebSockets for realtime features, Deepgram STT).
+
+GOAL (CRITICAL):
+Improve performance, responsiveness, and backend structure WITHOUT disrupting or changing existing user-visible functionality, flows, routes, or UI behavior. This is a stability-first refactor. The app must continue to work exactly as it works today, but faster and more reliable.
+
+NON-NEGOTIABLE RULES:
+1) DO NOT remove features. DO NOT change UI/UX behavior. DO NOT change route paths, request/response contracts, auth flows, role permissions, or any existing screen’s user journey.
+2) Any refactor must be backwards compatible. If you must introduce new modules/services, keep existing exports and route handlers working.
+3) Make small, incremental changes with clear commits. After each change, run the app and ensure core flows still work.
+4) Add instrumentation before optimizing: measure latency, WS message rates, rendering frequency, and API response times.
+5) All changes must be guarded with feature flags or environment toggles where risk exists.
+
+IMMEDIATE HIGH-IMPACT FIXES (DO THESE FIRST):
+A) Reduce UI re-render pressure in the live call screen:
+   - Implement transcript rendering virtualization (windowing) for long transcripts.
+   - Throttle transcript UI updates (batch updates, e.g., 200–500ms) to prevent rerender per token.
+   - Ensure non-visible panels (analysis/present-to-win) are not re-rendering during live mode.
+   - Add a “Performance Mode” automatically enabled during an active call: limit animations (Framer Motion) and expensive effects.
+
+B) Stabilize real-time pipeline:
+   - Ensure WebSocket messages are typed and batched; avoid sending extremely frequent small events.
+   - Separate event types logically (audio/stt vs coaching vs analysis) WITHOUT changing the UI behavior:
+     Keep a single WS connection if needed, but introduce internal channels/event routing and priority handling so transcript/coaching events always have priority over heavy analysis events.
+
+C) Move heavy work off the critical path:
+   - Any “analysis / battle cards / case studies / minutes generation” MUST be async and non-blocking.
+   - Implement a simple in-process job queue (or lightweight queue abstraction) that runs heavy AI tasks after the call ends or on-demand, and streams progress to UI.
+   - Keep existing endpoints intact (e.g., POST /api/conversations/:id/analyze), but internally it should enqueue work and return quickly with jobId/status, while maintaining backwards compatibility for current UI expectations.
+
+D) Backend structure clean-up (no behavior changes):
+   - Refactor server code into clear layers:
+     routes -> controllers -> services -> repositories (Drizzle)
+   - Ensure all existing route files and imports still work; only reorganize internally.
+   - Add request timeouts, retries (only where safe), and robust error handling with consistent error responses.
+
+E) Database performance safety:
+   - Avoid frequent writes for transcript tokens; buffer transcript chunks in memory and write in larger batches.
+   - For very large transcript fields, add optional storage abstraction:
+     keep existing DB storage working, but introduce an interface so we can later move blobs to object storage. For now, do not migrate data; just prepare structure.
+
+OBSERVABILITY (MANDATORY):
+- Add basic performance logs:
+  - API latency per route
+  - WS message frequency and payload sizes
+  - Deepgram latency (time-to-first-token, avg token rate)
+- Add a /api/admin/system-health endpoint (admin-only) that reports:
+  - queue length
+  - avg API latency
+  - WS throughput
+  - DB query timings (basic)
+
+TESTING / VERIFICATION (MANDATORY AFTER EACH CHANGE):
+Create a quick internal “smoke test checklist” and run it after each step:
+1) Login works (email/password + OTP if enabled)
+2) Create conversation session works
+3) Live transcript still appears
+4) Coaching panel still updates
+5) Analyze conversation still works (even if now queued internally)
+6) Backup/export still works
+7) Marketing add-on still generates content
+8) Admin panel pages load
+
+DELIVERABLES:
+1) A short written plan in the repo (docs/performance-refactor-plan.md) listing:
+   - changes made
+   - why it improves performance
+   - how backward compatibility is preserved
+2) Code changes implementing A–E with minimal risk.
+3) No broken functionality, no contract changes.
+
+START NOW:
+- First implement instrumentation + throttling/virtualization on the live transcript screen (A).
+- Then implement async job queue for heavy analysis tasks (C).
+- Then structure backend layers (D).
+Proceed step-by-step, keep diffs small, and verify with the smoke checklist after every step.

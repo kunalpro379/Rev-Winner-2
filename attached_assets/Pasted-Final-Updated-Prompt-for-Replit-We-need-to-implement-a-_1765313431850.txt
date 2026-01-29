@@ -1,0 +1,62 @@
+Final Updated Prompt for Replit:
+
+We need to implement a flow for Rev Winner's team licensing management, including an admin panel modification.
+
+Flow Overview:
+
+1. Providing Details Before Package Selection:
+
+Before selecting a package, the customer must provide their company name and the email address of the License Manager.
+
+
+
+2. Package Selection and Assignment:
+
+After providing these details, the customer selects the team license type and desired packages. The number of platform access subscriptions determines the total user licenses.
+
+
+
+3. License Manager Role:
+
+Once the packages are chosen and payment is completed, the designated License Manager gets access to the License Manager portal. They can assign licenses to team members, and each user will receive an email to set their password and access the platform.
+
+
+
+4. Admin Panel Modification:
+
+If a company wants to change their License Manager, they can request the Rev Winner team to do so. The admin managing the admin panel can reassign the License Manager role to a new user. This ensures that role changes are handled smoothly through the admin panel.
+
+
+
+5. Renewals and Validity:
+
+The License Manager can track usage and handle renewals. Session minutes and platform access packages will prompt for renewal as they expire or are used up.
+
+We also, need to implement a detailed onboarding and license management flow for the License Manager in Rev Winner. Here's the full breakdown:
+
+6. First-Time License Manager Access:
+
+When the License Manager purchases licenses for the first time, they will receive an email containing a link to the License Manager portal. This link will allow them to set a new password and gain initial access to the portal.
+
+Only the email address of the person who made the purchase will be able to access this link and set the password.
+
+
+
+7. Managing Licenses and Renewals:
+
+Once the password is set and access is granted, the License Manager can log in and manage licenses. They can add more seats if needed and renew any expired or soon-to-expire add-ons (like session minutes or platform access) directly from the portal.
+
+If they need to add new licenses, they can go through a process similar to the initial purchase. They will open the packages page, select the required options, and proceed with the purchase.
+
+
+
+8. User Onboarding for Assigned Licenses:
+
+When the License Manager assigns a license to a user, that user will receive an email with a link to the Rev Winner platform. They will click the link, set their own password, and gain access according to the packages selected by the License Manager. They will be able to track their own session minute usage, token usage, and see how long their platform access is valid.
+
+9. License Swapping:
+
+If the License Manager needs to reassign a license from one user to another (for example, if an employee leaves the organization), they can do so from the License Manager portal. The new user will get access for the remaining validity of the platform access. However, any add-ons like session minutes or AI tokens will need to be purchased again for the new user if required.
+
+Don't change anything with current makn web app fucntionality. Remember DAI, is optional, if anyone don't want to use DAI that is Default AI, currently Claud APlI, they can still add their own AI Api key to use Rev Winner. 
+
