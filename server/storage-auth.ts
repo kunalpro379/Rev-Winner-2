@@ -25,6 +25,7 @@ import {
   userProfiles,
   addonPurchases,
   aiTokenUsage,
+  termsAndConditions,
   type AuthUser,
   type OTP,
   type RefreshToken,
@@ -247,6 +248,7 @@ export interface IAuthStorage {
   // Comprehensive user management
   getUserDetailedProfile(userId: string): Promise<any>;
   getAllUsersWithDetails(filters?: { search?: string; status?: string; role?: string; planType?: string }): Promise<any[]>;
+  getIndividualUsersWithDetails(filters?: { search?: string; status?: string; planType?: string }): Promise<any[]>;
   updateUserStatus(userId: string, status: string, reason?: string): Promise<void>;
   grantTimeExtension(userId: string, extensionType: string, extensionValue: string, reason: string, grantedBy: string, expiresAt?: Date): Promise<void>;
   getUserSessionHistory(userId: string, limit?: number): Promise<any[]>;
@@ -462,6 +464,23 @@ export interface IAuthStorage {
   getUserProfile(userId: string): Promise<UserProfile | null>;
   upsertUserProfile(profile: InsertUserProfile & { userId: string }): Promise<UserProfile>;
   updateUserProfile(userId: string, updates: Partial<UserProfile>): Promise<UserProfile | null>;
+  
+  // Terms and Conditions management
+  getActiveTermsAndConditions(): Promise<import("@shared/schema").TermsAndConditions | null>;
+  getAllTermsVersions(): Promise<import("@shared/schema").TermsAndConditions[]>;
+  createTermsAndConditions(data: {
+    title: string;
+    content: string;
+    version: string;
+    lastModifiedBy: string;
+  }): Promise<import("@shared/schema").TermsAndConditions>;
+  updateTermsAndConditions(id: string, data: {
+    title?: string;
+    content?: string;
+    version?: string;
+    lastModifiedBy: string;
+  }): Promise<import("@shared/schema").TermsAndConditions>;
+  setActiveTerms(id: string): Promise<void>;
 }
 
 export class AuthStorage implements IAuthStorage {
@@ -1553,6 +1572,74 @@ export class AuthStorage implements IAuthStorage {
     const whereClause = conditions.length > 0 
       ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
       : sql``;
+    
+    const result = await db.execute(sql`
+      SELECT 
+        u.id,
+        u.email,
+        u.first_name,
+        u.last_name,
+        u.username,
+        u.mobile,
+        u.organization,
+        u.role,
+        u.status,
+        u.ai_engine,
+        u.created_at,
+        s.id as subscription_id,
+        s.plan_type,
+        s.status as subscription_status,
+        s.minutes_used,
+        s.minutes_limit,
+        s.current_period_start,
+        s.current_period_end,
+        COALESCE(SUM(smp.minutes_remaining), 0) as total_minutes_remaining,
+        (SELECT COUNT(*) FROM ${sessionUsage} su WHERE su.user_id = u.id) as total_sessions,
+        (SELECT COUNT(*) FROM ${sessionUsage} su WHERE su.user_id = u.id AND su.status = 'active') as active_sessions
+      FROM ${authUsers} u
+      LEFT JOIN ${subscriptions} s ON u.id = s.user_id
+      LEFT JOIN ${sessionMinutesPurchases} smp ON u.id = smp.user_id AND smp.status = 'active'
+      ${whereClause}
+      GROUP BY u.id, s.id
+      ORDER BY u.created_at DESC
+    `);
+    
+    return result.rows;
+  }
+  
+  async getIndividualUsersWithDetails(filters?: { search?: string; status?: string; planType?: string }): Promise<any[]> {
+    let conditions = [];
+    
+    if (filters?.search) {
+      conditions.push(sql`(
+        u.email ILIKE ${`%${filters.search}%`} OR
+        u.first_name ILIKE ${`%${filters.search}%`} OR
+        u.last_name ILIKE ${`%${filters.search}%`} OR
+        u.username ILIKE ${`%${filters.search}%`}
+      )`);
+    }
+    
+    // Filter by subscription status, not user status
+    if (filters?.status) {
+      conditions.push(sql`s.status = ${filters.status}`);
+    }
+    
+    if (filters?.planType) {
+      conditions.push(sql`s.plan_type = ${filters.planType}`);
+    }
+    
+    // Add condition to exclude users who are part of any organization
+    conditions.push(sql`NOT EXISTS (
+      SELECT 1 FROM ${organizationMemberships} om 
+      WHERE om.user_id = u.id AND om.status = 'active'
+    )`);
+    
+    const whereClause = conditions.length > 0 
+      ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
+      : sql`WHERE NOT EXISTS (
+          SELECT 1 FROM ${organizationMemberships} om 
+          WHERE om.user_id = u.id AND om.status = 'active'
+        )`;
     
     const result = await db.execute(sql`
       SELECT 
@@ -3763,6 +3850,77 @@ export class AuthStorage implements IAuthStorage {
       .groupBy(aiTokenUsage.provider);
     
     return results;
+  }
+  
+  // ========================================
+  // TERMS AND CONDITIONS MANAGEMENT
+  // ========================================
+  
+  async getActiveTermsAndConditions(): Promise<import("@shared/schema").TermsAndConditions | null> {
+    const [result] = await db.select()
+      .from(termsAndConditions)
+      .where(eq(termsAndConditions.isActive, true))
+      .orderBy(desc(termsAndConditions.updatedAt))
+      .limit(1);
+    return result || null;
+  }
+  
+  async getAllTermsVersions(): Promise<import("@shared/schema").TermsAndConditions[]> {
+    return await db.select()
+      .from(termsAndConditions)
+      .orderBy(desc(termsAndConditions.updatedAt));
+  }
+  
+  async createTermsAndConditions(data: {
+    title: string;
+    content: string;
+    version: string;
+    lastModifiedBy: string;
+  }): Promise<import("@shared/schema").TermsAndConditions> {
+    // Deactivate all existing terms first
+    await db.update(termsAndConditions)
+      .set({ isActive: false, updatedAt: new Date() });
+    
+    // Create new active terms
+    const [newTerms] = await db.insert(termsAndConditions)
+      .values({
+        title: data.title,
+        content: data.content,
+        version: data.version,
+        lastModifiedBy: data.lastModifiedBy,
+        isActive: true,
+      })
+      .returning();
+    
+    return newTerms;
+  }
+  
+  async updateTermsAndConditions(id: string, data: {
+    title?: string;
+    content?: string;
+    version?: string;
+    lastModifiedBy: string;
+  }): Promise<import("@shared/schema").TermsAndConditions> {
+    const [updated] = await db.update(termsAndConditions)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(termsAndConditions.id, id))
+      .returning();
+    
+    return updated;
+  }
+  
+  async setActiveTerms(id: string): Promise<void> {
+    // Deactivate all terms first
+    await db.update(termsAndConditions)
+      .set({ isActive: false, updatedAt: new Date() });
+    
+    // Activate the selected terms
+    await db.update(termsAndConditions)
+      .set({ isActive: true, updatedAt: new Date() })
+      .where(eq(termsAndConditions.id, id));
   }
 }
 

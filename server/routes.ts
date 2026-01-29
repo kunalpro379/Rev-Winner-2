@@ -153,6 +153,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get active terms and conditions (public endpoint)
+  app.get("/api/terms", async (req, res) => {
+    try {
+      const activeTerms = await authStorage.getActiveTermsAndConditions();
+      if (!activeTerms) {
+        return res.status(404).json({ error: "Terms and conditions not found" });
+      }
+      
+      res.json({
+        title: activeTerms.title,
+        content: activeTerms.content,
+        version: activeTerms.version,
+        lastUpdated: activeTerms.updatedAt
+      });
+    } catch (error) {
+      console.error("Get terms error:", error);
+      res.status(500).json({ error: "Failed to get terms and conditions" });
+    }
+  });
+
   // Get conversation and messages
   app.get("/api/conversations/:sessionId", async (req, res) => {
     try {
@@ -2049,6 +2069,141 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
     } catch (error: any) {
       console.error(`[DEBUG] Error fetching subscription:`, error);
       res.status(500).json({ message: "Failed to fetch subscription", error: error.message });
+    }
+  });
+
+  // Get current subscription (alias for settings page compatibility)
+  app.get("/api/subscriptions/current", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      console.log(`[DEBUG] Fetching current subscription for userId: ${userId}`);
+      
+      const subscription = await authStorage.getSubscriptionByUserId(userId);
+      console.log(`[DEBUG] Current subscription found:`, subscription ? {
+        id: subscription.id,
+        planType: subscription.planType,
+        status: subscription.status,
+        planId: subscription.planId,
+      } : 'NULL');
+      
+      if (!subscription) {
+        console.log(`[DEBUG] No subscription found for user ${userId}, returning trial`);
+        return res.json({
+          subscription: {
+            planType: "trial",
+            status: "no_subscription",
+            currentPeriodEnd: null
+          }
+        });
+      }
+      
+      // Get plan details if planId exists
+      let planDetails = null;
+      if (subscription.planId) {
+        planDetails = await authStorage.getPlanById(subscription.planId);
+        console.log(`[DEBUG] Plan details:`, planDetails ? {
+          name: planDetails.name,
+          price: planDetails.price,
+        } : 'NULL');
+      }
+      
+      res.json({
+        subscription: {
+          id: subscription.id,
+          planType: subscription.planType,
+          status: subscription.status,
+          currentPeriodStart: subscription.currentPeriodStart,
+          currentPeriodEnd: subscription.currentPeriodEnd,
+          sessionsUsed: subscription.sessionsUsed,
+          sessionsLimit: subscription.sessionsLimit,
+          minutesUsed: subscription.minutesUsed,
+          minutesLimit: subscription.minutesLimit,
+          sessionHistory: subscription.sessionHistory || [],
+          canceledAt: subscription.canceledAt,
+          createdAt: subscription.createdAt,
+          plan: planDetails ? {
+            name: planDetails.name,
+            price: planDetails.price,
+            currency: planDetails.currency,
+            billingInterval: planDetails.billingInterval,
+          } : null,
+        }
+      });
+    } catch (error: any) {
+      console.error(`[DEBUG] Error fetching current subscription:`, error);
+      res.status(500).json({ message: "Failed to fetch subscription", error: error.message });
+    }
+  });
+
+  // Check subscription limits (for settings page)
+  app.get("/api/subscriptions/check-limits", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      console.log(`[DEBUG] Checking subscription limits for userId: ${userId}`);
+      
+      // Check if user is super user (unlimited access)
+      const user = await authStorage.getUserById(userId);
+      const isSuperUser = user?.role === 'super_admin' || (req as any).jwtUser?.superUser === true;
+      
+      if (isSuperUser) {
+        return res.json({
+          canUseService: true,
+          planType: "professional",
+          status: "active",
+          sessionsUsed: 0,
+          sessionsLimit: null,
+          sessionsRemaining: null,
+          minutesUsed: 0,
+          minutesLimit: null,
+          minutesRemaining: null,
+        });
+      }
+      
+      const subscription = await authStorage.getSubscriptionByUserId(userId);
+      
+      if (!subscription) {
+        console.log(`[DEBUG] No subscription found for user ${userId}, returning trial limits`);
+        return res.json({
+          canUseService: true,
+          planType: "trial",
+          status: "no_subscription",
+          sessionsUsed: 0,
+          sessionsLimit: 5, // Trial limit
+          sessionsRemaining: 5,
+          minutesUsed: 0,
+          minutesLimit: 60, // Trial limit
+          minutesRemaining: 60,
+        });
+      }
+      
+      // Calculate remaining sessions and minutes
+      const sessionsUsed = parseInt(subscription.sessionsUsed || '0');
+      const sessionsLimit = subscription.sessionsLimit ? parseInt(subscription.sessionsLimit) : null;
+      const minutesUsed = parseInt(subscription.minutesUsed || '0');
+      const minutesLimit = subscription.minutesLimit ? parseInt(subscription.minutesLimit) : null;
+      
+      const sessionsRemaining = sessionsLimit ? Math.max(0, sessionsLimit - sessionsUsed) : null;
+      const minutesRemaining = minutesLimit ? Math.max(0, minutesLimit - minutesUsed) : null;
+      
+      // Determine if user can use service
+      const canUseService = subscription.status === 'active' && 
+        (sessionsLimit === null || sessionsRemaining! > 0) &&
+        (minutesLimit === null || minutesRemaining! > 0);
+      
+      res.json({
+        canUseService,
+        planType: subscription.planType,
+        status: subscription.status,
+        sessionsUsed,
+        sessionsLimit,
+        sessionsRemaining,
+        minutesUsed,
+        minutesLimit,
+        minutesRemaining,
+      });
+    } catch (error: any) {
+      console.error(`[DEBUG] Error checking subscription limits:`, error);
+      res.status(500).json({ message: "Failed to check subscription limits", error: error.message });
     }
   });
   

@@ -215,6 +215,69 @@ const refreshToken = generateRefreshToken({
     }
   });
   
+  // Get individual users (not part of any organization) with pagination and filters
+  app.get("/api/admin/users/individual", async (req: Request, res: Response) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = (page - 1) * limit;
+      const search = req.query.search as string;
+      const subscriptionStatus = req.query.subscriptionStatus as string;
+      const planType = req.query.planType as string;
+      
+      // Build filter conditions
+      const filters: any = {};
+      if (search) filters.search = search;
+      if (subscriptionStatus && subscriptionStatus !== 'all') filters.status = subscriptionStatus;
+      if (planType && planType !== 'all') filters.planType = planType;
+      
+      // Get individual users (not part of any organization) with subscription data
+      const allUsersData = await authStorage.getIndividualUsersWithDetails(filters);
+      
+      // Apply pagination
+      const totalCount = allUsersData.length;
+      const totalPages = Math.ceil(totalCount / limit);
+      const paginatedUsers = allUsersData.slice(offset, offset + limit);
+      
+      // Transform data to match frontend expectations
+      const usersWithSubscriptions = paginatedUsers.map((row: any) => ({
+        id: row.id,
+        email: row.email,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        username: row.username,
+        organization: row.organization,
+        role: row.role,
+        status: row.status,
+        createdAt: row.created_at,
+        subscription: row.subscription_id ? {
+          id: row.subscription_id,
+          userId: row.id,
+          planType: row.plan_type,
+          status: row.subscription_status,
+          currentPeriodStart: row.current_period_start,
+          currentPeriodEnd: row.current_period_end,
+          minutesUsed: row.minutes_used || '0',
+          minutesLimit: row.minutes_limit,
+          createdAt: row.created_at,
+        } : null,
+      }));
+      
+      res.json({ 
+        users: usersWithSubscriptions, 
+        pagination: {
+          page,
+          limit,
+          totalPages,
+          totalCount
+        }
+      });
+    } catch (error) {
+      console.error("Get individual users error:", error);
+      res.status(500).json({ message: "Failed to get individual users" });
+    }
+  });
+
   // Get all users with pagination and filters
   app.get("/api/admin/users", async (req: Request, res: Response) => {
     try {
@@ -3179,6 +3242,155 @@ const refreshToken = generateRefreshToken({
         success: false,
         message: error.message || "Failed to fetch AI token usage" 
       });
+    }
+  });
+  
+  // ========================================
+  // TERMS AND CONDITIONS MANAGEMENT
+  // ========================================
+  
+  // Get active terms and conditions
+  app.get("/api/admin/terms", async (req: Request, res: Response) => {
+    try {
+      const activeTerms = await authStorage.getActiveTermsAndConditions();
+      res.json({ terms: activeTerms });
+    } catch (error) {
+      console.error("Get active terms error:", error);
+      res.status(500).json({ message: "Failed to get terms and conditions" });
+    }
+  });
+  
+  // Get all terms versions
+  app.get("/api/admin/terms/versions", async (req: Request, res: Response) => {
+    try {
+      const allVersions = await authStorage.getAllTermsVersions();
+      res.json({ versions: allVersions });
+    } catch (error) {
+      console.error("Get terms versions error:", error);
+      res.status(500).json({ message: "Failed to get terms versions" });
+    }
+  });
+  
+  // Create new terms and conditions
+  app.post("/api/admin/terms", async (req: Request, res: Response) => {
+    try {
+      const createSchema = z.object({
+        title: z.string().min(1, "Title is required"),
+        content: z.string().min(1, "Content is required"),
+        version: z.string().min(1, "Version is required"),
+      });
+      
+      const validationResult = createSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({
+          message: "Validation failed",
+          errors: validationResult.error.errors
+        });
+      }
+      
+      const { title, content, version } = validationResult.data;
+      
+      const newTerms = await authStorage.createTermsAndConditions({
+        title,
+        content,
+        version,
+        lastModifiedBy: req.jwtUser?.userId || '',
+      });
+      
+      // Log audit
+      await eventLogger.log({
+        actorId: req.jwtUser?.userId,
+        action: 'terms.created',
+        targetType: 'terms',
+        targetId: newTerms.id,
+        metadata: { 
+          title,
+          version,
+          adminId: req.jwtUser?.userId 
+        },
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+      
+      res.status(201).json({ 
+        message: "Terms and conditions created successfully",
+        terms: newTerms 
+      });
+    } catch (error) {
+      console.error("Create terms error:", error);
+      res.status(500).json({ message: "Failed to create terms and conditions" });
+    }
+  });
+  
+  // Update terms and conditions
+  app.patch("/api/admin/terms/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const updateSchema = z.object({
+        title: z.string().min(1).optional(),
+        content: z.string().min(1).optional(),
+        version: z.string().min(1).optional(),
+      });
+      
+      const validationResult = updateSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({
+          message: "Validation failed",
+          errors: validationResult.error.errors
+        });
+      }
+      
+      const updatedTerms = await authStorage.updateTermsAndConditions(id, {
+        ...validationResult.data,
+        lastModifiedBy: req.jwtUser?.userId || '',
+      });
+      
+      // Log audit
+      await eventLogger.log({
+        actorId: req.jwtUser?.userId,
+        action: 'terms.updated',
+        targetType: 'terms',
+        targetId: id,
+        metadata: { 
+          changes: validationResult.data,
+          adminId: req.jwtUser?.userId 
+        },
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+      
+      res.json({ 
+        message: "Terms and conditions updated successfully",
+        terms: updatedTerms 
+      });
+    } catch (error) {
+      console.error("Update terms error:", error);
+      res.status(500).json({ message: "Failed to update terms and conditions" });
+    }
+  });
+  
+  // Set active terms version
+  app.post("/api/admin/terms/:id/activate", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      
+      await authStorage.setActiveTerms(id);
+      
+      // Log audit
+      await eventLogger.log({
+        actorId: req.jwtUser?.userId,
+        action: 'terms.activated',
+        targetType: 'terms',
+        targetId: id,
+        metadata: { adminId: req.jwtUser?.userId },
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+      
+      res.json({ message: "Terms version activated successfully" });
+    } catch (error) {
+      console.error("Activate terms error:", error);
+      res.status(500).json({ message: "Failed to activate terms version" });
     }
   });
 }

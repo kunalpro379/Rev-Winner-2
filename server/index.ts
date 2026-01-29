@@ -5,6 +5,11 @@ import TeamsIntegration from "./teams-integration";
 import { storage } from "./storage";
 import { performanceMonitor } from "./middleware/performance-logger";
 import 'dotenv/config';
+
+// Track last auto-rebuild time to prevent excessive rebuilds
+let lastAutoRebuildTime = 0;
+const AUTO_REBUILD_COOLDOWN = 5 * 60 * 1000; // 5 minutes cooldown
+
 const app = express();
 
 // Trust proxy for accurate client IP detection behind load balancers
@@ -142,42 +147,48 @@ app.use((req, res, next) => {
         const { domainExpertise, trainingDocuments, knowledgeEntries } = await import('@shared/schema');
         const { eq, and, sql } = await import('drizzle-orm');
         
-        // Find domains with completed documents but no knowledge entries
+        // Find domains with completed documents that haven't been processed for knowledge extraction
+        // Check both knowledge entries count AND knowledgeExtractedAt to avoid infinite loops
         const domainsWithDocs = await db.execute(sql`
           SELECT DISTINCT de.id, de.name, de.user_id,
             (SELECT COUNT(*) FROM training_documents td 
              WHERE td.domain_expertise_id = de.id AND td.processing_status = 'completed') as doc_count,
             (SELECT COUNT(*) FROM knowledge_entries ke 
-             WHERE ke.domain_expertise_id = de.id) as entry_count
+             WHERE ke.domain_expertise_id = de.id) as entry_count,
+            (SELECT COUNT(*) FROM training_documents td 
+             WHERE td.domain_expertise_id = de.id AND td.processing_status = 'completed' 
+             AND td.knowledge_extracted_at IS NULL) as unprocessed_doc_count
           FROM domain_expertise de
           WHERE EXISTS (
             SELECT 1 FROM training_documents td 
             WHERE td.domain_expertise_id = de.id AND td.processing_status = 'completed'
+            AND td.knowledge_extracted_at IS NULL
           )
         `);
         
+        // Only rebuild if there are unprocessed documents (not just missing knowledge entries)
         const domainsNeedingRebuild = (domainsWithDocs.rows as any[]).filter(
-          (d: any) => Number(d.doc_count) > 0 && Number(d.entry_count) === 0
+          (d: any) => Number(d.unprocessed_doc_count) > 0
         );
         
         if (domainsNeedingRebuild.length > 0) {
-          console.log(`📚 AUTO-REBUILD: Found ${domainsNeedingRebuild.length} domains with documents but no knowledge entries`);
+          console.log(`📚 AUTO-REBUILD: Found ${domainsNeedingRebuild.length} domains with unprocessed documents`);
           
           const { rebuildKnowledgeBase } = await import('./services/knowledgeExtraction');
           const { invalidateTrainingContextCache } = await import('./services/openai');
           
           for (const domain of domainsNeedingRebuild) {
             try {
-              console.log(`🔄 Rebuilding knowledge base for domain "${domain.name}" (${domain.doc_count} documents)...`);
-              const result = await rebuildKnowledgeBase(domain.id, domain.user_id);
-              console.log(`✅ Knowledge rebuilt for "${domain.name}": ${result.newEntriesAdded} entries created`);
+              console.log(`🔄 Processing unprocessed documents for domain "${domain.name}" (${domain.unprocessed_doc_count} unprocessed)...`);
+              const result = await rebuildKnowledgeBase(domain.id, domain.user_id, false); // Incremental only
+              console.log(`✅ Knowledge extraction completed for "${domain.name}": ${result.newEntriesAdded} entries created`);
               invalidateTrainingContextCache(domain.user_id);
             } catch (rebuildError: any) {
-              console.error(`❌ Knowledge rebuild failed for "${domain.name}":`, rebuildError.message);
+              console.error(`❌ Knowledge extraction failed for "${domain.name}":`, rebuildError.message);
             }
           }
         } else {
-          console.log('📚 Knowledge entries up-to-date - no auto-rebuild needed');
+          console.log('📚 All documents processed - no auto-rebuild needed');
         }
       } catch (error: any) {
         console.error('Knowledge auto-rebuild check failed:', error.message);

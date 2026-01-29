@@ -2906,3 +2906,31 @@ export const insertApiKeyUsageLogSchema = createInsertSchema(apiKeyUsageLogs).om
 });
 
 export type InsertApiKeyUsageLog = z.infer<typeof insertApiKeyUsageLogSchema>;
+
+// ========================================
+// TERMS AND CONDITIONS MANAGEMENT
+// ========================================
+
+// Terms and Conditions table - stores editable terms content
+export const termsAndConditions = pgTable("terms_and_conditions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar("title", { length: 255 }).notNull().default("Terms & Conditions"),
+  content: text("content").notNull(),
+  version: varchar("version", { length: 20 }).notNull().default("1.0"),
+  isActive: boolean("is_active").default(true),
+  lastModifiedBy: varchar("last_modified_by").references(() => authUsers.id).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_terms_active").on(table.isActive),
+  index("idx_terms_version").on(table.version),
+]);
+
+export type TermsAndConditions = typeof termsAndConditions.$inferSelect;
+export type InsertTermsAndConditions = typeof termsAndConditions.$inferInsert;
+
+export const insertTermsAndConditionsSchema = createInsertSchema(termsAndConditions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});

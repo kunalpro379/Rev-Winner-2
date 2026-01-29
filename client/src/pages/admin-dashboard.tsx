@@ -79,6 +79,7 @@ import {
   Layers,
   Globe,
   Cpu,
+  FileText,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAdminAuth } from "@/hooks/use-admin-auth";
@@ -96,6 +97,7 @@ import { AccountsManagement } from "@/components/admin/accounts-management";
 import { AITokenUsage } from "@/components/admin/ai-token-usage";
 import { SalesIntelligence } from "@/components/admin/SalesIntelligence";
 import { ApiKeysManagement } from "@/components/admin/api-keys-management";
+import { TermsManagement } from "@/components/admin/terms-management";
 import {
   MobileNavSheet,
   type NavItem,
@@ -178,6 +180,12 @@ const adminNavItems: NavItem[] = [
     label: "Traffic",
     icon: <Globe className="h-4 w-4" />,
     testId: "traffic",
+  },
+  {
+    value: "terms",
+    label: "Terms & Conditions",
+    icon: <FileText className="h-4 w-4" />,
+    testId: "terms",
   },
 ];
 
@@ -801,6 +809,11 @@ export default function AdminDashboard() {
           {/* Traffic Analytics Tab */}
           <TabsContent value="traffic" className="space-y-4">
             <TrafficAnalytics />
+          </TabsContent>
+
+          {/* Terms & Conditions Management Tab */}
+          <TabsContent value="terms" className="space-y-4">
+            <TermsManagement />
           </TabsContent>
         </Tabs>
       </main>
