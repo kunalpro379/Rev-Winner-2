@@ -131,7 +131,16 @@ async function activateCartCheckout(
         console.log(`[Cart Activation] Mapping addonType: ${item.addonType} → ${mappedAddonType} for package ${item.packageSku} (${pkg.name})`);
       }
       
-      console.log(`[Cart Activation] Creating purchase: addonType=${mappedAddonType}, packageSku=${item.packageSku}, totalUnits=${pkg.totalUnits || 0}`);
+      // Calculate the actual paid amount for this item
+      // Use the actual paid amount from pending order (which includes currency conversion and GST)
+      const totalPaidAmount = parseFloat(pendingOrder.amount || '0');
+      const actualCurrency = pendingOrder.currency || 'USD';
+      const itemCount = cartItems.length;
+      
+      // For single item carts, use the full amount; for multi-item, calculate proportionally
+      const itemPaidAmount = itemCount === 1 ? totalPaidAmount : (totalPaidAmount * parseFloat(item.basePrice)) / parseFloat(metadata.subtotal || '1');
+      
+      console.log(`[Cart Activation] Creating purchase: addonType=${mappedAddonType}, packageSku=${item.packageSku}, totalUnits=${pkg.totalUnits || 0}, paidAmount=${itemPaidAmount.toFixed(2)} ${actualCurrency}`);
 
       // For session_minutes: Check if user already has an active purchase and add to it
       // This handles the unique constraint that prevents multiple active purchases per user per addon type
@@ -164,8 +173,8 @@ async function activateCartCheckout(
             packageSku: item.packageSku,
             packageName: pkg.name,
             minutesAdded: newMinutes,
-            amount: item.basePrice,
-            currency: item.currency || 'USD',
+            amount: itemPaidAmount.toFixed(2), // Use actual paid amount
+            currency: actualCurrency, // Use actual currency
             quantity: item.quantity,
             purchasedViaCart: true,
             paymentId: verifiedPaymentId,
@@ -201,8 +210,8 @@ async function activateCartCheckout(
             addonType: mappedAddonType,
             packageSku: item.packageSku,
             billingType: 'one_time',
-            purchaseAmount: item.basePrice,
-            currency: item.currency || 'USD',
+            purchaseAmount: itemPaidAmount.toFixed(2), // Use actual paid amount
+            currency: actualCurrency, // Use actual currency
             totalUnits: newMinutes,
             usedUnits: 0,
             status: 'active',
@@ -211,20 +220,22 @@ async function activateCartCheckout(
             gatewayTransactionId: null,
             metadata: {
               packageName: pkg.name,
-              basePrice: item.basePrice,
+              basePrice: item.basePrice, // Keep original base price for reference
               quantity: item.quantity,
               purchasedViaCart: true,
               cartOrderId: orderId,
               paymentId: verifiedPaymentId,
               gatewayProvider: pendingOrder.gatewayProvider,
               originalAddonType: item.addonType,
+              actualPaidAmount: itemPaidAmount.toFixed(2), // Store actual paid amount
+              actualCurrency: actualCurrency, // Store actual currency
               purchaseHistory: [{
                 orderId: orderId,
                 packageSku: item.packageSku,
                 packageName: pkg.name,
                 minutesAdded: newMinutes,
-                amount: item.basePrice,
-                currency: item.currency || 'USD',
+                amount: itemPaidAmount.toFixed(2), // Use actual paid amount
+                currency: actualCurrency, // Use actual currency
                 quantity: item.quantity,
                 purchasedViaCart: true,
                 paymentId: verifiedPaymentId,
@@ -249,8 +260,8 @@ async function activateCartCheckout(
             addonType: mappedAddonType,
             packageSku: item.packageSku,
             billingType: 'one_time',
-            purchaseAmount: item.basePrice,
-            currency: item.currency || 'USD',
+            purchaseAmount: itemPaidAmount.toFixed(2), // Use actual paid amount
+            currency: actualCurrency, // Use actual currency
             totalUnits: pkg.totalUnits || 0,
             usedUnits: 0,
             status: 'active',
@@ -259,7 +270,7 @@ async function activateCartCheckout(
             gatewayTransactionId: null,
             metadata: {
               packageName: pkg.name,
-              basePrice: item.basePrice,
+              basePrice: item.basePrice, // Keep original base price for reference
               quantity: 1,
               purchasedViaCart: true,
               cartOrderId: orderId,
@@ -268,6 +279,8 @@ async function activateCartCheckout(
               itemNumber: i + 1,
               totalItems: item.quantity,
               originalAddonType: item.addonType, // Store original for reference
+              actualPaidAmount: itemPaidAmount.toFixed(2), // Store actual paid amount
+              actualCurrency: actualCurrency, // Store actual currency
             },
           });
 
@@ -573,7 +586,7 @@ export function setupBillingRoutes(app: Router) {
 
       const discountMessage = promoCode.discountType === 'percentage'
         ? `${promoCode.discountValue}% discount applied!`
-        : `₹${promoCode.discountValue} discount applied!`;
+        : `$${promoCode.discountValue} discount applied!`;
 
       const response = {
         valid: true,
@@ -923,8 +936,8 @@ export function setupBillingRoutes(app: Router) {
           packageSku: pendingOrder.packageSku,
           packageName: pkg.name,
           minutesAdded: newMinutes,
-          amount: pendingOrder.amount,
-          currency: pendingOrder.currency,
+          amount: pendingOrder.amount, // This is the actual paid amount (INR)
+          currency: pendingOrder.currency, // This is the actual currency (INR)
           gatewayOrderId: gatewayOrderId,
           paymentId: verifiedPaymentId,
           gatewayProvider: pendingOrder.gatewayProvider,
@@ -959,8 +972,8 @@ export function setupBillingRoutes(app: Router) {
             addonType: 'session_minutes',
             packageSku: pendingOrder.packageSku,
             billingType: 'one_time',
-            purchaseAmount: pendingOrder.amount,
-            currency: pendingOrder.currency,
+            purchaseAmount: pendingOrder.amount, // Use actual paid amount (INR)
+            currency: pendingOrder.currency, // Use actual currency (INR)
             totalUnits: newMinutes,
             usedUnits: 0,
             status: 'active',
@@ -973,13 +986,15 @@ export function setupBillingRoutes(app: Router) {
               paymentId: verifiedPaymentId,
               gatewayProvider: pendingOrder.gatewayProvider,
               pendingOrderId: pendingOrder.id,
+              actualPaidAmount: pendingOrder.amount, // Store actual paid amount
+              actualCurrency: pendingOrder.currency, // Store actual currency
               purchaseHistory: [{
                 orderId: pendingOrder.id,
                 packageSku: pendingOrder.packageSku,
                 packageName: pkg.name,
                 minutesAdded: newMinutes,
-                amount: pendingOrder.amount,
-                currency: pendingOrder.currency,
+                amount: pendingOrder.amount, // Use actual paid amount (INR)
+                currency: pendingOrder.currency, // Use actual currency (INR)
                 gatewayOrderId: gatewayOrderId,
                 paymentId: verifiedPaymentId,
                 gatewayProvider: pendingOrder.gatewayProvider,
@@ -1017,8 +1032,8 @@ export function setupBillingRoutes(app: Router) {
                 packageSku: pendingOrder.packageSku,
                 packageName: pkg.name,
                 minutesAdded: newMinutes,
-                amount: pendingOrder.amount,
-                currency: pendingOrder.currency,
+                amount: pendingOrder.amount, // Use actual paid amount (INR)
+                currency: pendingOrder.currency, // Use actual currency (INR)
                 gatewayOrderId: gatewayOrderId,
                 paymentId: verifiedPaymentId,
                 gatewayProvider: pendingOrder.gatewayProvider,
@@ -2987,10 +3002,17 @@ export function setupBillingRoutes(app: Router) {
       if (orderPurchases.length === 0) {
         console.log(`[Invoice Debug] No purchases found with cartOrderId ${orderId}, trying other methods...`);
         
-        // Try finding by orderId directly
+        // Try finding by pendingOrderId (for session minutes and other direct purchases)
         orderPurchases = allPurchases.filter(
-          (purchase: any) => purchase.orderId === orderId
+          (purchase: any) => purchase.metadata && (purchase.metadata as any).pendingOrderId === orderId
         );
+        
+        // Try finding by orderId directly
+        if (orderPurchases.length === 0) {
+          orderPurchases = allPurchases.filter(
+            (purchase: any) => purchase.orderId === orderId
+          );
+        }
         
         // If still no purchases, try finding by gateway order ID
         if (orderPurchases.length === 0 && pendingOrder.gatewayOrderId) {
@@ -3028,7 +3050,7 @@ export function setupBillingRoutes(app: Router) {
       const items = orderPurchases.length > 0 ? orderPurchases.map((purchase: any) => {
         const metadata = purchase.metadata as any || {};
         
-        // Use actual purchase amount (which includes GST for INR, no GST for USD)
+        // Use actual purchase amount and currency
         const totalWithGst = parseFloat(purchase.purchaseAmount || '0');
         const currency = purchase.currency || 'USD';
         
@@ -3036,16 +3058,20 @@ export function setupBillingRoutes(app: Router) {
         let gstAmount: number;
         let gstRate: number;
         
-        if (currency === 'INR') {
-          // For INR, calculate GST (18% of base amount)
-          // If total = base + (base * 0.18), then base = total / 1.18
+        // Check if we have the actual paid amount stored in metadata
+        const actualPaidAmount = metadata.actualPaidAmount ? parseFloat(metadata.actualPaidAmount) : totalWithGst;
+        const actualCurrency = metadata.actualCurrency || currency;
+        
+        if (actualCurrency === 'INR') {
+          // For INR, the amount includes GST, so calculate base amount
+          // GST = 18% of base amount, so total = base * 1.18
           gstRate = 18;
-          baseAmount = totalWithGst / 1.18;
-          gstAmount = totalWithGst - baseAmount;
+          baseAmount = actualPaidAmount / 1.18;
+          gstAmount = actualPaidAmount - baseAmount;
         } else {
           // For USD and other currencies, no GST
           gstRate = 0;
-          baseAmount = totalWithGst;
+          baseAmount = actualPaidAmount;
           gstAmount = 0;
         }
         
@@ -3062,30 +3088,76 @@ export function setupBillingRoutes(app: Router) {
           totalAmount: baseAmount.toFixed(2), // Subtotal without GST
           gstRate: gstRate,
           gstAmount: gstAmount.toFixed(2),
-          totalWithGst: totalWithGst.toFixed(2),
-          currency: currency,
+          totalWithGst: actualPaidAmount.toFixed(2),
+          currency: actualCurrency,
           startDate: purchase.startDate?.toISOString() || new Date().toISOString(),
           endDate: purchase.endDate ? purchase.endDate.toISOString() : null,
           description: getItemDescription(purchase.addonType, metadata),
         };
       }) : [
-        // Fallback item from pending order if no purchases found
-        {
-          packageSku: 'PENDING-ORDER',
-          packageName: 'Order Processing',
-          addonType: pendingOrder.addonType || 'cart_checkout',
-          quantity: 1,
-          unitPrice: parseFloat(pendingOrder.amount || '0').toFixed(2),
-          basePrice: parseFloat(pendingOrder.amount || '0').toFixed(2),
-          totalAmount: parseFloat(pendingOrder.amount || '0').toFixed(2),
-          gstRate: pendingOrder.currency === 'INR' ? 18 : 0,
-          gstAmount: pendingOrder.currency === 'INR' ? ((parseFloat(pendingOrder.amount || '0')) * 0.18 / 1.18).toFixed(2) : '0.00',
-          totalWithGst: parseFloat(pendingOrder.amount || '0').toFixed(2),
-          currency: pendingOrder.currency || 'USD',
-          startDate: new Date().toISOString(),
-          endDate: null,
-          description: `Order ${orderId} - Payment processed successfully`,
-        }
+        // Fallback item from pending order - use metadata breakdown if available
+        (() => {
+          const metadata = pendingOrder.metadata as any || {};
+          const totalAmount = parseFloat(pendingOrder.amount || '0');
+          const currency = pendingOrder.currency || 'USD';
+          
+          // Check if we have cart metadata with proper GST breakdown
+          if (metadata.subtotal !== undefined && metadata.gstAmount !== undefined) {
+            // Use the proper breakdown from cart calculation
+            const subtotal = parseFloat(metadata.subtotal?.toString() || '0');
+            const gstAmount = parseFloat(metadata.gstAmount?.toString() || '0');
+            const gstRate = currency === 'INR' ? 18 : 0;
+            
+            return {
+              packageSku: pendingOrder.packageSku || 'CART-MULTI-ITEM',
+              packageName: `${metadata.itemCount || 1} Item${(metadata.itemCount || 1) > 1 ? 's' : ''} - Cart Purchase`,
+              addonType: pendingOrder.addonType || 'cart_checkout',
+              quantity: 1,
+              unitPrice: subtotal.toFixed(2),
+              basePrice: subtotal.toFixed(2),
+              totalAmount: subtotal.toFixed(2), // Subtotal without GST
+              gstRate: gstRate,
+              gstAmount: gstAmount.toFixed(2),
+              totalWithGst: totalAmount.toFixed(2),
+              currency: currency,
+              startDate: new Date().toISOString(),
+              endDate: null,
+              description: `Cart Purchase - ${metadata.itemCount || 1} item${(metadata.itemCount || 1) > 1 ? 's' : ''} purchased successfully`,
+            };
+          } else {
+            // Fallback calculation for orders without proper metadata
+            let baseAmount: number;
+            let gstAmount: number;
+            let gstRate: number;
+            
+            if (currency === 'INR') {
+              gstRate = 18;
+              baseAmount = totalAmount / 1.18;
+              gstAmount = totalAmount - baseAmount;
+            } else {
+              gstRate = 0;
+              baseAmount = totalAmount;
+              gstAmount = 0;
+            }
+            
+            return {
+              packageSku: pendingOrder.packageSku || 'PENDING-ORDER',
+              packageName: 'Order Processing',
+              addonType: pendingOrder.addonType || 'cart_checkout',
+              quantity: 1,
+              unitPrice: baseAmount.toFixed(2),
+              basePrice: baseAmount.toFixed(2),
+              totalAmount: baseAmount.toFixed(2),
+              gstRate: gstRate,
+              gstAmount: gstAmount.toFixed(2),
+              totalWithGst: totalAmount.toFixed(2),
+              currency: currency,
+              startDate: new Date().toISOString(),
+              endDate: null,
+              description: `Order ${orderId} - Payment processed successfully`,
+            };
+          }
+        })()
       ];
 
       // Calculate totals from actual data
@@ -3124,8 +3196,10 @@ export function setupBillingRoutes(app: Router) {
         
         // Payment Information
         payment: {
-          method: pendingOrder.gatewayProvider || 'razorpay',
-          status: pendingOrder.status,
+          method: pendingOrder.gatewayProvider === 'cashfree' ? 'Cashfree' : 
+                  pendingOrder.gatewayProvider === 'razorpay' ? 'Razorpay' : 
+                  pendingOrder.gatewayProvider || 'Online Payment',
+          status: 'COMPLETED',
           transactionId: pendingOrder.gatewayOrderId,
           paymentDate: pendingOrder.createdAt?.toISOString() || new Date().toISOString(),
         },

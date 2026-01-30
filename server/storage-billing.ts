@@ -64,6 +64,7 @@ export interface IBillingStorage {
   // Pending Orders Management (for secure payment verification)
   createPendingOrder(data: InsertPendingOrder): Promise<PendingOrder>;
   getPendingOrder(gatewayOrderId: string): Promise<PendingOrder | null>;
+  getPendingOrderById(orderId: string, userId: string): Promise<PendingOrder | null>;
   updatePendingOrderGatewayId(pendingOrderId: string, gatewayOrderId: string): Promise<PendingOrder>;
   updatePendingOrderStatus(gatewayOrderId: string, userId: string, newStatus: 'completed' | 'failed' | 'expired', completedAt?: Date): Promise<PendingOrder>;
   expirePendingOrders(): Promise<number>;

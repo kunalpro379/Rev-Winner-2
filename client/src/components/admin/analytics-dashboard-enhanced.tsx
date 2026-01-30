@@ -377,7 +377,7 @@ Element("a");
             ) : (
               <>
                 <div className="text-2xl font-bold">
-                  {revMetrics ? formatCurrency(revMetrics.totalRevenue) : "₹0"}
+                  {revMetrics ? formatCurrency(revMetrics.totalRevenue) : "$0"}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {revMetrics?.successfulPayments || 0} successful payments

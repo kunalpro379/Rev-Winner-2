@@ -335,8 +335,8 @@ export default function Invoice() {
             addText(`${index + 1}. ${item.packageName}`, 11, true);
             addText(`   SKU: ${item.packageSku}`, 9);
             addText(`   ${item.description}`, 9);
-            addText(`   Quantity: ${item.quantity} | Unit Price: ${item.currency === 'INR' ? '₹' : '$'}${item.unitPrice}`, 9);
-            addText(`   Total: ${item.currency === 'INR' ? '₹' : '$'}${item.totalWithGst}`, 10, true);
+            addText(`   Quantity: ${item.quantity} | Unit Price: $${item.unitPrice}`, 9);
+            addText(`   Total: $${item.totalWithGst}`, 10, true);
             yPosition += 5;
           });
         } else {
@@ -345,11 +345,11 @@ export default function Invoice() {
         
         yPosition += 10;
         addText('PAYMENT SUMMARY:', 12, true);
-        addText(`Subtotal: ${invoiceData?.summary?.currency === 'INR' ? '₹' : '$'}${invoiceData?.summary?.subtotal?.toFixed(2) || '0.00'}`, 11);
+        addText(`Subtotal: $${invoiceData?.summary?.subtotal?.toFixed(2) || '0.00'}`, 11);
         if (invoiceData?.summary?.gst && invoiceData.summary.gst > 0) {
-          addText(`GST (${invoiceData.summary.gstRate}%): ${invoiceData.summary.currency === 'INR' ? '₹' : '$'}${invoiceData.summary.gst.toFixed(2)}`, 11);
+          addText(`GST (${invoiceData.summary.gstRate}%): $${invoiceData.summary.gst.toFixed(2)}`, 11);
         }
-        addText(`TOTAL PAID: ${invoiceData?.summary?.currency === 'INR' ? '₹' : '$'}${invoiceData?.summary?.total?.toFixed(2) || '0.00'}`, 14, true);
+        addText(`TOTAL PAID: $${invoiceData?.summary?.total?.toFixed(2) || '0.00'}`, 14, true);
         
         if (invoiceData?.summary?.amountInWords) {
           yPosition += 5;
@@ -503,20 +503,20 @@ export default function Invoice() {
             fontFamily: 'Arial, sans-serif',
             fontSize: '14px',
             lineHeight: '1.4',
-            padding: '20px',
+            padding: '16px',
             display: 'block',
             visibility: 'visible',
             position: 'relative'
           }}
         >
           {/* Invoice Header */}
-          <CardHeader className="space-y-4" style={{ backgroundColor: '#ffffff', color: '#000000' }}>
+          <CardHeader className="space-y-3 pb-4" style={{ backgroundColor: '#ffffff', color: '#000000' }}>
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <img src={logoPath} alt="Rev Winner Logo" className="h-12 w-auto" />
+                  <img src={logoPath} alt="Rev Winner Logo" className="h-10 w-auto" />
                   <div>
-                    <h2 className="text-2xl font-bold" style={{ color: '#000000' }}>{invoiceData.company.name}</h2>
+                    <h2 className="text-xl font-bold" style={{ color: '#000000' }}>{invoiceData.company.name}</h2>
                     <p className="text-sm" style={{ color: '#666666' }}>{invoiceData.company.address.split('\n')[0]}</p>
                     <p className="text-sm" style={{ color: '#666666' }}>{invoiceData.company.address.split('\n')[1]}</p>
                     <p className="text-xs" style={{ color: '#666666' }}>{invoiceData.company.email}</p>
@@ -525,10 +525,12 @@ export default function Invoice() {
                 </div>
               </div>
               <div className="text-right">
-                <Badge className="bg-green-500 hover:bg-green-600 mb-2 print:bg-green-100 print:text-green-800" style={{ backgroundColor: '#22c55e', color: '#ffffff' }}>
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  {invoiceData.payment.status.toUpperCase()}
-                </Badge>
+                <div className="flex justify-end mb-2">
+                  <Badge className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 text-sm font-semibold rounded-full flex items-center justify-center min-w-[120px]" style={{ backgroundColor: '#22c55e', color: '#ffffff' }}>
+                    <CheckCircle className="h-4 w-4 mr-1" />
+                    {invoiceData.payment.status.toUpperCase()}
+                  </Badge>
+                </div>
                 <div className="text-sm font-semibold" style={{ color: '#000000' }}>
                   Invoice #{invoiceData.invoiceNumber}
                 </div>
@@ -540,7 +542,7 @@ export default function Invoice() {
 
             <Separator style={{ backgroundColor: '#e5e7eb' }} />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <h3 className="font-semibold mb-2" style={{ color: '#000000' }}>Bill To:</h3>
                 <div className="text-sm space-y-1" style={{ color: '#666666' }}>
@@ -570,7 +572,7 @@ export default function Invoice() {
                   {invoiceData.payment.transactionId && (
                     <div>
                       <div className="text-sm" style={{ color: '#666666' }}>Transaction ID:</div>
-                      <div className="font-mono text-xs" style={{ color: '#000000' }}>{invoiceData.payment.transactionId}</div>
+                      <div className="font-mono text-xs break-all" style={{ color: '#000000' }}>{invoiceData.payment.transactionId}</div>
                     </div>
                   )}
                 </div>
@@ -579,9 +581,9 @@ export default function Invoice() {
           </CardHeader>
 
           {/* Invoice Items */}
-          <CardContent className="space-y-6" style={{ backgroundColor: '#ffffff', color: '#000000' }}>
+          <CardContent className="space-y-4 py-4" style={{ backgroundColor: '#ffffff', color: '#000000' }}>
             <div>
-              <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: '#000000' }}>
+              <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: '#000000' }}>
                 <Package className="h-5 w-5" />
                 Order Details
               </h3>
@@ -591,12 +593,12 @@ export default function Invoice() {
                   <p style={{ color: '#666666' }}>No items found for this order.</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {invoiceData.items.map((item, index) => (
-                    <div key={index} className="border border-gray-300 rounded-lg p-4" style={{ backgroundColor: '#ffffff' }}>
-                      <div className="flex items-start justify-between mb-3">
+                    <div key={index} className="border border-gray-300 rounded-lg p-3" style={{ backgroundColor: '#ffffff' }}>
+                      <div className="flex items-start justify-between mb-2">
                         <div className="flex-1">
-                          <div className="font-semibold text-lg" style={{ color: '#000000' }}>{item.packageName}</div>
+                          <div className="font-semibold text-base" style={{ color: '#000000' }}>{item.packageName}</div>
                           <div className="text-sm mb-1" style={{ color: '#666666' }}>SKU: {item.packageSku}</div>
                           <div className="text-sm mb-2" style={{ color: '#666666' }}>{item.description}</div>
                           <div className="inline-block px-2 py-1 rounded text-xs font-medium" style={{ backgroundColor: '#f3e8ff', color: '#7c3aed' }}>
@@ -604,18 +606,18 @@ export default function Invoice() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-xl font-bold" style={{ color: '#7c3aed' }}>
-                            {item.currency === 'INR' ? '₹' : '$'}{item.totalWithGst}
+                          <div className="text-lg font-bold" style={{ color: '#7c3aed' }}>
+                            ${item.totalWithGst}
                           </div>
                           {parseFloat(item.gstAmount) > 0 && (
                             <div className="text-xs" style={{ color: '#666666' }}>
-                              (incl. {item.currency === 'INR' ? '₹' : '$'}{item.gstAmount} GST @ {item.gstRate}%)
+                              (incl. ${item.gstAmount} GST @ {item.gstRate}%)
                             </div>
                           )}
                         </div>
                       </div>
 
-                      <div style={{ height: '1px', backgroundColor: '#e5e7eb', margin: '12px 0' }}></div>
+                      <div style={{ height: '1px', backgroundColor: '#e5e7eb', margin: '8px 0' }}></div>
 
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
@@ -624,7 +626,7 @@ export default function Invoice() {
                         </div>
                         <div>
                           <span style={{ color: '#666666' }}>Unit Price:</span>
-                          <span className="font-semibold ml-2" style={{ color: '#000000' }}>{item.currency === 'INR' ? '₹' : '$'}{item.unitPrice}</span>
+                          <span className="font-semibold ml-2" style={{ color: '#000000' }}>${item.unitPrice}</span>
                         </div>
                         <div>
                           <span style={{ color: '#666666' }}>Start Date:</span>
@@ -644,29 +646,29 @@ export default function Invoice() {
             <div style={{ height: '1px', backgroundColor: '#e5e7eb' }}></div>
 
             {/* Price Summary */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-lg">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-base">
                 <span style={{ color: '#666666' }}>Subtotal</span>
                 <span className="font-semibold" style={{ color: '#000000' }}>
-                  {invoiceData.summary.currency === 'INR' ? '₹' : '$'}{invoiceData.summary.subtotal.toFixed(2)}
+                  ${invoiceData.summary.subtotal.toFixed(2)}
                 </span>
               </div>
               {invoiceData.summary.gst > 0 && (
-                <div className="flex items-center justify-between text-lg">
+                <div className="flex items-center justify-between text-base">
                   <div className="flex items-center gap-2" style={{ color: '#666666' }}>
-                    <DollarSign className="h-5 w-5" style={{ color: '#7c3aed' }} />
+                    <DollarSign className="h-4 w-4" style={{ color: '#7c3aed' }} />
                     <span>GST ({invoiceData.summary.gstRate}%)</span>
                   </div>
                   <span className="font-semibold" style={{ color: '#7c3aed' }}>
-                    {invoiceData.summary.currency === 'INR' ? '₹' : '$'}{invoiceData.summary.gst.toFixed(2)}
+                    ${invoiceData.summary.gst.toFixed(2)}
                   </span>
                 </div>
               )}
               <div style={{ height: '1px', backgroundColor: '#e5e7eb' }}></div>
-              <div className="flex items-center justify-between text-2xl font-bold">
+              <div className="flex items-center justify-between text-xl font-bold">
                 <span style={{ color: '#000000' }}>Total Paid</span>
                 <span style={{ color: '#7c3aed' }}>
-                  {invoiceData.summary.currency === 'INR' ? '₹' : '$'}{invoiceData.summary.total.toFixed(2)}
+                  ${invoiceData.summary.total.toFixed(2)}
                 </span>
               </div>
               <div className="text-sm text-center mt-2" style={{ color: '#666666' }}>
@@ -675,8 +677,8 @@ export default function Invoice() {
             </div>
           </CardContent>
 
-          <CardFooter className="border-t" style={{ backgroundColor: '#f9fafb', borderTopColor: '#e5e7eb' }}>
-            <div className="w-full space-y-4">
+          <CardFooter className="border-t pt-4" style={{ backgroundColor: '#f9fafb', borderTopColor: '#e5e7eb' }}>
+            <div className="w-full space-y-3">
               {/* Terms and Conditions */}
               <div>
                 <h4 className="font-semibold mb-2" style={{ color: '#000000' }}>Terms & Conditions:</h4>

@@ -2290,12 +2290,21 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
             const amount = parseFloat(historyItem.amount || '0');
             const currency = historyItem.currency || 'USD';
             
-            // Keep original currency - no conversion
             let displayAmount = amount;
             let displayCurrency = currency;
+            let baseAmount: number;
+            let gstAmount: number;
             
-            const baseAmount = displayAmount / 1.18;
-            const gstAmount = displayAmount - baseAmount;
+            // Proper GST calculation based on currency
+            if (currency === 'INR') {
+              // For INR, the amount includes GST, so calculate base amount
+              baseAmount = displayAmount / 1.18;
+              gstAmount = displayAmount - baseAmount;
+            } else {
+              // For USD and other currencies, no GST
+              baseAmount = displayAmount;
+              gstAmount = 0;
+            }
             
             invoices.push({
               id: historyItem.orderId || historyItem.paymentId,
@@ -2329,21 +2338,33 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
             });
           });
         } else if (metadata.cartOrderId) {
-          // Cart purchase - create invoice from cart order
+          // Cart purchase - use the stored amount which should include proper GST
           const totalWithGst = parseFloat(purchase.purchaseAmount || '0');
-          const baseAmount = totalWithGst / 1.18;
-          const gstAmount = totalWithGst - baseAmount;
+          const currency = purchase.currency || 'INR';
+          let baseAmount: number;
+          let gstAmount: number;
+          
+          // Proper GST calculation based on currency
+          if (currency === 'INR') {
+            // For INR, the amount includes GST, so calculate base amount
+            baseAmount = totalWithGst / 1.18;
+            gstAmount = totalWithGst - baseAmount;
+          } else {
+            // For USD and other currencies, no GST
+            baseAmount = totalWithGst;
+            gstAmount = 0;
+          }
           
           invoices.push({
             id: metadata.cartOrderId,
             orderId: metadata.cartOrderId,
             amount: totalWithGst.toFixed(2),
-            currency: purchase.currency || 'INR',
+            currency: currency,
             status: 'succeeded',
             paymentMethod: 'online',
             razorpayOrderId: metadata.gatewayOrderId || metadata.cartOrderId,
             razorpayPaymentId: metadata.paymentId,
-            receiptUrl: null,
+            receiptUrl: `/api/billing/invoice?orderId=${metadata.cartOrderId}`,
             createdAt: purchase.createdAt,
             metadata: {
               itemCount: 1,
@@ -2356,14 +2377,26 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
         } else {
           // Standalone purchase (old format or other addon types)
           const totalWithGst = parseFloat(purchase.purchaseAmount || '0');
-          const baseAmount = totalWithGst / 1.18;
-          const gstAmount = totalWithGst - baseAmount;
+          const currency = purchase.currency || 'INR';
+          let baseAmount: number;
+          let gstAmount: number;
+          
+          // Proper GST calculation based on currency
+          if (currency === 'INR') {
+            // For INR, the amount includes GST, so calculate base amount
+            baseAmount = totalWithGst / 1.18;
+            gstAmount = totalWithGst - baseAmount;
+          } else {
+            // For USD and other currencies, no GST
+            baseAmount = totalWithGst;
+            gstAmount = 0;
+          }
           
           invoices.push({
             id: purchase.id,
             orderId: purchase.id,
             amount: totalWithGst.toFixed(2),
-            currency: purchase.currency || 'INR',
+            currency: currency,
             status: 'succeeded',
             paymentMethod: 'online',
             razorpayOrderId: metadata.gatewayOrderId || purchase.id,
