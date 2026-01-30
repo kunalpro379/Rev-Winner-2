@@ -176,61 +176,61 @@ export default function PricingModal({ open, onOpenChange, reason = "upgrade", c
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-[90vw] lg:max-w-5xl max-h-[95vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold text-center">
+            <DialogTitle className="text-xl sm:text-2xl font-bold text-center">
               {getModalTitle()}
             </DialogTitle>
-            <DialogDescription className="text-center text-base">
+            <DialogDescription className="text-center text-sm sm:text-base">
               {getModalDescription()}
             </DialogDescription>
           </DialogHeader>
 
           {plansLoading ? (
-            <div className="flex justify-center py-12">
+            <div className="flex justify-center py-8 sm:py-12">
               <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
             </div>
           ) : (
-            <div className="grid md:grid-cols-3 gap-6 mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mt-4 sm:mt-6">
               {/* Free Trial Card */}
               <Card className={`relative ${currentPlan === 'free_trial' ? 'border-purple-500 border-2' : 'border-slate-200 dark:border-slate-700'}`} data-testid="card-plan-free">
                 {currentPlan === 'free_trial' && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                  <div className="absolute -top-2 sm:-top-3 left-1/2 -translate-x-1/2 bg-purple-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-semibold">
                     Current Plan
                   </div>
                 )}
-                <CardHeader>
+                <CardHeader className="p-4 sm:p-6">
                   <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="h-5 w-5 text-slate-600" />
-                    <CardTitle className="text-xl">Free Trial</CardTitle>
+                    <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-slate-600" />
+                    <CardTitle className="text-lg sm:text-xl">Free Trial</CardTitle>
                   </div>
-                  <CardDescription>Get started for free</CardDescription>
-                  <div className="mt-4">
-                    <div className="text-4xl font-bold">$0</div>
-                    <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">No payment required</div>
+                  <CardDescription className="text-sm">Get started for free</CardDescription>
+                  <div className="mt-3 sm:mt-4">
+                    <div className="text-3xl sm:text-4xl font-bold">$0</div>
+                    <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">No payment required</div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <ul className="space-y-3 mb-6">
+                <CardContent className="p-4 sm:p-6 pt-0">
+                  <ul className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
                     <li className="flex items-start gap-2">
-                      <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm">3 free sessions</span>
+                      <Check className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-xs sm:text-sm">3 free sessions</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm">Max 1 hour per session</span>
+                      <Check className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-xs sm:text-sm">Max 1 hour per session</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm">Bring your own AI key</span>
+                      <Check className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-xs sm:text-sm">Bring your own AI key</span>
                     </li>
                     <li className="flex items-start gap-2">
-                      <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                      <span className="text-sm">All core features</span>
+                      <Check className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-xs sm:text-sm">All core features</span>
                     </li>
                   </ul>
                   {currentPlan === 'free_trial' && (
-                    <Button disabled className="w-full" variant="outline" data-testid="button-plan-free">
+                    <Button disabled className="w-full text-sm sm:text-base" variant="outline" data-testid="button-plan-free">
                       Current Plan
                     </Button>
                   )}
@@ -252,60 +252,65 @@ export default function PricingModal({ open, onOpenChange, reason = "upgrade", c
                     data-testid={`card-plan-${isYearly ? 'yearly' : 'three-year'}`}
                   >
                     {index === 1 && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-blue-900 text-white px-4 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
+                      <div className="absolute -top-2 sm:-top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-purple-600 to-blue-900 text-white px-3 sm:px-4 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
                         <Crown className="h-3 w-3" />
-                        BEST VALUE
+                        <span className="hidden sm:inline">BEST VALUE</span>
+                        <span className="sm:hidden">BEST</span>
                       </div>
                     )}
                     {isCurrent && (
-                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-purple-600 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                      <div className="absolute -top-2 sm:-top-3 left-1/2 -translate-x-1/2 bg-purple-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-semibold">
                         Current Plan
                       </div>
                     )}
-                    <CardHeader>
+                    <CardHeader className="p-4 sm:p-6">
                       <div className="flex items-center gap-2 mb-2">
-                        {isYearly ? <Zap className="h-5 w-5 text-purple-600" /> : <Crown className="h-5 w-5 text-yellow-600" />}
-                        <CardTitle className="text-xl">{plan.name}</CardTitle>
+                        {isYearly ? <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" /> : <Crown className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600" />}
+                        <CardTitle className="text-lg sm:text-xl">{plan.name}</CardTitle>
                       </div>
-                      <CardDescription>
+                      <CardDescription className="text-sm">
                         {isYearly ? "Professional annual plan" : "Maximum savings for 3 years"}
                       </CardDescription>
-                      <div className="mt-4">
+                      <div className="mt-3 sm:mt-4">
                         <div className="flex items-baseline gap-2">
-                          <div className="text-4xl font-bold">${plan.price}</div>
+                          <div className="text-3xl sm:text-4xl font-bold">${plan.price}</div>
                           {plan.listedPrice && (
-                            <div className="text-lg text-slate-500 line-through">${plan.listedPrice}</div>
+                            <div className="text-base sm:text-lg text-slate-500 line-through">${plan.listedPrice}</div>
                           )}
                         </div>
-                        <div className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                        <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
                           {plan.billingInterval} • {discount > 0 && `Save ${discount}%`}
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent>
-                      <ul className="space-y-3 mb-6">
+                    <CardContent className="p-4 sm:p-6 pt-0">
+                      <ul className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
                         {plan.features.map((feature, idx) => (
                           <li key={idx} className="flex items-start gap-2">
-                            <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                            <span className="text-sm">{feature}</span>
+                            <Check className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                            <span className="text-xs sm:text-sm">{feature}</span>
                           </li>
                         ))}
                       </ul>
                       <Button
                         onClick={() => handleSelectPlan(plan.id)}
                         disabled={createOrderMutation.isPending || isCurrent}
-                        className={`w-full ${index === 1 ? 'bg-gradient-to-r from-purple-600 to-blue-900 hover:from-purple-700 hover:to-blue-950' : ''}`}
+                        className={`w-full text-sm sm:text-base ${index === 1 ? 'bg-gradient-to-r from-purple-600 to-blue-900 hover:from-purple-700 hover:to-blue-950' : ''}`}
                         data-testid={`button-plan-${isYearly ? 'yearly' : 'three-year'}`}
                       >
                         {createOrderMutation.isPending && selectedPlanId === plan.id ? (
                           <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Processing...
+                            <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                            <span className="hidden sm:inline">Processing...</span>
+                            <span className="sm:hidden">...</span>
                           </>
                         ) : isCurrent ? (
                           "Current Plan"
                         ) : (
-                          `Upgrade to ${isYearly ? "1-Year" : "3-Year"}`
+                          <>
+                            <span className="hidden sm:inline">Upgrade to {isYearly ? "1-Year" : "3-Year"}</span>
+                            <span className="sm:hidden">Upgrade</span>
+                          </>
                         )}
                       </Button>
                     </CardContent>
@@ -315,7 +320,7 @@ export default function PricingModal({ open, onOpenChange, reason = "upgrade", c
             </div>
           )}
 
-          <div className="text-center text-sm text-slate-600 dark:text-slate-400 mt-6">
+          <div className="text-center text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-4 sm:mt-6 px-2">
             All plans require you to bring your own AI API keys (OpenAI, Anthropic, Google, etc.)
           </div>
         </DialogContent>

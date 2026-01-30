@@ -4,8 +4,11 @@ import { clearSessionStorageArtifacts } from "@/lib/session";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     let errorMessage = res.statusText;
+    let errorData: any = null;
+    
     try {
       const json = await res.json();
+      errorData = json;
       // Extract just the message from the JSON response
       errorMessage = json.message || json.error || errorMessage;
     } catch (e) {
@@ -17,7 +20,13 @@ async function throwIfResNotOk(res: Response) {
         // Use statusText as fallback
       }
     }
-    throw new Error(`${res.status}: ${errorMessage}`);
+    
+    // Create a more informative error object
+    const error = new Error(`${res.status}: ${errorMessage}`);
+    (error as any).status = res.status;
+    (error as any).data = errorData;
+    
+    throw error;
   }
 }
 

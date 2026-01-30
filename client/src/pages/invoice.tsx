@@ -26,25 +26,70 @@ interface InvoiceItem {
   packageName: string;
   addonType: string;
   quantity: number;
+  unitPrice: string;
   basePrice: string;
   totalAmount: string;
+  gstRate: number;
   gstAmount: string;
+  totalWithGst: string;
+  currency: string;
   startDate: string;
   endDate: string | null;
+  description: string;
 }
 
 interface InvoiceData {
+  // Invoice Header
+  invoiceNumber: string;
   orderId: string;
-  userId: number;
-  totalAmount: string;
-  status: string;
-  createdAt: string;
+  invoiceDate: string;
+  dueDate: string;
+  
+  // Company Information
+  company: {
+    name: string;
+    address: string;
+    email: string;
+    website: string;
+    gstNumber: string | null;
+  };
+  
+  // Customer Information
+  customer: {
+    id: string;
+    name: string;
+    email: string;
+    mobile: string | null;
+    organization: string | null;
+  };
+  
+  // Payment Information
+  payment: {
+    method: string;
+    status: string;
+    transactionId: string;
+    paymentDate: string;
+  };
+  
+  // Line Items
   items: InvoiceItem[];
-  subtotal: number;
-  gst: number;
-  total: number;
-  userName: string;
-  userEmail: string;
+  
+  // Financial Summary
+  summary: {
+    subtotal: number;
+    gst: number;
+    gstRate: number;
+    total: number;
+    currency: string;
+    amountInWords: string;
+  };
+  
+  // Metadata
+  createdAt: string;
+  generatedAt: string;
+  
+  // Terms and Conditions
+  terms: string[];
 }
 
 export default function Invoice() {
@@ -64,9 +109,18 @@ export default function Invoice() {
 
   // Fetch invoice data (include orderId in URL for backend)
   // Only construct queryKey when orderId exists to avoid caching 'null' URL
-  const { data: invoiceData, isLoading } = useQuery<InvoiceData>({
+  const { data: invoiceData, isLoading, error } = useQuery<InvoiceData>({
     queryKey: orderId ? [`/api/billing/invoice?orderId=${orderId}`] : ['disabled-invoice-query'],
     enabled: !!orderId && !!authData,
+  });
+
+  // Debug logging
+  console.log('Invoice Debug:', {
+    orderId,
+    authData: !!authData,
+    invoiceData,
+    isLoading,
+    error
   });
 
   // Redirect to login if not authenticated (but wait for auth check to complete)
@@ -82,7 +136,7 @@ export default function Invoice() {
   }
 
   const handleDownloadPDF = async () => {
-    if (!invoiceRef.current) return;
+    if (!invoiceRef.current || !invoiceData) return;
 
     try {
       toast({
@@ -90,32 +144,252 @@ export default function Invoice() {
         description: "Please wait while we generate your invoice.",
       });
 
-      // Capture the invoice as canvas
-      const canvas = await html2canvas(invoiceRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
+      // Wait a bit for any dynamic content to load
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Ensure the element is visible and has content
+      const element = invoiceRef.current;
+      if (!element.offsetHeight || !element.offsetWidth) {
+        throw new Error('Invoice element is not visible or has no content');
+      }
+
+      console.log('Element dimensions:', {
+        width: element.offsetWidth,
+        height: element.offsetHeight,
+        scrollWidth: element.scrollWidth,
+        scrollHeight: element.scrollHeight
       });
 
-      // Convert canvas to PDF
-      const imgData = canvas.toDataURL('image/png');
+      // Capture the invoice as canvas with optimized options
+      const canvas = await html2canvas(element, {
+        scale: 2, // Reduced scale for better compatibility
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: true, // Enable logging for debugging
+        foreignObjectRendering: false, // Disable for better compatibility
+        imageTimeout: 15000,
+        removeContainer: true,
+        width: element.scrollWidth,
+        height: element.scrollHeight,
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight,
+        onclone: (clonedDoc) => {
+          // Ensure styles are applied to cloned document
+          const clonedElement = clonedDoc.querySelector('[data-testid="invoice-card"]');
+          if (clonedElement) {
+            (clonedElement as HTMLElement).style.backgroundColor = '#ffffff';
+            (clonedElement as HTMLElement).style.color = '#000000';
+            (clonedElement as HTMLElement).style.fontFamily = 'Arial, sans-serif';
+            (clonedElement as HTMLElement).style.fontSize = '14px';
+            (clonedElement as HTMLElement).style.lineHeight = '1.4';
+            (clonedElement as HTMLElement).style.padding = '20px';
+            (clonedElement as HTMLElement).style.minHeight = 'auto';
+            (clonedElement as HTMLElement).style.display = 'block';
+            (clonedElement as HTMLElement).style.visibility = 'visible';
+            
+            // Force all text to be black
+            const allElements = clonedElement.querySelectorAll('*');
+            allElements.forEach((el) => {
+              (el as HTMLElement).style.color = '#000000';
+            });
+          }
+        }
+      });
+
+      console.log('Canvas dimensions:', {
+        width: canvas.width,
+        height: canvas.height
+      });
+
+      if (canvas.width === 0 || canvas.height === 0) {
+        throw new Error('Canvas has zero dimensions - content may not be visible');
+      }
+
+      // Convert canvas to PDF with better sizing
+      const imgData = canvas.toDataURL('image/png', 1.0);
+      
+      if (imgData === 'data:,') {
+        throw new Error('Canvas is empty - no content captured');
+      }
+
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210; // A4 width in mm
+      const pdfWidth = 210; // A4 width in mm
+      const pdfHeight = 297; // A4 height in mm
+      const imgWidth = pdfWidth - 20; // Leave 10mm margin on each side
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-      pdf.save(`invoice-${orderId}.pdf`);
+      // Center the image on the page
+      const xOffset = 10; // 10mm margin
+      let yOffset = 10; // 10mm margin from top
+      
+      // If the image is taller than one page, split into multiple pages
+      if (imgHeight > pdfHeight - 20) { // Account for margins
+        let remainingHeight = imgHeight;
+        let sourceY = 0;
+        let pageNumber = 1;
+        
+        while (remainingHeight > 0) {
+          const pageHeight = Math.min(pdfHeight - 20, remainingHeight);
+          const sourceHeight = (pageHeight / imgHeight) * canvas.height;
+          
+          // Create a cropped canvas for this page
+          const pageCanvas = document.createElement('canvas');
+          const pageCtx = pageCanvas.getContext('2d');
+          
+          if (!pageCtx) {
+            throw new Error('Could not get canvas context');
+          }
+          
+          pageCanvas.width = canvas.width;
+          pageCanvas.height = sourceHeight;
+          
+          pageCtx.fillStyle = '#ffffff';
+          pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+          pageCtx.drawImage(canvas, 0, sourceY, canvas.width, sourceHeight, 0, 0, canvas.width, sourceHeight);
+          
+          const pageImgData = pageCanvas.toDataURL('image/png', 1.0);
+          
+          if (pageNumber > 1) {
+            pdf.addPage();
+          }
+          
+          pdf.addImage(pageImgData, 'PNG', xOffset, yOffset, imgWidth, pageHeight);
+          
+          sourceY += sourceHeight;
+          remainingHeight -= pageHeight;
+          pageNumber++;
+        }
+      } else {
+        // Single page
+        pdf.addImage(imgData, 'PNG', xOffset, yOffset, imgWidth, imgHeight);
+      }
+      
+      const filename = `${invoiceData?.invoiceNumber || `invoice-${orderId}`}.pdf`;
+      pdf.save(filename);
 
       toast({
         title: "PDF Downloaded",
-        description: "Your invoice has been downloaded successfully.",
+        description: `Your invoice has been downloaded as ${filename}`,
       });
-    } catch (error) {
-      toast({
-        title: "Download Failed",
-        description: "Failed to generate PDF. Please try again.",
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      console.error('PDF generation error:', error);
+      
+      // Fallback: Create a simple text-based PDF
+      try {
+        console.log('Attempting fallback PDF generation...');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pageWidth = 210;
+        const pageHeight = 297;
+        const margin = 20;
+        const lineHeight = 7;
+        let yPosition = margin;
+        
+        // Helper function to add text with word wrapping
+        const addText = (text: string, fontSize: number = 12, isBold: boolean = false) => {
+          pdf.setFontSize(fontSize);
+          if (isBold) {
+            pdf.setFont('helvetica', 'bold');
+          } else {
+            pdf.setFont('helvetica', 'normal');
+          }
+          
+          const lines = pdf.splitTextToSize(text, pageWidth - 2 * margin);
+          lines.forEach((line: string) => {
+            if (yPosition > pageHeight - margin) {
+              pdf.addPage();
+              yPosition = margin;
+            }
+            pdf.text(line, margin, yPosition);
+            yPosition += lineHeight;
+          });
+          yPosition += 3; // Extra spacing after text block
+        };
+        
+        // Add invoice content
+        addText('REV WINNER', 20, true);
+        addText('AI-Powered Sales Intelligence Platform', 12);
+        addText('Healthcaa Technologies Inc.', 12);
+        addText('support@revwinner.com | https://revwinner.com', 10);
+        yPosition += 10;
+        
+        addText(`INVOICE #${invoiceData?.invoiceNumber || 'N/A'}`, 16, true);
+        addText(`Order ID: ${invoiceData?.orderId || orderId}`, 10);
+        addText(`Date: ${formatDate(invoiceData?.invoiceDate || new Date().toISOString())}`, 10);
+        yPosition += 10;
+        
+        addText('BILL TO:', 12, true);
+        addText(`${invoiceData?.customer?.name || 'Customer'}`, 12);
+        addText(`${invoiceData?.customer?.email || 'N/A'}`, 10);
+        if (invoiceData?.customer?.mobile) {
+          addText(`${invoiceData.customer.mobile}`, 10);
+        }
+        if (invoiceData?.customer?.organization) {
+          addText(`${invoiceData.customer.organization}`, 10);
+        }
+        yPosition += 10;
+        
+        addText('ORDER DETAILS:', 12, true);
+        if (invoiceData?.items && invoiceData.items.length > 0) {
+          invoiceData.items.forEach((item, index) => {
+            addText(`${index + 1}. ${item.packageName}`, 11, true);
+            addText(`   SKU: ${item.packageSku}`, 9);
+            addText(`   ${item.description}`, 9);
+            addText(`   Quantity: ${item.quantity} | Unit Price: ${item.currency === 'INR' ? '₹' : '$'}${item.unitPrice}`, 9);
+            addText(`   Total: ${item.currency === 'INR' ? '₹' : '$'}${item.totalWithGst}`, 10, true);
+            yPosition += 5;
+          });
+        } else {
+          addText('No items found for this order.', 10);
+        }
+        
+        yPosition += 10;
+        addText('PAYMENT SUMMARY:', 12, true);
+        addText(`Subtotal: ${invoiceData?.summary?.currency === 'INR' ? '₹' : '$'}${invoiceData?.summary?.subtotal?.toFixed(2) || '0.00'}`, 11);
+        if (invoiceData?.summary?.gst && invoiceData.summary.gst > 0) {
+          addText(`GST (${invoiceData.summary.gstRate}%): ${invoiceData.summary.currency === 'INR' ? '₹' : '$'}${invoiceData.summary.gst.toFixed(2)}`, 11);
+        }
+        addText(`TOTAL PAID: ${invoiceData?.summary?.currency === 'INR' ? '₹' : '$'}${invoiceData?.summary?.total?.toFixed(2) || '0.00'}`, 14, true);
+        
+        if (invoiceData?.summary?.amountInWords) {
+          yPosition += 5;
+          addText(`Amount in Words: ${invoiceData.summary.amountInWords}`, 9);
+        }
+        
+        yPosition += 15;
+        addText('PAYMENT DETAILS:', 12, true);
+        addText(`Payment Method: ${invoiceData?.payment?.method || 'N/A'}`, 10);
+        addText(`Transaction ID: ${invoiceData?.payment?.transactionId || 'N/A'}`, 10);
+        addText(`Payment Date: ${formatDate(invoiceData?.payment?.paymentDate || new Date().toISOString())}`, 10);
+        addText(`Status: ${invoiceData?.payment?.status?.toUpperCase() || 'COMPLETED'}`, 10);
+        
+        yPosition += 15;
+        addText('TERMS & CONDITIONS:', 12, true);
+        if (invoiceData?.terms) {
+          invoiceData.terms.forEach((term, index) => {
+            addText(`${index + 1}. ${term}`, 9);
+          });
+        }
+        
+        yPosition += 10;
+        addText('Thank you for your business!', 12, true);
+        addText('For any questions, please contact support@revwinner.com', 10);
+        
+        const filename = `${invoiceData?.invoiceNumber || `invoice-${orderId}`}.pdf`;
+        pdf.save(filename);
+        
+        toast({
+          title: "PDF Downloaded (Text Version)",
+          description: `Your invoice has been downloaded as ${filename}`,
+        });
+      } catch (fallbackError) {
+        console.error('Fallback PDF generation also failed:', fallbackError);
+        toast({
+          title: "Download Failed",
+          description: `Failed to generate PDF: ${error.message}. Please try again or contact support.`,
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -184,7 +458,7 @@ export default function Invoice() {
         </div>
 
         {/* Download Button */}
-        <div className="flex justify-center mb-8">
+        <div className="flex justify-center gap-4 mb-8">
           <Button
             size="lg"
             onClick={handleDownloadPDF}
@@ -194,142 +468,239 @@ export default function Invoice() {
             <Download className="mr-2 h-5 w-5" />
             Download PDF Invoice
           </Button>
+          
+          {/* Debug button - temporary */}
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => {
+              console.log('Invoice Data:', invoiceData);
+              console.log('Order ID:', orderId);
+              console.log('Invoice Ref:', invoiceRef.current);
+              if (invoiceRef.current) {
+                console.log('Element dimensions:', {
+                  offsetWidth: invoiceRef.current.offsetWidth,
+                  offsetHeight: invoiceRef.current.offsetHeight,
+                  scrollWidth: invoiceRef.current.scrollWidth,
+                  scrollHeight: invoiceRef.current.scrollHeight
+                });
+              }
+            }}
+          >
+            Debug Info
+          </Button>
         </div>
 
         {/* Invoice Card */}
         <Card 
           ref={invoiceRef}
-          className="bg-white dark:bg-slate-900 border-2 border-purple-300 dark:border-purple-700"
+          className="bg-white border-2 border-gray-300 max-w-4xl mx-auto"
           data-testid="invoice-card"
+          style={{ 
+            minHeight: '800px',
+            backgroundColor: '#ffffff',
+            color: '#000000',
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '14px',
+            lineHeight: '1.4',
+            padding: '20px',
+            display: 'block',
+            visibility: 'visible',
+            position: 'relative'
+          }}
         >
           {/* Invoice Header */}
-          <CardHeader className="space-y-4">
+          <CardHeader className="space-y-4" style={{ backgroundColor: '#ffffff', color: '#000000' }}>
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <img src={logoPath} alt="Rev Winner Logo" className="h-10 w-auto" />
+                  <img src={logoPath} alt="Rev Winner Logo" className="h-12 w-auto" />
                   <div>
-                    <h2 className="text-2xl font-bold">Rev Winner</h2>
-                    <p className="text-sm text-muted-foreground">AI-Powered Sales Assistant</p>
+                    <h2 className="text-2xl font-bold" style={{ color: '#000000' }}>{invoiceData.company.name}</h2>
+                    <p className="text-sm" style={{ color: '#666666' }}>{invoiceData.company.address.split('\n')[0]}</p>
+                    <p className="text-sm" style={{ color: '#666666' }}>{invoiceData.company.address.split('\n')[1]}</p>
+                    <p className="text-xs" style={{ color: '#666666' }}>{invoiceData.company.email}</p>
+                    <p className="text-xs" style={{ color: '#666666' }}>{invoiceData.company.website}</p>
                   </div>
                 </div>
               </div>
               <div className="text-right">
-                <Badge className="bg-green-500 hover:bg-green-600 mb-2">
+                <Badge className="bg-green-500 hover:bg-green-600 mb-2 print:bg-green-100 print:text-green-800" style={{ backgroundColor: '#22c55e', color: '#ffffff' }}>
                   <CheckCircle className="h-3 w-3 mr-1" />
-                  Paid
+                  {invoiceData.payment.status.toUpperCase()}
                 </Badge>
-                <div className="text-sm text-muted-foreground">
-                  Invoice #{orderId.substring(0, 12)}...
+                <div className="text-sm font-semibold" style={{ color: '#000000' }}>
+                  Invoice #{invoiceData.invoiceNumber}
+                </div>
+                <div className="text-xs" style={{ color: '#666666' }}>
+                  Order: {invoiceData.orderId.substring(0, 12)}...
                 </div>
               </div>
             </div>
 
-            <Separator />
+            <Separator style={{ backgroundColor: '#e5e7eb' }} />
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <h3 className="font-semibold mb-2">Bill To:</h3>
-                <div className="text-sm text-muted-foreground">
-                  <div>{invoiceData.userName}</div>
-                  <div>{invoiceData.userEmail}</div>
+                <h3 className="font-semibold mb-2" style={{ color: '#000000' }}>Bill To:</h3>
+                <div className="text-sm space-y-1" style={{ color: '#666666' }}>
+                  <div className="font-medium" style={{ color: '#000000' }}>{invoiceData.customer.name}</div>
+                  <div>{invoiceData.customer.email}</div>
+                  {invoiceData.customer.mobile && <div>{invoiceData.customer.mobile}</div>}
+                  {invoiceData.customer.organization && <div>{invoiceData.customer.organization}</div>}
                 </div>
               </div>
-              <div className="text-right">
-                <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground mb-1">
-                  <Calendar className="h-4 w-4" />
-                  <span>Purchase Date:</span>
+              <div className="text-left md:text-right">
+                <div className="space-y-2">
+                  <div>
+                    <div className="flex items-center gap-2 text-sm mb-1" style={{ color: '#666666' }}>
+                      <Calendar className="h-4 w-4" />
+                      <span>Invoice Date:</span>
+                    </div>
+                    <div className="font-semibold" style={{ color: '#000000' }}>{formatDate(invoiceData.invoiceDate)}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm" style={{ color: '#666666' }}>Payment Date:</div>
+                    <div className="font-semibold" style={{ color: '#000000' }}>{formatDate(invoiceData.payment.paymentDate)}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm" style={{ color: '#666666' }}>Payment Method:</div>
+                    <div className="font-semibold capitalize" style={{ color: '#000000' }}>{invoiceData.payment.method}</div>
+                  </div>
+                  {invoiceData.payment.transactionId && (
+                    <div>
+                      <div className="text-sm" style={{ color: '#666666' }}>Transaction ID:</div>
+                      <div className="font-mono text-xs" style={{ color: '#000000' }}>{invoiceData.payment.transactionId}</div>
+                    </div>
+                  )}
                 </div>
-                <div className="font-semibold">{formatDate(invoiceData.createdAt)}</div>
               </div>
             </div>
           </CardHeader>
 
           {/* Invoice Items */}
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-6" style={{ backgroundColor: '#ffffff', color: '#000000' }}>
             <div>
-              <h3 className="font-semibold mb-4 flex items-center gap-2">
+              <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: '#000000' }}>
                 <Package className="h-5 w-5" />
                 Order Details
               </h3>
               
-              <div className="space-y-4">
-                {invoiceData.items.map((item, index) => (
-                  <div key={index} className="border border-border rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <div className="font-semibold text-lg">{item.packageName}</div>
-                        <div className="text-sm text-muted-foreground">SKU: {item.packageSku}</div>
-                        <Badge className="mt-2 bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-100">
-                          {item.addonType.replace('_', ' ').toUpperCase()}
-                        </Badge>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xl font-bold text-purple-600 dark:text-purple-400">
-                          ${item.totalAmount}
+              {(!invoiceData?.items || invoiceData.items.length === 0) ? (
+                <div className="border border-gray-300 rounded-lg p-4 text-center" style={{ backgroundColor: '#f9fafb' }}>
+                  <p style={{ color: '#666666' }}>No items found for this order.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {invoiceData.items.map((item, index) => (
+                    <div key={index} className="border border-gray-300 rounded-lg p-4" style={{ backgroundColor: '#ffffff' }}>
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="font-semibold text-lg" style={{ color: '#000000' }}>{item.packageName}</div>
+                          <div className="text-sm mb-1" style={{ color: '#666666' }}>SKU: {item.packageSku}</div>
+                          <div className="text-sm mb-2" style={{ color: '#666666' }}>{item.description}</div>
+                          <div className="inline-block px-2 py-1 rounded text-xs font-medium" style={{ backgroundColor: '#f3e8ff', color: '#7c3aed' }}>
+                            {item.addonType.replace('_', ' ').toUpperCase()}
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          + ${item.gstAmount} GST
+                        <div className="text-right">
+                          <div className="text-xl font-bold" style={{ color: '#7c3aed' }}>
+                            {item.currency === 'INR' ? '₹' : '$'}{item.totalWithGst}
+                          </div>
+                          {parseFloat(item.gstAmount) > 0 && (
+                            <div className="text-xs" style={{ color: '#666666' }}>
+                              (incl. {item.currency === 'INR' ? '₹' : '$'}{item.gstAmount} GST @ {item.gstRate}%)
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ height: '1px', backgroundColor: '#e5e7eb', margin: '12px 0' }}></div>
+
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span style={{ color: '#666666' }}>Quantity:</span>
+                          <span className="font-semibold ml-2" style={{ color: '#000000' }}>{item.quantity}</span>
+                        </div>
+                        <div>
+                          <span style={{ color: '#666666' }}>Unit Price:</span>
+                          <span className="font-semibold ml-2" style={{ color: '#000000' }}>{item.currency === 'INR' ? '₹' : '$'}{item.unitPrice}</span>
+                        </div>
+                        <div>
+                          <span style={{ color: '#666666' }}>Start Date:</span>
+                          <span className="font-semibold ml-2" style={{ color: '#000000' }}>{formatDate(item.startDate)}</span>
+                        </div>
+                        <div>
+                          <span style={{ color: '#666666' }}>Expiry Date:</span>
+                          <span className="font-semibold ml-2" style={{ color: '#000000' }}>{formatDate(item.endDate)}</span>
                         </div>
                       </div>
                     </div>
-
-                    <Separator className="my-3" />
-
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Quantity:</span>
-                        <span className="font-semibold ml-2">{item.quantity}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Unit Price:</span>
-                        <span className="font-semibold ml-2">${item.basePrice}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Start Date:</span>
-                        <span className="font-semibold ml-2">{formatDate(item.startDate)}</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Expiry Date:</span>
-                        <span className="font-semibold ml-2">{formatDate(item.endDate)}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <Separator />
+            <div style={{ height: '1px', backgroundColor: '#e5e7eb' }}></div>
 
             {/* Price Summary */}
             <div className="space-y-3">
               <div className="flex items-center justify-between text-lg">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-semibold">${invoiceData.subtotal.toFixed(2)}</span>
+                <span style={{ color: '#666666' }}>Subtotal</span>
+                <span className="font-semibold" style={{ color: '#000000' }}>
+                  {invoiceData.summary.currency === 'INR' ? '₹' : '$'}{invoiceData.summary.subtotal.toFixed(2)}
+                </span>
               </div>
-              <div className="flex items-center justify-between text-lg">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <DollarSign className="h-5 w-5 text-purple-600" />
-                  <span>GST (18%)</span>
+              {invoiceData.summary.gst > 0 && (
+                <div className="flex items-center justify-between text-lg">
+                  <div className="flex items-center gap-2" style={{ color: '#666666' }}>
+                    <DollarSign className="h-5 w-5" style={{ color: '#7c3aed' }} />
+                    <span>GST ({invoiceData.summary.gstRate}%)</span>
+                  </div>
+                  <span className="font-semibold" style={{ color: '#7c3aed' }}>
+                    {invoiceData.summary.currency === 'INR' ? '₹' : '$'}{invoiceData.summary.gst.toFixed(2)}
+                  </span>
                 </div>
-                <span className="font-semibold text-purple-600 dark:text-purple-400">
-                  ${invoiceData.gst.toFixed(2)}
+              )}
+              <div style={{ height: '1px', backgroundColor: '#e5e7eb' }}></div>
+              <div className="flex items-center justify-between text-2xl font-bold">
+                <span style={{ color: '#000000' }}>Total Paid</span>
+                <span style={{ color: '#7c3aed' }}>
+                  {invoiceData.summary.currency === 'INR' ? '₹' : '$'}{invoiceData.summary.total.toFixed(2)}
                 </span>
               </div>
-              <Separator />
-              <div className="flex items-center justify-between text-2xl font-bold">
-                <span>Total Paid</span>
-                <span className="text-purple-600 dark:text-purple-400">
-                  ${invoiceData.total.toFixed(2)}
-                </span>
+              <div className="text-sm text-center mt-2" style={{ color: '#666666' }}>
+                <strong>Amount in Words:</strong> {invoiceData.summary.amountInWords}
               </div>
             </div>
           </CardContent>
 
-          <CardFooter className="bg-muted/50 border-t">
-            <div className="w-full text-center text-sm text-muted-foreground">
-              <p>Thank you for your business!</p>
-              <p className="mt-1">For any questions, please contact support@revwinner.com</p>
+          <CardFooter className="border-t" style={{ backgroundColor: '#f9fafb', borderTopColor: '#e5e7eb' }}>
+            <div className="w-full space-y-4">
+              {/* Terms and Conditions */}
+              <div>
+                <h4 className="font-semibold mb-2" style={{ color: '#000000' }}>Terms & Conditions:</h4>
+                <ul className="text-xs space-y-1" style={{ color: '#666666' }}>
+                  {invoiceData.terms.map((term, index) => (
+                    <li key={index}>• {term}</li>
+                  ))}
+                </ul>
+              </div>
+              
+              <div style={{ height: '1px', backgroundColor: '#e5e7eb' }}></div>
+              
+              {/* Footer */}
+              <div className="text-center text-sm" style={{ color: '#666666' }}>
+                <p className="font-semibold" style={{ color: '#000000' }}>Thank you for your business!</p>
+                <p className="mt-1">For any questions, please contact {invoiceData.company.email}</p>
+                <p className="text-xs mt-2">
+                  Generated on {formatDate(invoiceData.generatedAt)} | 
+                  Invoice #{invoiceData.invoiceNumber}
+                </p>
+                {invoiceData.company.gstNumber && (
+                  <p className="text-xs">GST Number: {invoiceData.company.gstNumber}</p>
+                )}
+              </div>
             </div>
           </CardFooter>
         </Card>

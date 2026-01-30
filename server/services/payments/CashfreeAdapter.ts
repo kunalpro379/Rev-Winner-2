@@ -77,17 +77,25 @@ export class CashfreeAdapter implements IPaymentGateway {
       let returnUrl = options.metadata?.returnUrl || "";
       let notifyUrl = options.metadata?.notifyUrl || "";
       
-      // If localhost and sandbox, use a placeholder HTTPS URL
+      // For localhost development in sandbox mode, we need to handle this differently
       const isSandbox = process.env.CASHFREE_ENVIRONMENT === 'SANDBOX';
       const isLocalhost = returnUrl.includes('localhost') || returnUrl.includes('127.0.0.1');
       
       if (isSandbox && isLocalhost) {
-        console.log(`[Cashfree] ⚠️  Localhost detected in SANDBOX mode. Using placeholder HTTPS URLs.`);
+        console.log(`[Cashfree] ⚠️  Localhost detected in SANDBOX mode.`);
         console.log(`[Cashfree] ⚠️  Original return URL: ${returnUrl}`);
-        // Use a placeholder that Cashfree will accept
-        returnUrl = `https://sandbox-placeholder.cashfree.com/return`;
-        notifyUrl = `https://sandbox-placeholder.cashfree.com/notify`;
-        console.log(`[Cashfree] ⚠️  Using placeholder return URL: ${returnUrl}`);
+        console.log(`[Cashfree] ⚠️  Original notify URL: ${notifyUrl}`);
+        
+        // For sandbox mode with localhost, Cashfree allows HTTP URLs
+        // Keep the original URLs but ensure they're properly formatted
+        if (!returnUrl.startsWith('http://') && !returnUrl.startsWith('https://')) {
+          returnUrl = `http://${returnUrl}`;
+        }
+        if (!notifyUrl.startsWith('http://') && !notifyUrl.startsWith('https://')) {
+          notifyUrl = `http://${notifyUrl}`;
+        }
+        
+        console.log(`[Cashfree] ⚠️  Using localhost URLs: return=${returnUrl}, notify=${notifyUrl}`);
       }
       
       const request: CreateOrderRequest = {

@@ -141,12 +141,10 @@ export default function Checkout() {
     setIsProcessing(true);
 
     try {
-      const selectedGateway = isDomestic ? "razorpay" : "cashfree";
-      
-      // Create cart checkout order
-      // Note: apiRequest automatically handles 403 token expiration and retries with refreshed token
+      // Use the configured default payment gateway instead of location-based selection
+      // This ensures consistency with the server configuration
       const response = await apiRequest("POST", "/api/cart/checkout", {
-        paymentGateway: selectedGateway,
+        // Don't pass paymentGateway - let server use DEFAULT_PAYMENT_GATEWAY
       });
 
       if (!response.ok) {
@@ -162,9 +160,9 @@ export default function Checkout() {
       }
 
       const checkoutData = await response.json();
-      const { orderId, amount, currency } = checkoutData;
+      const { orderId, amount, currency, gateway } = checkoutData;
 
-      if (isDomestic) {
+      if (gateway === 'razorpay') {
         // Handle Razorpay Payment
         // Razorpay expects amount in paise (1 USD = 100 cents equivalent)
         const amountInSmallestUnit = Math.round(checkoutData.amount * 100);
@@ -307,7 +305,7 @@ export default function Checkout() {
           });
           setIsProcessing(false);
         }
-      } else {
+      } else if (gateway === 'cashfree') {
         // Handle Cashfree Payment
         const { paymentSessionId, cashfreeMode: serverMode } = checkoutData;
         if (!paymentSessionId) throw new Error("Payment gateway configuration error.");
@@ -325,7 +323,7 @@ export default function Checkout() {
 
         cashfree.checkout({
           paymentSessionId: paymentSessionId,
-          redirectTarget: "_modal",
+          redirectTarget: "_self", // Full screen instead of modal
         }).then(async (result: any) => {
           if (result.error) {
             toast({ title: "Payment Failed", description: result.error.message, variant: "destructive" });
@@ -408,43 +406,43 @@ export default function Checkout() {
     <div className="min-h-screen bg-gradient-to-br from-fuchsia-600 via-purple-700 to-blue-900 dark:from-fuchsia-900 dark:via-purple-900 dark:to-slate-950">
       <HamburgerNav currentPath={location} />
       
-      <div className="max-w-4xl mx-auto px-4 py-12">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* Hero Section */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-white mb-4 flex items-center justify-center gap-3">
-            <CreditCard className="h-10 w-10" />
+        <div className="text-center mb-8 sm:mb-12">
+          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-4 flex items-center justify-center gap-3">
+            <CreditCard className="h-8 w-8 sm:h-10 sm:w-10" />
             Secure Checkout
           </h1>
-          <p className="text-lg text-purple-100">
+          <p className="text-base sm:text-lg text-purple-100">
             Review and complete your purchase
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
           {/* Order Summary */}
           <Card className="bg-white/10 backdrop-blur-sm border-white/20">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Package className="h-5 w-5" />
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-white flex items-center gap-2 text-lg sm:text-xl">
+                <Package className="h-4 w-4 sm:h-5 sm:w-5" />
                 Order Summary
               </CardTitle>
-              <CardDescription className="text-purple-100">
+              <CardDescription className="text-purple-100 text-sm sm:text-base">
                 {cart?.items?.length || 0} item(s) in your order
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0">
               {cart?.items?.map((item) => (
-                <div key={item.id} className="flex justify-between items-center py-3 border-b border-white/10 last:border-0">
-                  <div>
-                    <p className="font-medium text-white">{item.packageName}</p>
-                    <p className="text-sm text-purple-200">Qty: {item.quantity || 1}</p>
+                <div key={item.id} className="flex justify-between items-start py-2 sm:py-3 border-b border-white/10 last:border-0">
+                  <div className="flex-1 min-w-0 pr-4">
+                    <p className="font-medium text-white text-sm sm:text-base truncate">{item.packageName}</p>
+                    <p className="text-xs sm:text-sm text-purple-200">Qty: {item.quantity || 1}</p>
                     {item.promoCodeCode && (
                       <Badge variant="secondary" className="mt-1 text-xs">
                         Promo: {item.promoCodeCode}
                       </Badge>
                     )}
                   </div>
-                  <p className="font-semibold text-white">
+                  <p className="font-semibold text-white text-sm sm:text-base flex-shrink-0">
                     ${parseFloat(item.basePrice || '0').toFixed(2)}
                   </p>
                 </div>
@@ -454,32 +452,32 @@ export default function Checkout() {
 
           {/* Payment Details */}
           <Card className="bg-white/10 backdrop-blur-sm border-white/20">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="text-white flex items-center gap-2 text-lg sm:text-xl">
+                <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
                 Payment Details
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0">
               <div className="space-y-2">
-                <div className="flex justify-between text-purple-100">
+                <div className="flex justify-between text-purple-100 text-sm sm:text-base">
                   <span>Subtotal</span>
                   <span>${(cart?.subtotal || 0).toFixed(2)}</span>
                 </div>
                 {cart?.gstAmount && cart.gstAmount > 0 && (
-                  <div className="flex justify-between text-purple-100">
+                  <div className="flex justify-between text-purple-100 text-sm sm:text-base">
                     <span>GST (18%)</span>
                     <span>${cart.gstAmount.toFixed(2)}</span>
                   </div>
                 )}
                 {cart?.discount && cart.discount > 0 && (
-                  <div className="flex justify-between text-green-400">
+                  <div className="flex justify-between text-green-400 text-sm sm:text-base">
                     <span>Discount</span>
                     <span>-${cart.discount.toFixed(2)}</span>
                   </div>
                 )}
                 <Separator className="bg-white/20" />
-                <div className="flex justify-between text-xl font-bold text-white">
+                <div className="flex justify-between text-lg sm:text-xl font-bold text-white">
                   <span>Total</span>
                   <span>${Math.max(cart?.total || 0, 1).toFixed(2)} USD</span>
                 </div>
@@ -490,20 +488,20 @@ export default function Checkout() {
                 )}
               </div>
 
-              <div className="pt-4 space-y-3">
-                <div className="flex items-center gap-2 text-sm text-purple-100">
-                  <Lock className="h-4 w-4" />
+              <div className="pt-3 sm:pt-4 space-y-2 sm:space-y-3">
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-purple-100">
+                  <Lock className="h-3 w-3 sm:h-4 sm:w-4" />
                   <span>Secured by {gatewayName}</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-purple-100">
-                  <CheckCircle className="h-4 w-4" />
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-purple-100">
+                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                   <span>SSL encrypted payment</span>
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex flex-col gap-4">
+            <CardFooter className="flex flex-col gap-3 sm:gap-4 p-4 sm:p-6">
               <Button 
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-sm sm:text-base"
                 size="lg"
                 onClick={handlePayment}
                 disabled={isProcessing || !locationDetected || !gatewayLoaded}
@@ -511,22 +509,25 @@ export default function Checkout() {
               >
                 {isProcessing ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
+                    <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                    <span className="hidden sm:inline">Processing...</span>
+                    <span className="sm:hidden">Processing</span>
                   </>
                 ) : !locationDetected ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Detecting location...
+                    <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                    <span className="hidden sm:inline">Detecting location...</span>
+                    <span className="sm:hidden">Loading</span>
                   </>
                 ) : !gatewayLoaded ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading {gatewayName}...
+                    <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
+                    <span className="hidden sm:inline">Loading {gatewayName}...</span>
+                    <span className="sm:hidden">Loading</span>
                   </>
                 ) : (
                   <>
-                    <CreditCard className="mr-2 h-4 w-4" />
+                    <CreditCard className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                     Pay ${Math.max(cart?.total || 0, 1).toFixed(2)} USD
                   </>
                 )}
@@ -534,7 +535,7 @@ export default function Checkout() {
               {isProcessing ? (
                 <Button 
                   variant="destructive" 
-                  className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold shadow-md"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold shadow-md text-sm sm:text-base"
                   onClick={() => {
                     setIsProcessing(false);
                     toast({
@@ -544,17 +545,17 @@ export default function Checkout() {
                   }}
                   data-testid="button-cancel-payment"
                 >
-                  <AlertCircle className="mr-2 h-4 w-4" />
+                  <AlertCircle className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                   Cancel Payment
                 </Button>
               ) : (
                 <Button 
                   variant="secondary" 
-                  className="w-full bg-white text-purple-700 hover:bg-gray-100 dark:bg-gray-100 dark:text-purple-700 dark:hover:bg-white font-semibold shadow-md"
+                  className="w-full bg-white text-purple-700 hover:bg-gray-100 dark:bg-gray-100 dark:text-purple-700 dark:hover:bg-white font-semibold shadow-md text-sm sm:text-base"
                   onClick={() => setLocation('/cart')}
                   data-testid="button-back-to-cart"
                 >
-                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  <ShoppingCart className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                   Back to Cart
                 </Button>
               )}
@@ -563,10 +564,11 @@ export default function Checkout() {
         </div>
 
         {/* Security Notice */}
-        <div className="mt-8 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full text-purple-100 text-sm">
-            <AlertCircle className="h-4 w-4" />
-            Your payment information is processed securely via {gatewayName}
+        <div className="mt-6 sm:mt-8 text-center">
+          <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/10 rounded-full text-purple-100 text-xs sm:text-sm">
+            <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Your payment information is processed securely via {gatewayName}</span>
+            <span className="sm:hidden">Secured by {gatewayName}</span>
           </div>
         </div>
       </div>

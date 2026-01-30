@@ -6,7 +6,25 @@ import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 export default defineConfig({
   plugins: [
     react(),
-    runtimeErrorOverlay(),
+    runtimeErrorOverlay({
+      // Don't show overlay for expected business logic errors
+      filter: (error) => {
+        // Hide overlay for HTTP 400 errors (bad request/validation errors)
+        if (error.message?.includes('400:')) {
+          return false;
+        }
+        // Hide overlay for promo code related errors
+        if (error.message?.toLowerCase().includes('promo code')) {
+          return false;
+        }
+        // Hide overlay for validation errors
+        if (error.message?.toLowerCase().includes('invalid') && error.message?.includes('400')) {
+          return false;
+        }
+        // Show overlay for all other errors
+        return true;
+      }
+    }),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [

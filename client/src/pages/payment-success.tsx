@@ -11,29 +11,88 @@ export default function PaymentSuccess() {
   const { toast } = useToast();
   const [status, setStatus] = useState<'verifying' | 'success' | 'failed'>('verifying');
   const [message, setMessage] = useState('Verifying your payment...');
+  const [orderId, setOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     const verifyPayment = async () => {
       try {
-        // Get order ID from URL
+        // Get order ID and payment details from URL
         const params = new URLSearchParams(window.location.search);
-        const orderId = params.get('orderId');
+        const orderIdParam = params.get('orderId');
+        const cfPaymentId = params.get('cf_payment_id') || params.get('payment_id');
+        const razorpayPaymentId = params.get('razorpay_payment_id');
+        const razorpaySignature = params.get('razorpay_signature');
 
-        if (!orderId) {
+        if (!orderIdParam) {
           setStatus('failed');
           setMessage('Invalid payment link. Order ID not found.');
           return;
         }
 
-        // Verify payment with backend
-        const response = await apiRequest(
-          'POST',
-          '/api/session-minutes/verify-payment',
-          {
-            orderId: orderId,
-            paymentGateway: 'cashfree',
+        setOrderId(orderIdParam);
+
+        // First, get the order details to determine the correct verification endpoint
+        let verificationEndpoint = '/api/cart/verify'; // Default to cart verification
+        let requestBody: any = {
+          orderId: orderIdParam,
+        };
+
+        // Add payment details if available
+        if (cfPaymentId) {
+          requestBody.cfPaymentId = cfPaymentId;
+        }
+        if (razorpayPaymentId && razorpaySignature) {
+          requestBody.razorpayPaymentId = razorpayPaymentId;
+          requestBody.razorpaySignature = razorpaySignature;
+        }
+
+        try {
+          // Try to get order details to determine the correct endpoint
+          const orderResponse = await apiRequest('GET', `/api/billing/order-details?orderId=${orderIdParam}`);
+          if (orderResponse.ok) {
+            const orderData = await orderResponse.json();
+            
+            // Determine endpoint based on order type
+            if (orderData.addonType === 'session_minutes') {
+              verificationEndpoint = '/api/session-minutes/verify-payment';
+              // Session minutes endpoint expects different parameters
+              requestBody = {
+                orderId: orderIdParam,
+                ...(cfPaymentId && { cfPaymentId }),
+                ...(razorpayPaymentId && { razorpay_payment_id: razorpayPaymentId }),
+                ...(razorpaySignature && { razorpay_signature: razorpaySignature }),
+              };
+            } else if (orderData.addonType === 'train_me') {
+              verificationEndpoint = '/api/train-me/verify-payment';
+              // Train Me endpoint expects different parameters
+              requestBody = {
+                orderId: orderIdParam,
+                ...(cfPaymentId && { cfPaymentId }),
+                ...(razorpayPaymentId && { razorpay_payment_id: razorpayPaymentId }),
+                ...(razorpaySignature && { razorpay_signature: razorpaySignature }),
+              };
+            } else if (orderData.addonType === 'platform_access') {
+              verificationEndpoint = '/api/billing/platform-access/verify';
+              requestBody = {
+                orderId: orderIdParam,
+                ...(cfPaymentId && { cfPaymentId }),
+                ...(razorpayPaymentId && { razorpayPaymentId }),
+                ...(razorpaySignature && { razorpaySignature }),
+              };
+            } else if (orderData.addonType === 'cart_checkout') {
+              verificationEndpoint = '/api/cart/verify';
+              // Cart verification uses the parameters we already set
+            }
+            
+            console.log(`[Payment Success] Order type: ${orderData.addonType}, using endpoint: ${verificationEndpoint}`);
           }
-        );
+        } catch (orderError) {
+          console.warn('[Payment Success] Could not get order details, defaulting to cart verification:', orderError);
+          // Default to cart verification if we can't get order details
+        }
+
+        // Verify payment with the correct backend endpoint
+        const response = await apiRequest('POST', verificationEndpoint, requestBody);
 
         const data = await response.json();
 
@@ -41,14 +100,22 @@ export default function PaymentSuccess() {
           setStatus('success');
           setMessage(data.message || 'Payment verified successfully!');
           
+          // Show appropriate success message based on verification type
+          let successDescription = 'Your payment has been processed successfully.';
+          if (data.minutesAdded) {
+            successDescription = `You've added ${data.minutesAdded} minutes to your account.`;
+          } else if (data.activatedAddons && data.activatedAddons.length > 0) {
+            successDescription = `${data.activatedAddons.length} item(s) have been activated in your account.`;
+          }
+          
           toast({
             title: "Payment Successful!",
-            description: `You've added ${data.minutesAdded || 0} minutes to your account.`,
+            description: successDescription,
           });
 
-          // Redirect to profile after 3 seconds
+          // Redirect to invoice page after 3 seconds
           setTimeout(() => {
-            setLocation('/manage-subscription');
+            setLocation(`/invoice?orderId=${orderIdParam}`);
           }, 3000);
         } else {
           setStatus('failed');
@@ -101,8 +168,16 @@ export default function PaymentSuccess() {
         </CardHeader>
         <CardContent className="space-y-4">
           {status === 'success' && (
-            <div className="text-center text-sm text-muted-foreground">
-              Redirecting to your account in 3 seconds...
+            <div className="space-y-4">
+              <Button
+                onClick={() => setLocation(`/invoice?orderId=${orderId}`)}
+                className="w-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700"
+              >
+                View Invoice
+              </Button>
+              <div className="text-center text-sm text-muted-foreground">
+                Redirecting to invoice in 3 seconds...
+              </div>
             </div>
           )}
           

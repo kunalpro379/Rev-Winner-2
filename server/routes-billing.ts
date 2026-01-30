@@ -4,6 +4,8 @@ import { captureRawBody } from "./middleware/raw-body";
 import { billingStorage } from "./storage-billing";
 import { authStorage } from "./storage-auth";
 import { PaymentGatewayFactory, type PaymentGatewayProvider } from "./services/payments";
+import { DEFAULT_PAYMENT_GATEWAY } from "./config/payment.config";
+import { currencyConverter } from "./services/currency-converter";
 import {
   getPackageBySku,
   getPackageOrAddonBySku,
@@ -417,6 +419,57 @@ export function setupBillingRoutes(app: Router) {
   // PRICING & PACKAGES
   // ========================================
 
+  // Test endpoint to verify cart verification route is working
+  app.get("/api/cart/test", (req, res) => {
+    res.json({ message: "Cart verification route is working", timestamp: new Date().toISOString() });
+  });
+
+  // Get order details for verification routing (used by payment success page)
+  app.get("/api/billing/order-details", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const { orderId } = req.query;
+
+      if (!orderId || typeof orderId !== 'string') {
+        return res.status(400).json({ message: "Order ID is required" });
+      }
+
+      // Get pending order
+      const pendingOrder = await billingStorage.getPendingOrder(orderId);
+      if (!pendingOrder) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      // Security check: Verify user owns this order
+      if (pendingOrder.userId !== userId) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Include team manager details for debugging
+      const metadata = pendingOrder.metadata as any;
+      const teamItems = metadata?.items?.filter((item: any) => item.purchaseMode === 'team') || [];
+      const teamManagerInfo = teamItems.length > 0 ? {
+        teamManagerEmail: teamItems[0].teamManagerEmail,
+        teamManagerName: teamItems[0].teamManagerName,
+        companyName: teamItems[0].companyName,
+      } : null;
+
+      res.json({
+        orderId: pendingOrder.id,
+        addonType: pendingOrder.addonType,
+        packageSku: pendingOrder.packageSku,
+        amount: pendingOrder.amount,
+        currency: pendingOrder.currency,
+        status: pendingOrder.status,
+        gatewayProvider: pendingOrder.gatewayProvider,
+        teamManagerInfo, // Include for debugging
+      });
+    } catch (error: any) {
+      console.error("Get order details error:", error);
+      res.status(500).json({ message: "Failed to get order details", error: error.message });
+    }
+  });
+
   // Get session minutes packages
   app.get("/api/session-minutes/packages", async (req: Request, res: Response) => {
     try {
@@ -559,8 +612,11 @@ export function setupBillingRoutes(app: Router) {
       const { packageId, promoCode, paymentGateway: requestedGateway } = validation.data;
       
       // Use requested gateway or fall back to configured default
-      const { DEFAULT_PAYMENT_GATEWAY } = await import("./config/payment.config");
       const paymentGateway = requestedGateway || DEFAULT_PAYMENT_GATEWAY;
+      
+      console.log(`[Cart Checkout] requestedGateway: ${requestedGateway || 'undefined'}`);
+      console.log(`[Cart Checkout] DEFAULT_PAYMENT_GATEWAY: ${DEFAULT_PAYMENT_GATEWAY}`);
+      console.log(`[Cart Checkout] Final paymentGateway: ${paymentGateway}`);
 
       // Get package/addon by ID
       const pkg = await getPackageOrAddonBySku(packageId);
@@ -630,9 +686,26 @@ export function setupBillingRoutes(app: Router) {
       const gateway = PaymentGatewayFactory.getGateway(paymentGateway);
       const baseUrl = getBaseUrl(req);
       
-      // Keep all payments in USD - no currency conversion
+      // Real-time currency conversion for Cashfree (only supports INR)
       let finalCurrency = pkg.currency || 'USD';
       let finalAmount = finalPrice;
+      let conversionInfo = null;
+      
+      if (paymentGateway === 'cashfree' && finalCurrency === 'USD') {
+        try {
+          const conversion = await currencyConverter.convertCurrency(finalPrice, 'USD', 'INR');
+          finalAmount = conversion.convertedAmount;
+          finalCurrency = 'INR';
+          conversionInfo = conversion;
+          console.log(`[Cashfree] Converted ${conversion.originalAmount} USD to ${conversion.convertedAmount} INR (rate: ${conversion.exchangeRate})`);
+        } catch (error) {
+          console.error(`[Cashfree] Currency conversion failed:`, error);
+          return res.status(500).json({ 
+            message: "Currency conversion failed. Please try again later.",
+            error: "CURRENCY_CONVERSION_ERROR"
+          });
+        }
+      }
 
       const order = await gateway.createOrder({
         amount: finalAmount,
@@ -703,6 +776,8 @@ export function setupBillingRoutes(app: Router) {
   app.post("/api/session-minutes/verify-payment", authenticateToken, async (req: Request, res: Response) => {
     try {
       const userId = req.jwtUser!.userId;
+      console.log(`[Session Minutes Verify] Processing verification for user: ${userId}`);
+      
       const validation = z.object({
         orderId: z.string(), // Rev Winner pending order ID
         razorpay_payment_id: z.string().optional(),
@@ -741,7 +816,24 @@ export function setupBillingRoutes(app: Router) {
 
       // Validate addon type
       if (pendingOrder.addonType !== 'session_minutes') {
-        return res.status(400).json({ message: "Invalid order type" });
+        console.error(`[Session Minutes Verify] Invalid order type: ${pendingOrder.addonType}, expected: session_minutes, orderId: ${orderId}`);
+        
+        // If this is a cart checkout order, provide helpful error
+        if (pendingOrder.addonType === 'cart_checkout') {
+          return res.status(400).json({ 
+            message: "This order should be verified using the cart verification endpoint", 
+            correctEndpoint: "/api/cart/verify",
+            orderType: pendingOrder.addonType,
+            orderId: orderId
+          });
+        }
+        
+        return res.status(400).json({ 
+          message: "Invalid order type for session minutes verification", 
+          expected: "session_minutes",
+          actual: pendingOrder.addonType,
+          orderId: orderId
+        });
       }
 
       // Get package details
@@ -1089,7 +1181,6 @@ export function setupBillingRoutes(app: Router) {
       const { paymentGateway: requestedGateway } = validation.data;
       
       // Use requested gateway or fall back to configured default
-      const { DEFAULT_PAYMENT_GATEWAY } = await import("./config/payment.config");
       const paymentGateway = requestedGateway || DEFAULT_PAYMENT_GATEWAY;
 
       // Find Train Me addon by slug
@@ -1245,7 +1336,24 @@ export function setupBillingRoutes(app: Router) {
 
       // Validate addon type
       if (pendingOrder.addonType !== 'train_me') {
-        return res.status(400).json({ message: "Invalid order type" });
+        console.error(`[Train Me Verify] Invalid order type: ${pendingOrder.addonType}, expected: train_me, orderId: ${orderId}`);
+        
+        // If this is a cart checkout order, provide helpful error
+        if (pendingOrder.addonType === 'cart_checkout') {
+          return res.status(400).json({ 
+            message: "This order should be verified using the cart verification endpoint", 
+            correctEndpoint: "/api/cart/verify",
+            orderType: pendingOrder.addonType,
+            orderId: orderId
+          });
+        }
+        
+        return res.status(400).json({ 
+          message: "Invalid order type for Train Me verification", 
+          expected: "train_me",
+          actual: pendingOrder.addonType,
+          orderId: orderId
+        });
       }
 
       // Get package details
@@ -2074,7 +2182,6 @@ export function setupBillingRoutes(app: Router) {
       const { paymentGateway: requestedGateway } = validation.data;
       
       // Use requested gateway or fall back to configured default
-      const { DEFAULT_PAYMENT_GATEWAY } = await import("./config/payment.config");
       const paymentGateway = requestedGateway || DEFAULT_PAYMENT_GATEWAY;
       
       if (paymentGateway === 'stripe') {
@@ -2094,10 +2201,28 @@ export function setupBillingRoutes(app: Router) {
         return res.status(400).json({ message: "Cart is empty" });
       }
 
-      // Keep all payments in USD - no currency conversion
+      // Real-time currency conversion for Cashfree (only supports INR)
       let finalCurrency = cartTotal.currency;
       let conversionRate = 1;
+      let conversionInfo = null;
       let finalAmount = Math.round(cartTotal.total * 100) / 100; // Round to 2 decimal places
+      
+      if (paymentGateway === 'cashfree' && finalCurrency === 'USD') {
+        try {
+          const conversion = await currencyConverter.convertCurrency(cartTotal.total, 'USD', 'INR');
+          finalAmount = Math.round(conversion.convertedAmount * 100) / 100; // Round to 2 decimal places
+          finalCurrency = 'INR';
+          conversionRate = conversion.exchangeRate;
+          conversionInfo = conversion;
+          console.log(`[Cart Cashfree] Converted ${conversion.originalAmount} USD to ${conversion.convertedAmount} INR (rate: ${conversion.exchangeRate})`);
+        } catch (error) {
+          console.error(`[Cart Cashfree] Currency conversion failed:`, error);
+          return res.status(500).json({ 
+            message: "Currency conversion failed. Please try again later.",
+            error: "CURRENCY_CONVERSION_ERROR"
+          });
+        }
+      }
 
       // Minimum transaction amount adjustment
       const MINIMUM_USD_AMOUNT = 1.00;
@@ -2219,6 +2344,8 @@ export function setupBillingRoutes(app: Router) {
         },
         expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes expiry
       });
+
+      console.log(`[Cart Checkout] Created pending order: ${pendingOrder.id}, addonType: ${pendingOrder.addonType}, userId: ${userId}`);
 
       // Create payment gateway order for final amount (with roundoff adjustment if needed)
       const gateway = PaymentGatewayFactory.getGateway(paymentGateway);
@@ -2353,6 +2480,7 @@ export function setupBillingRoutes(app: Router) {
       
       console.log(`Cart checkout response - amount: ${finalAmount} ${finalCurrency} roundoff: ${roundoffAmount}`);
       console.log(`${paymentGateway} order details:`, order);
+      console.log(`[Cart Checkout] Returning orderId: ${pendingOrder.id} for verification`);
       
       // Validate payment session ID exists before sending response
       if (!order.paymentSessionId && paymentGateway === 'cashfree') {
@@ -2409,20 +2537,58 @@ export function setupBillingRoutes(app: Router) {
 
       const { orderId, cfPaymentId, razorpayPaymentId, razorpaySignature } = validation.data;
 
+      console.log(`[Cart Verify] Processing verification for order: ${orderId}, user: ${userId}`);
+
       // Get pending order using our order ID
       const pendingOrder = await billingStorage.getPendingOrder(orderId);
       if (!pendingOrder) {
+        console.error(`[Cart Verify] Order not found: ${orderId}`);
         return res.status(404).json({ message: "Order not found" });
       }
 
+      console.log(`[Cart Verify] Found order: ${orderId}, addonType: ${pendingOrder.addonType}, packageSku: ${pendingOrder.packageSku}`);
+
       // Security check: Verify user owns this order
       if (pendingOrder.userId !== userId) {
+        console.error(`[Cart Verify] Unauthorized access: order userId ${pendingOrder.userId} !== request userId ${userId}`);
         return res.status(403).json({ message: "Unauthorized" });
       }
 
       // Check if order already completed
       if (pendingOrder.status === 'completed') {
+        console.log(`[Cart Verify] Order already completed: ${orderId}`);
         return res.status(400).json({ message: "Order already completed" });
+      }
+
+      // Validate that this is a cart checkout order
+      if (pendingOrder.addonType !== 'cart_checkout') {
+        console.error(`[Cart Verify] Invalid order type for cart verification: ${pendingOrder.addonType}, expected: cart_checkout`);
+        
+        // Provide helpful error message based on the actual order type
+        if (pendingOrder.addonType === 'session_minutes') {
+          return res.status(400).json({ 
+            message: "This order should be verified using the session minutes verification endpoint", 
+            correctEndpoint: "/api/session-minutes/verify-payment",
+            orderType: pendingOrder.addonType,
+            orderId: orderId,
+            hint: "This appears to be a session minutes order, not a cart checkout order"
+          });
+        } else if (pendingOrder.addonType === 'train_me') {
+          return res.status(400).json({ 
+            message: "This order should be verified using the Train Me verification endpoint", 
+            correctEndpoint: "/api/train-me/verify-payment",
+            orderType: pendingOrder.addonType,
+            orderId: orderId,
+            hint: "This appears to be a Train Me order, not a cart checkout order"
+          });
+        } else {
+          return res.status(400).json({ 
+            message: "Invalid order type for cart verification", 
+            expected: "cart_checkout",
+            actual: pendingOrder.addonType,
+            orderId: orderId
+          });
+        }
       }
 
       // Get gateway
@@ -2766,9 +2932,19 @@ export function setupBillingRoutes(app: Router) {
         itemCount: activatedAddons.length,
         licenseManagerInvitationSent,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Verify cart checkout error:", error);
-      res.status(500).json({ message: "Failed to verify payment" });
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        orderId: req.body?.orderId,
+        userId: req.jwtUser?.userId
+      });
+      res.status(500).json({ 
+        message: "Failed to verify payment", 
+        error: error.message,
+        orderId: req.body?.orderId
+      });
     }
   });
 
@@ -2800,9 +2976,47 @@ export function setupBillingRoutes(app: Router) {
 
       // Fetch all addon purchases for this cart order
       const allPurchases = await billingStorage.getUserAddonPurchases(userId);
-      const orderPurchases = allPurchases.filter(
+      console.log(`[Invoice Debug] Found ${allPurchases.length} total purchases for user ${userId}`);
+      
+      // Try multiple ways to find order purchases
+      let orderPurchases = allPurchases.filter(
         (purchase: any) => purchase.metadata && (purchase.metadata as any).cartOrderId === orderId
       );
+      
+      // If no purchases found with cartOrderId, try other methods
+      if (orderPurchases.length === 0) {
+        console.log(`[Invoice Debug] No purchases found with cartOrderId ${orderId}, trying other methods...`);
+        
+        // Try finding by orderId directly
+        orderPurchases = allPurchases.filter(
+          (purchase: any) => purchase.orderId === orderId
+        );
+        
+        // If still no purchases, try finding by gateway order ID
+        if (orderPurchases.length === 0 && pendingOrder.gatewayOrderId) {
+          orderPurchases = allPurchases.filter(
+            (purchase: any) => purchase.metadata && (purchase.metadata as any).gatewayOrderId === pendingOrder.gatewayOrderId
+          );
+        }
+        
+        // If still no purchases, try finding recent purchases for this user
+        if (orderPurchases.length === 0) {
+          const orderDate = pendingOrder.createdAt || new Date();
+          const timeDiff = 10 * 60 * 1000; // 10 minutes
+          orderPurchases = allPurchases.filter(
+            (purchase: any) => {
+              const purchaseDate = new Date(purchase.createdAt || purchase.purchaseDate);
+              return Math.abs(purchaseDate.getTime() - orderDate.getTime()) < timeDiff;
+            }
+          );
+          console.log(`[Invoice Debug] Found ${orderPurchases.length} purchases within 10 minutes of order time`);
+        }
+      }
+      
+      console.log(`[Invoice Debug] Final orderPurchases count: ${orderPurchases.length}`);
+      if (orderPurchases.length > 0) {
+        console.log(`[Invoice Debug] Sample purchase:`, JSON.stringify(orderPurchases[0], null, 2));
+      }
 
       // Get user info
       const user = await authStorage.getUserById(userId);
@@ -2811,7 +3025,7 @@ export function setupBillingRoutes(app: Router) {
       }
 
       // Enhanced invoice items formatting with proper GST calculation
-      const items = orderPurchases.map((purchase: any) => {
+      const items = orderPurchases.length > 0 ? orderPurchases.map((purchase: any) => {
         const metadata = purchase.metadata as any || {};
         
         // Use actual purchase amount (which includes GST for INR, no GST for USD)
@@ -2854,13 +3068,33 @@ export function setupBillingRoutes(app: Router) {
           endDate: purchase.endDate ? purchase.endDate.toISOString() : null,
           description: getItemDescription(purchase.addonType, metadata),
         };
-      });
+      }) : [
+        // Fallback item from pending order if no purchases found
+        {
+          packageSku: 'PENDING-ORDER',
+          packageName: 'Order Processing',
+          addonType: pendingOrder.addonType || 'cart_checkout',
+          quantity: 1,
+          unitPrice: parseFloat(pendingOrder.amount || '0').toFixed(2),
+          basePrice: parseFloat(pendingOrder.amount || '0').toFixed(2),
+          totalAmount: parseFloat(pendingOrder.amount || '0').toFixed(2),
+          gstRate: pendingOrder.currency === 'INR' ? 18 : 0,
+          gstAmount: pendingOrder.currency === 'INR' ? ((parseFloat(pendingOrder.amount || '0')) * 0.18 / 1.18).toFixed(2) : '0.00',
+          totalWithGst: parseFloat(pendingOrder.amount || '0').toFixed(2),
+          currency: pendingOrder.currency || 'USD',
+          startDate: new Date().toISOString(),
+          endDate: null,
+          description: `Order ${orderId} - Payment processed successfully`,
+        }
+      ];
 
       // Calculate totals from actual data
       const subtotal = items.reduce((sum: number, item: any) => sum + parseFloat(item.totalAmount), 0);
       const totalGst = items.reduce((sum: number, item: any) => sum + parseFloat(item.gstAmount), 0);
       const grandTotal = subtotal + totalGst;
-      const currency = items[0]?.currency || 'USD';
+      const currency = items[0]?.currency || pendingOrder.currency || 'USD';
+
+      console.log(`[Invoice Debug] Calculated totals - subtotal: ${subtotal}, gst: ${totalGst}, total: ${grandTotal}, currency: ${currency}`);
 
       // Enhanced invoice data with professional formatting
       const invoiceData = {
@@ -2873,7 +3107,7 @@ export function setupBillingRoutes(app: Router) {
         // Company Information
         company: {
           name: "Rev Winner",
-          address: "Digital Sales Assistant Platform",
+          address: "AI-Powered Sales Intelligence Platform\nHealthcaa Technologies Inc.",
           email: "support@revwinner.com",
           website: "https://revwinner.com",
           gstNumber: currency === 'INR' ? "GST123456789" : null, // Add actual GST number if available
@@ -2917,8 +3151,11 @@ export function setupBillingRoutes(app: Router) {
         terms: [
           "This is a computer-generated invoice and does not require a signature.",
           "Payment has been processed successfully via secure payment gateway.",
-          "For support queries, contact support@revwinner.com",
+          "All Rev Winner services are subject to our Terms of Service available at revwinner.com/terms",
+          "Refunds are processed as per our refund policy. Contact support for assistance.",
+          "For technical support or billing queries, contact support@revwinner.com",
           currency === 'INR' ? "GST is applicable as per Indian tax regulations." : "No GST applicable for international transactions.",
+          "This invoice serves as your receipt for tax and accounting purposes.",
         ],
       };
 
@@ -2933,30 +3170,87 @@ export function setupBillingRoutes(app: Router) {
   function getItemDescription(addonType: string, metadata: any): string {
     switch (addonType) {
       case 'session_minutes':
-        return `Session Minutes Package - ${metadata.packageName || 'Standard Package'}`;
+        return `Session Minutes Package - ${metadata.packageName || 'Standard Package'}. Provides AI-powered conversation analysis and real-time sales insights.`;
       case 'train_me':
-        return 'Train Me Add-on - 30 Days Access to AI Training Features';
+        return 'Train Me Add-on - 30 Days Access to AI Training Features. Personalized AI coaching and sales skill development.';
       case 'enterprise_license':
-        return `Enterprise License - ${metadata.seats || 1} seats`;
+        return `Enterprise License - ${metadata.seats || 1} seats. Full platform access with team management and advanced analytics.`;
+      case 'platform_access':
+        return `Platform Access - ${metadata.packageName || 'Standard Access'}. Complete access to Rev Winner sales intelligence platform.`;
+      case 'cart_checkout':
+        return `Cart Purchase - ${metadata.packageName || 'Multiple Items'}. Bundle purchase with multiple Rev Winner features.`;
       default:
-        return metadata.packageName || addonType;
+        return metadata.packageName || `${addonType.replace('_', ' ').toUpperCase()} - Professional sales assistance features`;
     }
   }
 
-  // Helper function to convert amount to words (basic implementation)
+  // Helper function to convert amount to words (enhanced implementation)
   function convertAmountToWords(amount: number, currency: string): string {
     const currencyName = currency === 'INR' ? 'Rupees' : 'Dollars';
-    const wholePart = Math.floor(amount);
+    const subCurrencyName = currency === 'INR' ? 'Paise' : 'Cents';
+    let wholePart = Math.floor(amount);
     const decimalPart = Math.round((amount - wholePart) * 100);
     
-    // Basic number to words conversion (you can enhance this)
+    // Basic number to words conversion for common amounts
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+    const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    
+    function convertHundreds(num: number): string {
+      let result = '';
+      
+      if (num >= 100) {
+        result += ones[Math.floor(num / 100)] + ' Hundred ';
+        num %= 100;
+      }
+      
+      if (num >= 20) {
+        result += tens[Math.floor(num / 10)] + ' ';
+        num %= 10;
+      } else if (num >= 10) {
+        result += teens[num - 10] + ' ';
+        return result;
+      }
+      
+      if (num > 0) {
+        result += ones[num] + ' ';
+      }
+      
+      return result;
+    }
+    
     if (wholePart === 0) {
       return `Zero ${currencyName} Only`;
-    } else if (wholePart < 100) {
-      return `${wholePart} ${currencyName} ${decimalPart > 0 ? `and ${decimalPart} cents` : ''} Only`;
-    } else {
-      return `${wholePart} ${currencyName} ${decimalPart > 0 ? `and ${decimalPart} cents` : ''} Only`;
     }
+    
+    let result = '';
+    
+    if (wholePart >= 10000000) { // 1 crore and above
+      result += convertHundreds(Math.floor(wholePart / 10000000)) + 'Crore ';
+      wholePart %= 10000000;
+    }
+    
+    if (wholePart >= 100000) { // 1 lakh and above
+      result += convertHundreds(Math.floor(wholePart / 100000)) + 'Lakh ';
+      wholePart %= 100000;
+    }
+    
+    if (wholePart >= 1000) {
+      result += convertHundreds(Math.floor(wholePart / 1000)) + 'Thousand ';
+      wholePart %= 1000;
+    }
+    
+    if (wholePart > 0) {
+      result += convertHundreds(wholePart);
+    }
+    
+    result += currencyName;
+    
+    if (decimalPart > 0) {
+      result += ` and ${convertHundreds(decimalPart)}${subCurrencyName}`;
+    }
+    
+    return result.trim() + ' Only';
   }
 
   // ========================================

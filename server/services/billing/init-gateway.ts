@@ -6,6 +6,11 @@ export async function initializeDefaultGateway() {
   try {
     const gatewayConfig = getCurrentGatewayConfig();
     
+    // IMPORTANT: Set the PaymentGatewayFactory default provider to match our config
+    const { PaymentGatewayFactory } = await import('../payments/PaymentGatewayFactory');
+    PaymentGatewayFactory.setDefaultProvider(DEFAULT_PAYMENT_GATEWAY);
+    console.log(`🔧 PaymentGatewayFactory default provider set to: ${DEFAULT_PAYMENT_GATEWAY}`);
+    
     // Check if the default provider already exists
     const existingProvider = await billingStorage.getGatewayProviderByName(DEFAULT_PAYMENT_GATEWAY);
     

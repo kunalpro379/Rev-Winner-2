@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { HamburgerNav } from "@/components/hamburger-nav";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
-import { User, Mail, Phone, Building2, Calendar, CreditCard, Download, ShieldCheck, Clock, GraduationCap, Loader2, Video, ChevronDown, ChevronUp, Search, FileAudio } from "lucide-react";
+import { User, Mail, Phone, Building2, Calendar, CreditCard, Download, ShieldCheck, Clock, GraduationCap, Loader2, Video, ChevronDown, ChevronUp, Search, FileAudio, FileText, Package, Hash } from "lucide-react";
 import { useSEO } from "@/hooks/use-seo";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -300,10 +300,8 @@ export default function Profile() {
     return <Badge variant={statusInfo.variant as any}>{statusInfo.label}</Badge>;
   };
 
-  const handleDownloadInvoice = (invoice: Invoice) => {
-    if (invoice.receiptUrl) {
-      window.open(invoice.receiptUrl, "_blank");
-    } else {
+  const handleDownloadInvoice = async (invoice: Invoice) => {
+    if (!invoice.receiptUrl) {
       // Generate a simple invoice view
       const invoiceWindow = window.open("", "_blank");
       if (invoiceWindow) {
@@ -320,20 +318,65 @@ export default function Profile() {
             </head>
             <body>
               <div class="header">
-                <h1>Rev Winner - Invoice</h1>
+                <h1>Rev Winner Invoice</h1>
                 <p>Invoice ID: ${invoice.id}</p>
               </div>
               <div class="details">
-                <div class="row"><strong>Date:</strong> ${formatDate(invoice.createdAt)}</div>
-                <div class="row"><strong>Amount:</strong> ${formatCurrency(invoice.amount, invoice.currency)}</div>
-                <div class="row"><strong>Status:</strong> ${invoice.status}</div>
-                <div class="row"><strong>Payment ID:</strong> ${invoice.razorpayPaymentId || "N/A"}</div>
-                <div class="row"><strong>Order ID:</strong> ${invoice.razorpayOrderId || "N/A"}</div>
+                <div class="row"><span>Date:</span><span>${new Date(invoice.createdAt).toLocaleDateString()}</span></div>
+                <div class="row"><span>Product:</span><span>${invoice.productName}</span></div>
+                <div class="row"><span>Amount:</span><span>$${invoice.amount}</span></div>
+                <div class="row"><span>Status:</span><span>${invoice.status}</span></div>
+                <div class="row"><span>Payment Method:</span><span>${invoice.paymentMethod}</span></div>
               </div>
             </body>
           </html>
         `);
+        invoiceWindow.document.close();
       }
+      return;
+    }
+
+    try {
+      // Redirect to the new invoice page instead of trying to download directly
+      if (invoice.orderId) {
+        window.open(`/invoice?orderId=${invoice.orderId}`, '_blank');
+        return;
+      }
+      
+      // Fallback for old invoices: try receiptUrl first, then generate simple view
+      if (invoice.receiptUrl) {
+        // Make authenticated request to get invoice data
+        const response = await apiRequest("GET", invoice.receiptUrl);
+        
+        if (response.ok) {
+          // Check if response is JSON (error) or HTML (invoice)
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to download invoice');
+          }
+          
+          // Get the HTML content
+          const htmlContent = await response.text();
+          
+          // Create a new window and write the invoice HTML
+          const invoiceWindow = window.open("", "_blank");
+          if (invoiceWindow) {
+            invoiceWindow.document.write(htmlContent);
+            invoiceWindow.document.close();
+            return;
+          }
+        }
+      }
+      
+      // Generate a simple invoice view as fallback
+    } catch (error: any) {
+      console.error("Invoice download error:", error);
+      toast({
+        title: "Download Failed",
+        description: error.message || "Failed to download invoice. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -828,54 +871,132 @@ export default function Profile() {
           </CardHeader>
           <CardContent className="p-6">
             {isLoadingInvoices ? (
-              <div className="space-y-3">
-                <div className="h-16 bg-muted animate-pulse rounded"></div>
-                <div className="h-16 bg-muted animate-pulse rounded"></div>
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="border border-border rounded-lg p-4 animate-pulse">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="h-6 bg-muted rounded w-32"></div>
+                      <div className="h-6 bg-muted rounded w-20"></div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-muted rounded w-48"></div>
+                      <div className="h-4 bg-muted rounded w-36"></div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : invoicesData && invoicesData.invoices.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {invoicesData.invoices.map((invoice, index) => (
                   <div
                     key={invoice.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                    className="border border-border rounded-lg p-4 hover:bg-muted/30 transition-all duration-200 hover:shadow-md"
                     data-testid={`invoice-${index}`}
                   >
-                    <div className="flex-1 space-y-1 mb-3 sm:mb-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-foreground">
-                          {formatCurrency(invoice.amount, invoice.currency)}
-                        </p>
-                        {getStatusBadge(invoice.status)}
+                    {/* Invoice Header */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gradient-to-br from-purple-500 to-fuchsia-500 rounded-lg">
+                          <FileText className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-bold text-lg text-foreground">
+                              {formatCurrency(invoice.amount, invoice.currency)}
+                            </h3>
+                            {getStatusBadge(invoice.status)}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Invoice #{invoice.razorpayPaymentId?.substring(0, 12) || invoice.id.substring(0, 12)}...
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDate(invoice.createdAt)}
-                      </p>
-                      {invoice.razorpayPaymentId && (
-                        <p className="text-xs text-muted-foreground font-mono">
-                          ID: {invoice.razorpayPaymentId}
-                        </p>
-                      )}
+                      <Button
+                        onClick={() => handleDownloadInvoice(invoice)}
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 hover:bg-purple-50 hover:border-purple-300 dark:hover:bg-purple-950"
+                        data-testid={`button-download-invoice-${index}`}
+                      >
+                        <Download className="h-4 w-4" />
+                        Download
+                      </Button>
                     </div>
-                    <Button
-                      onClick={() => handleDownloadInvoice(invoice)}
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
-                      data-testid={`button-download-invoice-${index}`}
-                    >
-                      <Download className="h-4 w-4" />
-                      Download
-                    </Button>
+
+                    {/* Invoice Details */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-purple-500" />
+                        <div>
+                          <p className="text-muted-foreground">Purchase Date</p>
+                          <p className="font-semibold">{formatDate(invoice.createdAt)}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-blue-500" />
+                        <div>
+                          <p className="text-muted-foreground">Product</p>
+                          <p className="font-semibold">
+                            {invoice.metadata?.description || 'Rev Winner Service'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-green-500" />
+                        <div>
+                          <p className="text-muted-foreground">Payment Method</p>
+                          <p className="font-semibold">
+                            {invoice.razorpayPaymentId ? 'Razorpay' : 'Cashfree'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Additional Details */}
+                    {(invoice.metadata?.minutesAdded || invoice.razorpayPaymentId) && (
+                      <div className="mt-4 pt-4 border-t border-border/50">
+                        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                          {invoice.metadata?.minutesAdded && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              <span>{invoice.metadata.minutesAdded} minutes added</span>
+                            </div>
+                          )}
+                          {invoice.razorpayPaymentId && (
+                            <div className="flex items-center gap-1">
+                              <Hash className="h-3 w-3" />
+                              <span>Payment ID: {invoice.razorpayPaymentId}</span>
+                            </div>
+                          )}
+                          {invoice.metadata?.invoiceNumber && (
+                            <div className="flex items-center gap-1">
+                              <FileText className="h-3 w-3" />
+                              <span>{invoice.metadata.invoiceNumber}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             ) : (
               <div className="text-center py-12">
-                <CreditCard className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
-                <p className="text-muted-foreground">No invoices found</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Your payment history will appear here
+                <div className="p-4 bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-900/20 dark:to-blue-900/20 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                  <CreditCard className="h-10 w-10 text-purple-500" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2">No invoices yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Your payment history and invoices will appear here
                 </p>
+                <Button
+                  onClick={() => setLocation('/packages')}
+                  className="bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700"
+                >
+                  Browse Packages
+                </Button>
               </div>
             )}
           </CardContent>

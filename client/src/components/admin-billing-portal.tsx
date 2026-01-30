@@ -721,7 +721,7 @@ export function AdminBillingPortal() {
         </CardHeader>
         <CardContent>
           {/* Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6 gap-2 md:gap-3 lg:gap-4 mb-6 max-w-full overflow-x-auto">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -731,13 +731,13 @@ export function AdminBillingPortal() {
                   setSearch(e.target.value);
                   setPage(1);
                 }}
-                className="pl-10"
+                className="pl-10 text-sm"
                 data-testid="input-transaction-search"
               />
             </div>
             
             <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-              <SelectTrigger data-testid="select-status-filter">
+              <SelectTrigger data-testid="select-status-filter" className="text-sm">
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
@@ -751,7 +751,7 @@ export function AdminBillingPortal() {
             </Select>
             
             <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1); }}>
-              <SelectTrigger data-testid="select-type-filter">
+              <SelectTrigger data-testid="select-type-filter" className="text-sm">
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>
@@ -762,7 +762,7 @@ export function AdminBillingPortal() {
             </Select>
             
             <Select value={customerTypeFilter} onValueChange={(v) => { setCustomerTypeFilter(v); setPage(1); }}>
-              <SelectTrigger data-testid="select-customer-type-filter">
+              <SelectTrigger data-testid="select-customer-type-filter" className="text-sm">
                 <SelectValue placeholder="All Customer Types" />
               </SelectTrigger>
               <SelectContent>
@@ -778,6 +778,7 @@ export function AdminBillingPortal() {
               value={startDate}
               onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
               data-testid="input-start-date"
+              className="text-sm"
             />
             
             <Input
@@ -786,6 +787,7 @@ export function AdminBillingPortal() {
               value={endDate}
               onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
               data-testid="input-end-date"
+              className="text-sm"
             />
           </div>
           

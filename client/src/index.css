@@ -93,6 +93,15 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   }
 
+  /* Mobile viewport fixes */
+  @media (max-width: 640px) {
+    .dialog-content {
+      margin: 1rem;
+      max-height: calc(100vh - 2rem);
+      width: calc(100vw - 2rem);
+    }
+  }
+
   /* Enhanced scrollbar styling */
   ::-webkit-scrollbar {
     width: 8px;

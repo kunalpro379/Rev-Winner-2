@@ -144,9 +144,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: any) => {
+      // Handle specific promo code errors gracefully
+      let title = "Failed to apply promo code";
+      let description = "Invalid promo code";
+      
+      if (error.message?.includes("expired")) {
+        title = "Promo Code Expired";
+        description = "This promo code has expired and is no longer valid.";
+      } else if (error.message?.includes("invalid")) {
+        title = "Invalid Promo Code";
+        description = "This promo code is not valid or does not exist.";
+      } else if (error.message?.includes("limit")) {
+        title = "Promo Code Limit Reached";
+        description = "This promo code has reached its usage limit.";
+      } else if (error.message) {
+        // Extract just the error message without the status code
+        const cleanMessage = error.message.replace(/^\d+:\s*/, '');
+        description = cleanMessage;
+      }
+      
       toast({
-        title: "Failed to apply promo code",
-        description: error.message || "Invalid promo code",
+        title,
+        description,
         variant: "destructive",
       });
     },

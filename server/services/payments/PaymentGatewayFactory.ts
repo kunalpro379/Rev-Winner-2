@@ -18,18 +18,24 @@ export interface PaymentGatewayConfig {
 
 export class PaymentGatewayFactory {
   private static instances = new Map<string, IPaymentGateway>();
-  private static defaultProvider: PaymentGatewayProvider = DEFAULT_PAYMENT_GATEWAY;
 
   static setDefaultProvider(provider: PaymentGatewayProvider): void {
-    this.defaultProvider = provider;
+    // Clear cache when changing provider to ensure fresh instances
+    this.instances.clear();
+    console.log(`[PaymentGatewayFactory] Default provider changed to: ${provider}`);
   }
 
   static getDefaultProvider(): PaymentGatewayProvider {
-    return this.defaultProvider;
+    // Always return the current config value instead of cached static value
+    return DEFAULT_PAYMENT_GATEWAY;
   }
 
   static getGateway(provider?: PaymentGatewayProvider): IPaymentGateway {
-    const providerName = provider || this.defaultProvider;
+    const providerName = provider || DEFAULT_PAYMENT_GATEWAY;
+    
+    // Debug logging to see what's happening
+    console.log(`[PaymentGatewayFactory] getGateway called with provider: ${provider || 'undefined'}`);
+    console.log(`[PaymentGatewayFactory] Using provider: ${providerName} (DEFAULT_PAYMENT_GATEWAY: ${DEFAULT_PAYMENT_GATEWAY})`);
     
     // For Cashfree, always recreate the gateway to ensure correct credentials are used
     // (environment might have changed or credentials updated)
