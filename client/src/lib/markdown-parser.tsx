@@ -113,66 +113,6 @@ export function parseMarkdown(text: string): React.ReactNode {
 
   return <>{elements}</>;
 }
-        if (currentLine.startsWith('-') || currentLine.startsWith('*')) {
-          listItems.push(currentLine.substring(1).trim());
-          i++;
-        } else if (currentLine === '') {
-          i++;
-          break;
-        } else {
-          break;
-        }
-      }
-      elements.push(
-        <ul key={`ul-${i}`} className="list-disc list-inside space-y-1 mb-2 pl-2">
-          {listItems.map((item, idx) => (
-            <li key={`li-${idx}`} className="text-sm text-foreground">
-              {parseInlineMarkdown(item)}
-            </li>
-          ))}
-        </ul>
-      );
-      continue;
-    }
-
-    // Numbered lists
-    if (/^\d+\./.test(trimmed)) {
-      const listItems: string[] = [];
-      while (i < lines.length) {
-        const currentLine = lines[i].trim();
-        if (/^\d+\./.test(currentLine)) {
-          listItems.push(currentLine.replace(/^\d+\.\s*/, '').trim());
-          i++;
-        } else if (currentLine === '') {
-          i++;
-          break;
-        } else {
-          break;
-        }
-      }
-      elements.push(
-        <ol key={`ol-${i}`} className="list-decimal list-inside space-y-1 mb-2 pl-2">
-          {listItems.map((item, idx) => (
-            <li key={`ol-li-${idx}`} className="text-sm text-foreground">
-              {parseInlineMarkdown(item)}
-            </li>
-          ))}
-        </ol>
-      );
-      continue;
-    }
-
-    // Regular paragraphs
-    elements.push(
-      <p key={`p-${i}`} className="text-sm text-foreground mb-2 leading-relaxed">
-        {parseInlineMarkdown(trimmed)}
-      </p>
-    );
-    i++;
-  }
-
-  return elements;
-}
 
 /**
  * Parse inline markdown formatting: bold, italic, code
