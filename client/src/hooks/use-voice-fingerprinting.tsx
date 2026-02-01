@@ -18,12 +18,14 @@ interface VoiceFingerprintingOptions {
   onSpeakerChange?: (speakerId: string) => void;
   sensitivity?: number;
   minConfidence?: number;
+  inputStream?: MediaStream | null;
 }
 
 export function useVoiceFingerprinting({
   onSpeakerChange,
   sensitivity = 0.6,
-  minConfidence = 0.6
+  minConfidence = 0.6,
+  inputStream = null
 }: VoiceFingerprintingOptions) {
   const [currentSpeaker, setCurrentSpeaker] = useState<string>("speaker1");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -32,6 +34,7 @@ export function useVoiceFingerprinting({
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const ownsStreamRef = useRef<boolean>(false);
   const speakersRef = useRef<Map<string, SpeakerFingerprint>>(new Map());
   const speakerCountRef = useRef<number>(0);
   const lastSpeakerRef = useRef<string>("speaker1");
@@ -40,7 +43,7 @@ export function useVoiceFingerprinting({
 
   const startAnalysis = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = inputStream ?? await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
@@ -50,6 +53,7 @@ export function useVoiceFingerprinting({
         } 
       });
       mediaStreamRef.current = stream;
+      ownsStreamRef.current = !inputStream;
 
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       audioContextRef.current = audioContext;
@@ -68,11 +72,13 @@ export function useVoiceFingerprinting({
     } catch (error) {
       console.error("Failed to start voice analysis:", error);
     }
-  }, []);
+  }, [inputStream]);
 
   const stopAnalysis = useCallback(() => {
-    if (mediaStreamRef.current) {
+    if (mediaStreamRef.current && ownsStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      mediaStreamRef.current = null;
+    } else if (mediaStreamRef.current) {
       mediaStreamRef.current = null;
     }
 
@@ -295,6 +301,13 @@ export function useVoiceFingerprinting({
       stopAnalysis();
     };
   }, [stopAnalysis]);
+
+  useEffect(() => {
+    if (isAnalyzing && inputStream) {
+      stopAnalysis();
+      startAnalysis();
+    }
+  }, [inputStream, isAnalyzing, startAnalysis, stopAnalysis]);
 
   return {
     currentSpeaker,

@@ -5,9 +5,9 @@ import { z } from "zod";
 import { storage } from "./storage";
 import { authStorage } from "./storage-auth";
 import { generateSalesResponse, generateCallSummary, generateCoachingSuggestions } from "./services/openai";
-import { insertConversationSchema, insertMessageSchema, insertTeamsMeetingSchema, insertAudioSourceSchema, insertSessionUsageSchema, AUDIO_SOURCE_TYPES, subscriptions, pendingOrders } from "../shared/schema";
+import { insertConversationSchema, insertMessageSchema, insertTeamsMeetingSchema, insertAudioSourceSchema, insertSessionUsageSchema, AUDIO_SOURCE_TYPES, subscriptions, pendingOrders, addonPurchases, sessionUsage } from "../shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupAuthRoutes } from "./routes-auth";
 import { setupAdminRoutes } from "./routes-admin";
@@ -664,14 +664,15 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
         return res.status(400).json({ message: "Question is required" });
       }
 
-      // Get recent conversation history for context (last 30 messages)
+      // Get recent conversation history for context (last 15 messages instead of 30 - reduces memory)
       const allMessages = await storage.getMessages(conversation.id);
-      const recentMessages = allMessages.slice(-30);
+      const recentMessages = allMessages.slice(-15);
       const conversationHistory = recentMessages.map(m => ({
         sender: m.sender,
         content: m.content
       }));
 
+      // Use provided context or build from history
       const context = conversationContext || conversationHistory.map(m => `${m.sender}: ${m.content}`).join('\n');
       
       const domain = req.body.domainExpertise || "Generic Product";
@@ -694,6 +695,10 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
       
       console.log(`❓ Ask Question: domain="${domain}", strict=${!isUniversalMode}, question="${question.slice(0, 50)}..."`);
       
+      // Set response headers for faster initial response
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      
       const answer = await answerConversationQuestion(
         question,
         context,
@@ -706,7 +711,10 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
       
     } catch (error: any) {
       console.error('Q&A error:', error);
-      res.status(500).json({ message: "Failed to answer question", error: error.message });
+      // Return error without blocking UI
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to answer question", error: error.message });
+      }
     }
   });
 
@@ -1814,17 +1822,19 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
       }
       
       // Check subscription limits before starting session
-      const subscription = await authStorage.getSubscriptionByUserId(userId);
+      let subscription = await authStorage.getSubscriptionByUserId(userId);
       if (!subscription) {
-        return res.status(403).json({ 
-          message: "No active subscription or enterprise license found. Please subscribe or contact your organization to continue.",
-          requiresUpgrade: true
+        // Auto-create trial subscription for new users
+        subscription = await authStorage.createSubscription({
+          userId,
+          status: 'trial',
+          planType: 'free_trial'
         });
       }
       
-      const sessionsUsed = parseInt(subscription.sessionsUsed);
+      const sessionsUsed = parseInt(subscription.sessionsUsed || "0") || 0;
       const sessionsLimit = subscription.sessionsLimit ? parseInt(subscription.sessionsLimit) : null;
-      const minutesUsed = parseInt(subscription.minutesUsed);
+      const minutesUsed = parseInt(subscription.minutesUsed || "0") || 0;
       const minutesLimit = subscription.minutesLimit ? parseInt(subscription.minutesLimit) : null;
       
       // Check if user has exceeded session limit
@@ -1939,49 +1949,36 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
   app.get("/api/session-usage/total", authenticateToken, async (req, res) => {
     try {
       const userId = req.jwtUser!.userId;
+      const sessions = await db
+        .select()
+        .from(sessionUsage)
+        .where(eq(sessionUsage.userId, userId))
+        .orderBy(desc(sessionUsage.startTime));
 
-      // Use subscription table as source of truth for session usage
-      // This ensures consistency with add-on expiry logic
-      const subscription = await authStorage.getSubscriptionByUserId(userId);
-      
-      const allSessions = await storage.getUserSessionUsage(userId);
-      
-      let totalSessions = 0;
-      let totalMinutes = 0;
-      
-      if (subscription) {
-        // Use subscription table counters (authoritative for add-on expiry)
-        totalSessions = parseInt(subscription.sessionsUsed || '0');
-        totalMinutes = parseInt(subscription.minutesUsed || '0');
-      } else {
-        // Fallback: calculate from session records if no subscription exists
-        let totalSeconds = 0;
-        for (const session of allSessions) {
-          if (session.durationSeconds) {
-            totalSeconds += parseInt(session.durationSeconds);
-          }
+      const now = new Date();
+      let totalSeconds = 0;
+
+      for (const session of sessions) {
+        if (session.durationSeconds) {
+          const parsed = parseInt(session.durationSeconds, 10);
+          if (!Number.isNaN(parsed)) totalSeconds += parsed;
+        } else if (session.startTime && session.status === "active") {
+          const startTime = new Date(session.startTime);
+          const diff = Math.max(0, Math.floor((now.getTime() - startTime.getTime()) / 1000));
+          totalSeconds += diff;
         }
-        totalSessions = allSessions.length;
-        totalMinutes = Math.floor(totalSeconds / 60);
       }
 
-      const totalSeconds = totalMinutes * 60;
-      const totalHours = Math.floor(totalMinutes / 60);
+      const totalSessions = sessions.length;
+      const totalMinutes = Math.floor(totalSeconds / 60);
+      const totalHours = Math.floor(totalSeconds / 3600);
 
-      res.json({
+      return res.json({
         totalSessions,
         totalSeconds,
         totalMinutes,
         totalHours,
-        sessions: allSessions.map(s => ({
-          id: s.id,
-          sessionId: s.sessionId,
-          startTime: s.startTime,
-          endTime: s.endTime,
-          durationSeconds: s.durationSeconds,
-          status: s.status,
-          createdAt: s.createdAt
-        }))
+        sessions
       });
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch usage data", error: error.message });
@@ -2022,7 +2019,44 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
     try {
       const userId = req.jwtUser!.userId;
       console.log(`[DEBUG] Fetching subscription for userId: ${userId}`);
-      
+      const now = new Date();
+
+      const hasPaymentReference = (purchase: any) => {
+        const metadata = (purchase?.metadata as any) || {};
+        const amount = (purchase?.purchaseAmount || '').toString();
+        const isFree = amount === '0' || amount === '0.00';
+        return Boolean(purchase?.gatewayTransactionId || metadata?.paymentId || isFree);
+      };
+
+      const platformPurchases = await db
+        .select()
+        .from(addonPurchases)
+        .where(
+          and(
+            eq(addonPurchases.userId, userId),
+            eq(addonPurchases.addonType, 'platform_access'),
+            eq(addonPurchases.status, 'active')
+          )
+        );
+
+      const validPlatform = platformPurchases
+        .filter(p => !p.endDate || p.endDate > now)
+        .filter(hasPaymentReference);
+
+      if (validPlatform.length > 0) {
+        const activePlatform = validPlatform[0];
+        return res.json({
+          planType: "professional",
+          status: "active",
+          currentPeriodStart: activePlatform.startDate,
+          currentPeriodEnd: activePlatform.endDate,
+          purchaseId: activePlatform.id,
+          packageSku: activePlatform.packageSku,
+          purchaseAmount: activePlatform.purchaseAmount,
+          currency: activePlatform.currency,
+        });
+      }
+
       const subscription = await authStorage.getSubscriptionByUserId(userId);
       console.log(`[DEBUG] Subscription found:`, subscription ? {
         id: subscription.id,
@@ -2030,7 +2064,7 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
         status: subscription.status,
         planId: subscription.planId,
       } : 'NULL');
-      
+
       if (!subscription) {
         console.log(`[DEBUG] No subscription found for user ${userId}, returning free_trial`);
         return res.json({
@@ -2039,68 +2073,7 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
           message: "No active subscription"
         });
       }
-      
-      // Get plan details if planId exists
-      let planDetails = null;
-      if (subscription.planId) {
-        planDetails = await authStorage.getPlanById(subscription.planId);
-        console.log(`[DEBUG] Plan details:`, planDetails ? {
-          name: planDetails.name,
-          price: planDetails.price,
-        } : 'NULL');
-      }
-      
-      res.json({
-        id: subscription.id,
-        planType: subscription.planType,
-        status: subscription.status,
-        currentPeriodStart: subscription.currentPeriodStart,
-        currentPeriodEnd: subscription.currentPeriodEnd,
-        sessionsUsed: subscription.sessionsUsed,
-        sessionsLimit: subscription.sessionsLimit,
-        minutesUsed: subscription.minutesUsed,
-        minutesLimit: subscription.minutesLimit,
-        sessionHistory: subscription.sessionHistory || [],
-        canceledAt: subscription.canceledAt,
-        createdAt: subscription.createdAt,
-        plan: planDetails ? {
-          name: planDetails.name,
-          price: planDetails.price,
-          currency: planDetails.currency,
-          billingInterval: planDetails.billingInterval,
-        } : null,
-      });
-    } catch (error: any) {
-      console.error(`[DEBUG] Error fetching subscription:`, error);
-      res.status(500).json({ message: "Failed to fetch subscription", error: error.message });
-    }
-  });
 
-  // Get current subscription (alias for settings page compatibility)
-  app.get("/api/subscriptions/current", authenticateToken, async (req, res) => {
-    try {
-      const userId = req.jwtUser!.userId;
-      console.log(`[DEBUG] Fetching current subscription for userId: ${userId}`);
-      
-      const subscription = await authStorage.getSubscriptionByUserId(userId);
-      console.log(`[DEBUG] Current subscription found:`, subscription ? {
-        id: subscription.id,
-        planType: subscription.planType,
-        status: subscription.status,
-        planId: subscription.planId,
-      } : 'NULL');
-      
-      if (!subscription) {
-        console.log(`[DEBUG] No subscription found for user ${userId}, returning trial`);
-        return res.json({
-          subscription: {
-            planType: "trial",
-            status: "no_subscription",
-            currentPeriodEnd: null
-          }
-        });
-      }
-      
       // Get plan details if planId exists
       let planDetails = null;
       if (subscription.planId) {
@@ -2110,7 +2083,7 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
           price: planDetails.price,
         } : 'NULL');
       }
-      
+
       res.json({
         subscription: {
           id: subscription.id,
@@ -2162,42 +2135,136 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
           minutesRemaining: null,
         });
       }
+
+      const now = new Date();
+
+      const hasPaymentReference = (purchase: any) => {
+        const metadata = (purchase?.metadata as any) || {};
+        const amount = (purchase?.purchaseAmount || '').toString();
+        const isFree = amount === '0' || amount === '0.00';
+        return Boolean(purchase?.gatewayTransactionId || metadata?.paymentId || isFree);
+      };
       
+      // NEW: Check addon_purchases table for actual purchases
+      const platformPurchases = await db
+        .select()
+        .from(addonPurchases)
+        .where(
+          and(
+            eq(addonPurchases.userId, userId),
+            eq(addonPurchases.addonType, 'platform_access'),
+            eq(addonPurchases.status, 'active')
+          )
+        );
+
+      const sessionMinutesPurchases = await db
+        .select()
+        .from(addonPurchases)
+        .where(
+          and(
+            eq(addonPurchases.userId, userId),
+            eq(addonPurchases.addonType, 'session_minutes'),
+            eq(addonPurchases.status, 'active')
+          )
+        );
+
+      // Check for expired purchases + payment reference
+      const activePlatform = platformPurchases
+        .filter(p => !p.endDate || p.endDate > now)
+        .filter(hasPaymentReference)
+        .find(() => true);
+
+      const activeMinutes = sessionMinutesPurchases
+        .filter(p => !p.endDate || p.endDate > now)
+        .filter(hasPaymentReference);
+
+      // Calculate total remaining minutes
+      const totalMinutesRemaining = activeMinutes.reduce((sum, p) => sum + (p.totalUnits - p.usedUnits), 0);
+
+      console.log(`[DEBUG] Addon Purchases:`, {
+        hasPlatformAccess: !!activePlatform,
+        platformExpires: activePlatform?.endDate,
+        hasSessionMinutes: activeMinutes.length > 0,
+        totalMinutesRemaining
+      });
+
+      // KEY LOGIC: Users need BOTH platform access AND session minutes to use the service
+      const hasPlatformAccess = !!activePlatform;
+      const hasSessionMinutes = totalMinutesRemaining > 0;
+      const canUseService = hasPlatformAccess && hasSessionMinutes;
+
+      if (hasPlatformAccess || hasSessionMinutes) {
+        const planType = hasPlatformAccess ? 'professional' : 'free_trial';
+        const status = hasPlatformAccess ? 'active' : 'no_subscription';
+
+        console.log(`[DEBUG] Final Check (paid flow):`, {
+          planType,
+          status,
+          canUseService,
+          hasPlatformAccess,
+          hasSessionMinutes
+        });
+
+        return res.json({
+          canUseService,
+          planType,
+          status,
+          hasPlatformAccess,
+          hasSessionMinutes,
+          sessionsUsed: 0,
+          sessionsLimit: null,
+          sessionsRemaining: null,
+          minutesUsed: 0,
+          minutesLimit: null,
+          minutesRemaining: totalMinutesRemaining > 0 ? totalMinutesRemaining : 0,
+        });
+      }
+
       const subscription = await authStorage.getSubscriptionByUserId(userId);
-      
       if (!subscription) {
         console.log(`[DEBUG] No subscription found for user ${userId}, returning trial limits`);
         return res.json({
           canUseService: true,
           planType: "trial",
           status: "no_subscription",
+          hasPlatformAccess: false,
+          hasSessionMinutes: false,
           sessionsUsed: 0,
-          sessionsLimit: 5, // Trial limit
+          sessionsLimit: 5,
           sessionsRemaining: 5,
           minutesUsed: 0,
-          minutesLimit: 60, // Trial limit
+          minutesLimit: 60,
           minutesRemaining: 60,
         });
       }
-      
-      // Calculate remaining sessions and minutes
+
       const sessionsUsed = parseInt(subscription.sessionsUsed || '0');
       const sessionsLimit = subscription.sessionsLimit ? parseInt(subscription.sessionsLimit) : null;
       const minutesUsed = parseInt(subscription.minutesUsed || '0');
       const minutesLimit = subscription.minutesLimit ? parseInt(subscription.minutesLimit) : null;
-      
+
       const sessionsRemaining = sessionsLimit ? Math.max(0, sessionsLimit - sessionsUsed) : null;
       const minutesRemaining = minutesLimit ? Math.max(0, minutesLimit - minutesUsed) : null;
-      
-      // Determine if user can use service
-      const canUseService = subscription.status === 'active' && 
-        (sessionsLimit === null || sessionsRemaining! > 0) &&
-        (minutesLimit === null || minutesRemaining! > 0);
-      
-      res.json({
-        canUseService,
+
+      const isTrialUser = subscription.status === 'trial' || (sessionsLimit !== null && minutesLimit !== null);
+      const trialCanUse = (subscription.status === 'trial' || subscription.status === 'active') &&
+        (sessionsLimit === null || (sessionsLimit !== null && sessionsRemaining !== null && sessionsRemaining > 0)) &&
+        (minutesLimit === null || (minutesLimit !== null && minutesRemaining !== null && minutesRemaining > 0));
+
+      console.log(`[DEBUG] Service access (trial flow):`, {
+        status: subscription.status,
+        isTrialUser,
+        canUseService: trialCanUse,
+        sessionsCheck: `${sessionsLimit === null} || ${sessionsRemaining !== null && sessionsRemaining > 0}`,
+        minutesCheck: `${minutesLimit === null} || ${minutesRemaining !== null && minutesRemaining > 0}`
+      });
+
+      return res.json({
+        canUseService: trialCanUse,
         planType: subscription.planType,
         status: subscription.status,
+        hasPlatformAccess: false,
+        hasSessionMinutes: false,
         sessionsUsed,
         sessionsLimit,
         sessionsRemaining,

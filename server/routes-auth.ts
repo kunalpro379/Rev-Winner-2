@@ -574,12 +574,30 @@ export function setupAuthRoutes(app: Router) {
       const subscription = await authStorage.getSubscriptionByUserId(user.id);
       
       let sessionsRemaining = 0;
+      let minutesRemaining = 0;
       let trialExpired = false;
+      let isTrialUser = false;
       
       if (subscription) {
         const sessionsUsed = parseInt(subscription.sessionsUsed || '0');
-        sessionsRemaining = Math.max(0, 3 - sessionsUsed);
-        trialExpired = subscription.status === 'trial' && sessionsUsed >= 3;
+        const minutesUsed = parseInt(subscription.minutesUsed || '0');
+        const sessionsLimit = subscription.sessionsLimit ? parseInt(subscription.sessionsLimit) : null;
+        const minutesLimit = subscription.minutesLimit ? parseInt(subscription.minutesLimit) : null;
+        
+        // Check if user is on trial: subscription status is 'trial' OR both limits are set (not null)
+        isTrialUser = subscription.status === 'trial' || (sessionsLimit !== null && minutesLimit !== null);
+        
+        if (isTrialUser) {
+          // Trial user - has limited sessions and minutes
+          sessionsRemaining = Math.max(0, (sessionsLimit || 3) - sessionsUsed);
+          minutesRemaining = Math.max(0, (minutesLimit || 180) - minutesUsed);
+          trialExpired = sessionsUsed >= (sessionsLimit || 3) && minutesUsed >= (minutesLimit || 180);
+        } else {
+          // Paid user - unlimited (or return large number)
+          sessionsRemaining = 999999;
+          minutesRemaining = 999999;
+          trialExpired = false;
+        }
       }
       
       res.json({
@@ -597,9 +615,15 @@ export function setupAuthRoutes(app: Router) {
         },
         subscription: subscription ? {
           status: subscription.status,
+          planType: subscription.planType,
           sessionsUsed: parseInt(subscription.sessionsUsed || '0'),
           sessionsRemaining,
+          sessionsLimit: subscription.sessionsLimit ? parseInt(subscription.sessionsLimit) : null,
+          minutesUsed: parseInt(subscription.minutesUsed || '0'),
+          minutesRemaining,
+          minutesLimit: subscription.minutesLimit ? parseInt(subscription.minutesLimit) : null,
           trialExpired,
+          isTrialUser,
           currentPeriodEnd: subscription.currentPeriodEnd,
         } : null,
       });

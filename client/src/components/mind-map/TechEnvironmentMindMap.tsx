@@ -643,9 +643,12 @@ export function TechEnvironmentMindMap({
                 {(isFetching || isGenerating) && !hasNodes ? (
                   <div className="h-full flex items-center justify-center">
                     <div className="text-center">
-                      <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-purple-500" />
-                      <p className="text-sm text-muted-foreground">
-                        {isGenerating ? 'Analyzing environment...' : 'Loading map...'}
+                      <Loader2 className="h-12 w-12 animate-spin mx-auto mb-3 text-purple-500" />
+                      <p className="text-base font-medium text-foreground mb-1">
+                        {isGenerating ? 'Analyzing Environment' : 'Loading Map'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {isGenerating ? 'Creating your visual map...' : 'Please wait...'}
                       </p>
                     </div>
                   </div>
@@ -665,18 +668,22 @@ export function TechEnvironmentMindMap({
                   </ReactFlow>
                 ) : (
                   <div className="h-full flex items-center justify-center">
-                    <div className="text-center p-8">
-                      <Network className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
-                      <h3 className="font-medium mb-1">No Map/Flow Generated</h3>
-                      <p className="text-sm text-muted-foreground max-w-sm mb-4">
-                        Click "Generate" to create a visual map of the customer's 
-                        technology environment, workflows, and pain points.
-                      </p>
-                      {!transcript || transcript.length < 50 ? (
-                        <p className="text-xs text-amber-600">
-                          A reference architecture will be generated based on your domain expertise.
+                    <div className="text-center p-8 max-w-md mx-auto">
+                      <div className="bg-gradient-to-br from-purple-50/80 to-indigo-50/80 dark:from-purple-950/30 dark:to-indigo-950/30 rounded-xl p-10 border border-dashed border-purple-300 dark:border-purple-700">
+                        <Network className="h-16 w-16 mx-auto mb-4 text-purple-500 dark:text-purple-400" />
+                        <h3 className="text-lg font-semibold mb-2 text-foreground">No Map/Flow Generated</h3>
+                        <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+                          Click "Generate" to create a visual map of the customer's 
+                          technology environment, workflows, and pain points.
                         </p>
-                      ) : null}
+                        {!transcript || transcript.length < 50 ? (
+                          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mt-4">
+                            <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                              💡 A reference architecture will be generated based on your domain expertise.
+                            </p>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 )}

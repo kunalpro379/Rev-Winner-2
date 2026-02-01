@@ -56,6 +56,7 @@ function getRazorpayKeySecret(): string | undefined {
 async function activateCartCheckout(
   pendingOrder: any,
   verifiedPaymentId: string,
+  gatewayTransactionId?: string,
   req?: Request
 ): Promise<{ success: boolean; activatedAddons: AddonPurchase[]; message?: string }> {
   try {
@@ -217,7 +218,7 @@ async function activateCartCheckout(
             status: 'active',
             startDate,
             endDate,
-            gatewayTransactionId: null,
+            gatewayTransactionId: gatewayTransactionId || undefined,
             metadata: {
               packageName: pkg.name,
               basePrice: item.basePrice, // Keep original base price for reference
@@ -267,7 +268,7 @@ async function activateCartCheckout(
             status: 'active',
             startDate,
             endDate,
-            gatewayTransactionId: null,
+            gatewayTransactionId: gatewayTransactionId || undefined,
             metadata: {
               packageName: pkg.name,
               basePrice: item.basePrice, // Keep original base price for reference
@@ -2709,8 +2710,43 @@ export function setupBillingRoutes(app: Router) {
         }
       }
 
+      // Create gateway transaction for payment tracking BEFORE activating cart
+      console.log(`[Cart Verify] Creating gateway transaction for order: ${orderId}`);
+      let gatewayTransactionId: string | undefined;
+      
+      try {
+        const gatewayProvider = await billingStorage.getGatewayProviderByName(pendingOrder.gatewayProvider);
+        if (gatewayProvider) {
+          const gatewayTx = await billingStorage.createGatewayTransaction({
+            providerId: gatewayProvider.id,
+            providerTransactionId: verifiedPaymentId,
+            transactionType: 'payment',
+            status: 'completed',
+            amount: pendingOrder.amount,
+            currency: pendingOrder.currency || 'USD',
+            userId,
+            relatedEntity: 'cart_checkout',
+            payload: {
+              orderId,
+              cartItems: metadata?.items || [],
+              gatewayProvider: pendingOrder.gatewayProvider,
+            },
+            metadata: { 
+              orderId,
+              cartCheckout: true,
+              itemCount: cartItems.length,
+            },
+          });
+          gatewayTransactionId = gatewayTx.id;
+          console.log(`[Cart Verify] Gateway transaction created: ${gatewayTransactionId}`);
+        }
+      } catch (txError) {
+        console.error('[Cart Verify] Failed to create gateway transaction:', txError);
+        // Continue anyway - addon purchases should still be created
+      }
+      
       // Use the helper function to activate cart items
-      const result = await activateCartCheckout(pendingOrder, verifiedPaymentId, req);
+      const result = await activateCartCheckout(pendingOrder, verifiedPaymentId, gatewayTransactionId, req);
       
       if (!result.success) {
         return res.status(500).json({ message: result.message || "Failed to activate cart items" });

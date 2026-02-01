@@ -25,6 +25,7 @@ export function useDeepgramTranscription({
 }: UseDeepgramTranscriptionOptions) {
   const [isConnected, setIsConnected] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
@@ -134,6 +135,7 @@ export function useDeepgramTranscription({
       audioContextRef.current = null;
     }
 
+    setAudioStream(null);
     disconnectWebSocket();
     setIsTranscribing(false);
     console.log('🛑 Transcription stopped');
@@ -255,6 +257,7 @@ export function useDeepgramTranscription({
         source.connect(merger, 0, index);
       });
       merger.connect(destination);
+      setAudioStream(destination.stream);
 
       const processor = audioContext.createScriptProcessor(2048, 1, 1);
       merger.connect(processor);
@@ -313,6 +316,7 @@ export function useDeepgramTranscription({
     isConnected,
     isTranscribing,
     startTranscription,
-    stopTranscription
+    stopTranscription,
+    audioStream
   };
 }

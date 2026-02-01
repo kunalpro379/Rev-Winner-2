@@ -6,24 +6,17 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useDeepgramTranscription } from "@/hooks/use-deepgram-transcription";
 import { useVoiceFingerprinting } from "@/hooks/use-voice-fingerprinting";
-import { Mic, MicOff, Play, Pause, Square, Copy, Trash2, Volume2, Radio, User, Users, Zap, Monitor, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
+import { Mic, MicOff, Play, Pause, Square, Copy, Trash2, Volume2, Radio, Zap, Monitor, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import PricingModal from "./pricing-modal";
+import { SessionMinutesModal } from "./session-minutes-modal";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import PricingModal from "./pricing-modal";
-import { SessionMinutesModal } from "./session-minutes-modal";
 
 interface Speaker {
   id: string;
@@ -87,14 +80,14 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
   const [currentSpeakerId, setCurrentSpeakerId] = useState<string>("speaker1");
   const [autoDetectEnabled, setAutoDetectEnabled] = useState(true);
   const [captureMeetingAudio, setCaptureMeetingAudio] = useState(isDesktopBrowser());
-  const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
-  const [isOpen, setIsOpen] = useState(true);
   const [selectedSegments, setSelectedSegments] = useState<Set<number>>(new Set());
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [showSessionMinutesModal, setShowSessionMinutesModal] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
   const prevIsTranscribingRef = useRef<boolean>(false);
+  const analyzeOnSpeechRef = useRef<(() => void) | null>(null);
   const { toast } = useToast();
 
   // Check subscription limits
@@ -102,6 +95,8 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
     canUseService: boolean;
     planType: string;
     status: string;
+    hasPlatformAccess?: boolean;
+    hasSessionMinutes?: boolean;
     sessionsUsed: number;
     sessionsLimit: number | null;
     sessionsRemaining: number | null;
@@ -152,23 +147,11 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
     return newSpeaker;
   };
 
-  const { currentSpeaker: detectedSpeaker, confidence, isAnalyzing: isVoiceAnalyzing, startAnalysis, stopAnalysis, analyzeOnSpeech, reset: resetVoiceDetection } = useVoiceFingerprinting({
-    onSpeakerChange: (speakerId) => {
-      if (autoDetectEnabled) {
-        console.log(`👤 Voice fingerprint detected speaker change to: ${speakerId}`);
-        getSpeakerById(speakerId);
-        setCurrentSpeakerId(speakerId);
-      }
-    },
-    sensitivity: 0.5,    // Lower threshold = more sensitive to speaker changes
-    minConfidence: 0.5   // Accept lower confidence matches for meeting audio
-  });
-
-  const { isConnected, isTranscribing, startTranscription, stopTranscription } = useDeepgramTranscription({
+  const { isConnected, isTranscribing, startTranscription, stopTranscription, audioStream } = useDeepgramTranscription({
     enabled: true,
     onResult: (result) => {
-      if (autoDetectEnabled && analyzeOnSpeech) {
-        analyzeOnSpeech();
+      if (autoDetectEnabled) {
+        analyzeOnSpeechRef.current?.();
       }
 
       if (result.isFinal) {
@@ -226,6 +209,31 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
     }
   });
 
+  const { currentSpeaker: detectedSpeaker, confidence, isAnalyzing: isVoiceAnalyzing, startAnalysis, stopAnalysis, analyzeOnSpeech, reset: resetVoiceDetection } = useVoiceFingerprinting({
+    onSpeakerChange: (speakerId) => {
+      if (autoDetectEnabled) {
+        console.log(`👤 Voice fingerprint detected speaker change to: ${speakerId}`);
+        getSpeakerById(speakerId);
+        setCurrentSpeakerId(speakerId);
+      }
+    },
+    sensitivity: 0.5,    // Lower threshold = more sensitive to speaker changes
+    minConfidence: 0.5,   // Accept lower confidence matches for meeting audio
+    inputStream: audioStream
+  });
+
+  useEffect(() => {
+    analyzeOnSpeechRef.current = analyzeOnSpeech;
+  }, [analyzeOnSpeech]);
+
+  useEffect(() => {
+    if (audioStream) {
+      // Rebind voice fingerprinting to the same meeting audio stream
+      // so speaker detection works for all participants, not just mic input.
+      resetVoiceDetection();
+    }
+  }, [audioStream, resetVoiceDetection]);
+
   useEffect(() => {
     if (shouldStop && isTranscribing) {
       stopTranscription();
@@ -280,7 +288,11 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
       // Check subscription limits before starting
       if (limitsData && !limitsData.canUseService) {
         let limitMessage = "";
-        if (limitsData.sessionsLimit && limitsData.sessionsUsed >= limitsData.sessionsLimit) {
+        if (limitsData.hasPlatformAccess === false) {
+          limitMessage = "Platform access is required. Visit Packages to purchase Platform Access.";
+        } else if (limitsData.hasSessionMinutes === false) {
+          limitMessage = "Session minutes are required to use the platform. Purchase a minutes package to continue.";
+        } else if (limitsData.sessionsLimit && limitsData.sessionsUsed >= limitsData.sessionsLimit) {
           limitMessage = `You've used all ${limitsData.sessionsLimit} free sessions. Visit Packages to purchase Platform Access!`;
         } else if (limitsData.minutesLimit && limitsData.minutesUsed >= limitsData.minutesLimit) {
           limitMessage = `You've used all ${limitsData.minutesLimit} free minutes. Visit Packages to purchase Platform Access!`;
@@ -302,10 +314,14 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
         return;
       }
 
-      // Check if user has exceeded free tier (3 sessions OR 180 minutes)
-      const hasExceededFreeTier = (limitsData?.sessionsUsed ?? 0) >= 3 || (limitsData?.minutesUsed ?? 0) >= 180;
+      // Check if user is on trial/free tier (has actual limits) and has exceeded them
+      // Paid users with null limits should bypass this check
+      const isTrialUser = limitsData?.sessionsLimit !== null || limitsData?.minutesLimit !== null;
+      const hasExceededFreeTier = isTrialUser && (
+        (limitsData?.sessionsUsed ?? 0) >= 3 || (limitsData?.minutesUsed ?? 0) >= 180
+      );
 
-      // Only require Session Minutes purchase if user has exceeded free tier
+      // Only require Session Minutes purchase if trial user has exceeded free tier
       if (hasExceededFreeTier) {
         if (!sessionMinutesData || !sessionMinutesData.hasActiveMinutes || sessionMinutesData.totalMinutesRemaining <= 0) {
           setShowSessionMinutesModal(true);
@@ -388,10 +404,9 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
       setCurrentSpeakerId("speaker1");
       setAutoDetectEnabled(true);
       
-      // Step 4: Close modals and collapse instructions
+      // Step 4: Close modals
       setShowPricingModal(false);
       setShowSessionMinutesModal(false);
-      setIsInstructionsOpen(false);
     }
   }, [resetVersion, isTranscribing, isPaused]);
 
@@ -486,30 +501,24 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
   };
 
   return (
-    <Card className="w-full shadow-lg border-border/40">
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CardHeader className="border-b border-border/30 bg-gradient-to-r from-purple-50/50 to-blue-50/50 dark:from-purple-950/20 dark:to-blue-950/20">
-          <div className="flex items-center justify-between">
-            <CollapsibleTrigger className="flex items-center gap-3 flex-1 text-left group" data-testid="toggle-live-transcript">
-              <div className="p-2 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg shadow-md group-hover:scale-105 transition-transform">
-                <Volume2 className="h-5 w-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 bg-clip-text text-transparent">
-                  Live Transcript
-                </CardTitle>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Real-time speech-to-text transcription
-                </p>
-              </div>
-              {isOpen ? (
-                <ChevronUp className="h-5 w-5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-              ) : (
-                <ChevronDown className="h-5 w-5 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-              )}
-            </CollapsibleTrigger>
+    <Card className="w-full h-full shadow-lg border-border/40 flex flex-col">
+      <CardHeader className="border-b border-border/30 bg-gradient-to-r from-purple-50/50 to-blue-50/50 dark:from-purple-950/20 dark:to-blue-950/20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 flex-1 text-left">
+            <div className="p-2 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg shadow-md">
+              <Volume2 className="h-5 w-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 dark:from-purple-400 dark:to-blue-400 bg-clip-text text-transparent">
+                Live Transcript
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Real-time speech-to-text transcription
+              </p>
+            </div>
+          </div>
 
-            <div className="flex items-center gap-3 ml-2">
+          <div className="flex items-center gap-3 ml-2">
             {isConnected && (
               <Badge variant="outline" className="bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900">
                 <Radio className="h-3 w-3 mr-1.5 animate-pulse" />
@@ -517,83 +526,51 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
               </Badge>
             )}
             
-            {autoDetectEnabled ? (
-              <Badge 
-                variant="default" 
-                className="bg-gradient-to-r from-purple-500 to-blue-500 cursor-pointer hover:opacity-90 transition"
-                onClick={() => setAutoDetectEnabled(false)}
-                data-testid="badge-auto-detect"
-              >
-                <Zap className="h-3 w-3 mr-1.5" />
-                Auto Detect ON
-              </Badge>
-            ) : (
-              <Badge 
-                variant="outline" 
-                className="cursor-pointer hover:bg-muted/50 transition"
-                onClick={() => setAutoDetectEnabled(true)}
-                data-testid="badge-manual-select"
-              >
-                <User className="h-3 w-3 mr-1.5" />
-                Manual Select
-              </Badge>
-            )}
-
-            {!autoDetectEnabled && (
-              <>
-                <Badge variant="secondary" className="px-2 py-0.5">
-                  <Users className="h-3 w-3 mr-1.5" />
-                  Speaker:
-                </Badge>
-                <Select value={currentSpeakerId} onValueChange={setCurrentSpeakerId}>
-                  <SelectTrigger className="w-[140px] h-8 text-xs" data-testid="select-speaker">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {speakers.map(speaker => (
-                      <SelectItem key={speaker.id} value={speaker.id}>
-                        <div className="flex items-center gap-2">
-                          <div className={`w-5 h-5 rounded-full ${speaker.color} text-white text-[10px] font-bold flex items-center justify-center`}>
-                            {speaker.initials}
-                          </div>
-                          <span>{speaker.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </>
-            )}
+            <Badge
+              variant="default"
+              className="bg-gradient-to-r from-purple-500 to-blue-500"
+              data-testid="badge-auto-detect"
+            >
+              <Zap className="h-3 w-3 mr-1.5" />
+              Auto Detect
+            </Badge>
           </div>
         </div>
       </CardHeader>
 
-      <CollapsibleContent>
-        <CardContent className="p-6 space-y-4">
+      <CardContent className="p-6 space-y-4 flex-1">
         {!isTranscribing && (
-          <Collapsible open={isInstructionsOpen} onOpenChange={setIsInstructionsOpen}>
-            <Alert className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-blue-300 dark:border-blue-800">
-              <CheckCircle2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              <AlertDescription className="text-sm text-blue-900 dark:text-blue-100">
-                <div className="space-y-3">
-                  <CollapsibleTrigger className="w-full" data-testid="button-toggle-instructions">
-                    <div className="flex items-center justify-between cursor-pointer hover:opacity-80">
-                      <div className="text-left">
-                        <p className="font-bold text-base mb-1">🎙️ Ready to Transcribe Your Conversation</p>
-                        <p className="text-xs text-blue-800 dark:text-blue-200">
-                          Rev Winner will capture and transcribe ALL audio from your sales call
-                        </p>
-                      </div>
+          <Alert className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 border-blue-300 dark:border-blue-800">
+            <CheckCircle2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <AlertDescription className="text-sm text-blue-900 dark:text-blue-100">
+              <div className="space-y-3">
+                <div className="text-left">
+                  <p className="font-bold text-base mb-1">🎙️ Ready to Transcribe Your Conversation</p>
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    Rev Winner will capture and transcribe ALL audio from your sales call
+                  </p>
+                </div>
+
+                <Collapsible open={isInstructionsOpen} onOpenChange={setIsInstructionsOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-between px-2 py-1 h-auto text-blue-900 dark:text-blue-100 hover:bg-blue-100 dark:hover:bg-blue-900/50"
+                    >
+                      <span className="text-xs font-semibold">
+                        {isInstructionsOpen ? 'Hide Instructions' : 'Show Instructions'}
+                      </span>
                       {isInstructionsOpen ? (
-                        <ChevronUp className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2" />
+                        <ChevronUp className="h-4 w-4" />
                       ) : (
-                        <ChevronDown className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 ml-2" />
+                        <ChevronDown className="h-4 w-4" />
                       )}
-                    </div>
+                    </Button>
                   </CollapsibleTrigger>
-                  
-                  <CollapsibleContent className="space-y-3">
-                    <div className="border-t border-blue-200 dark:border-blue-800 pt-3 space-y-2">
+
+                  <CollapsibleContent className="space-y-2 mt-2">
+                    <div className="space-y-2">
                       <p className="font-semibold text-sm">What you'll hear transcribed:</p>
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="flex items-center gap-2">
@@ -637,10 +614,10 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
                       </p>
                     </div>
                   </CollapsibleContent>
-                </div>
-              </AlertDescription>
-            </Alert>
-          </Collapsible>
+                </Collapsible>
+              </div>
+            </AlertDescription>
+          </Alert>
         )}
 
         {isTranscribing && captureMeetingAudio && (
@@ -649,7 +626,7 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
             <AlertDescription className="text-sm text-green-900 dark:text-green-100">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-bold">🔴 LIVE - Transcribing All Audio</p>
+                  <p className="font-bold">Live - Transcribing All Audio</p>
                   <p className="text-xs text-green-800 dark:text-green-200 mt-1">
                     Capturing both sides of your conversation in real-time
                   </p>
@@ -739,12 +716,12 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
               </p>
               {!isTranscribing && (
                 <div className="text-xs text-muted-foreground/70 max-w-md space-y-2">
-                  <p>⚡ Auto-detect ON: Automatically identifies different speakers</p>
-                  <p>🌍 Supports all languages with high accuracy</p>
+                  <p>Auto-detect is on: Automatically identifies different speakers</p>
+                  <p>Supports all languages with high accuracy</p>
                   {isDesktopBrowser() ? (
-                    <p>📞 Capturing meeting audio from microphone and tab</p>
+                    <p>Capturing meeting audio from microphone and tab</p>
                   ) : (
-                    <p>🎤 Mobile mode: Microphone audio only</p>
+                    <p>Mobile mode: Microphone audio only</p>
                   )}
                 </div>
               )}
@@ -877,8 +854,6 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
           )}
         </div>
       </CardContent>
-      </CollapsibleContent>
-      </Collapsible>
       
       {/* Pricing Modal for upgrade */}
       <PricingModal

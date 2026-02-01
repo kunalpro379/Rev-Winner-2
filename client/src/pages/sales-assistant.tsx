@@ -26,7 +26,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useSEO } from "@/hooks/use-seo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Globe, X, Check, Edit2 } from "lucide-react";
+import { Globe, X, Check, Edit2, AlertCircle, MessageCircle } from "lucide-react";
 
 export default function SalesAssistant() {
   const [, setLocation] = useLocation();
@@ -771,9 +771,9 @@ export default function SalesAssistant() {
         </div>
 
         {/* Top Row: Live Transcript and Shift Gears Side by Side */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:items-start mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch mb-6">
             {/* Left Column: Live Transcript */}
-            <div className="space-y-4">
+            <div className="space-y-4 h-full">
               <EnhancedLiveTranscript 
                 onSendMessage={handleSendMessage}
                 onAnalyze={handleAnalyze}
@@ -790,7 +790,7 @@ export default function SalesAssistant() {
             </div>
 
             {/* Right Column: Shift Gears and Mind Map */}
-            <div className="space-y-4">
+            <div className="space-y-4 h-full">
               {/* Shift Gears - Real-time AI tips */}
               {sessionId && (
                 <ShiftGears
@@ -804,35 +804,70 @@ export default function SalesAssistant() {
             </div>
           </div>
 
-          {/* Conversation Analysis - Full Width Section */}
-          <div className="w-full mb-6" id="conversation-area">
-            <ConversationArea
-              onRegenerate={handleRegenerateAnalysis}
-              isRegenerating={isAnalyzing}
-              hasAnalysis={!!analysisResults}
-            >
-              {/* Sales Assistant Q&A - Always Visible */}
+          {/* Conversation Analysis (70%) + Sales Q&A (30%) Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 mb-6" id="conversation-area">
+            {/* Left: Conversation Analysis - 70% */}
+            <div className="lg:col-span-7">
+              <ConversationArea
+                onRegenerate={handleRegenerateAnalysis}
+                isRegenerating={isAnalyzing}
+                hasAnalysis={!!analysisResults}
+              >
+                <div className="min-h-[400px]">
+                  {/* Analysis Results Panel */}
+                  <div className="rounded-lg border border-border/50 bg-muted/10 p-4">
+                    {analysisResults ? (
+                      <AnalysisResults
+                        results={analysisResults}
+                        onClose={() => setAnalysisResults(null)}
+                        sessionId={sessionId || ""}
+                        conversationContext={analyzedTranscript}
+                        domainExpertise={domainExpertise}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center h-[350px] text-center">
+                        <div className="p-4 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20 rounded-full mb-4">
+                          <AlertCircle className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                        </div>
+                        <p className="text-base font-semibold text-foreground mb-2">No Analysis Yet</p>
+                        <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
+                          Select transcript segments or use the Analyze button to get AI-powered insights
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </ConversationArea>
+            </div>
+
+            {/* Right: Sales Q&A - 30% */}
+            <div className="lg:col-span-3">
               {sessionId && (
-                <SalesAssistantQA
-                  sessionId={sessionId}
-                  conversationContext={currentTranscript || analyzedTranscript}
-                  domainExpertise={domainExpertise}
-                  domainExpertiseId={domainExpertiseId}
-                  resetVersion={resetVersion}
-                />
+                <Card className="card-shadow-lg border-border/50 h-full min-h-[400px] flex flex-col">
+                  <CardHeader className="border-b border-border/50 pb-3 bg-gradient-to-r from-blue-500/10 via-indigo-500/5 to-transparent">
+                    <CardTitle className="text-base flex items-center gap-2 font-semibold">
+                      <MessageCircle className="h-5 w-5 text-blue-600" />
+                      Sales Q&A
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Ask questions about your conversation
+                    </p>
+                  </CardHeader>
+                  <CardContent className="flex-1 p-0">
+                    <div className="h-full">
+                      <SalesAssistantQA
+                        variant="embedded"
+                        sessionId={sessionId}
+                        conversationContext={currentTranscript || analyzedTranscript}
+                        domainExpertise={domainExpertise}
+                        domainExpertiseId={domainExpertiseId}
+                        resetVersion={resetVersion}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
               )}
-              
-              {/* Analysis Results - Shown on demand */}
-              {analysisResults && (
-                <AnalysisResults
-                  results={analysisResults}
-                  onClose={() => setAnalysisResults(null)}
-                  sessionId={sessionId || ""}
-                  conversationContext={analyzedTranscript}
-                  domainExpertise={domainExpertise}
-                />
-              )}
-            </ConversationArea>
+            </div>
           </div>
 
           {/* Present to Win - Added margin-top for spacing */}
@@ -890,7 +925,7 @@ export default function SalesAssistant() {
           )}
       </main>
       
-      {/* Floating Assistant - AI-powered sales coaching */}
+      {/* Floating AI Assistant - Bottom Right Corner */}
       {sessionId && <FloatingAssistant conversationId={sessionId} />}
     </div>
   );

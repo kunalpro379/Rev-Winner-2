@@ -743,9 +743,11 @@ export class AuthStorage implements IAuthStorage {
       ...data,
       planType: data.planType || 'free_trial',
       sessionsUsed: data.sessionsUsed || '0',
-      sessionsLimit: data.sessionsLimit || '3',
+      // For paid subscriptions, DO NOT set default limits (leave them null for unlimited)
+      sessionsLimit: data.sessionsLimit !== undefined ? data.sessionsLimit : (data.status === 'active' ? undefined : '3'),
       minutesUsed: data.minutesUsed || '0',
-      minutesLimit: data.minutesLimit || '180',
+      // For paid subscriptions, DO NOT set default limits (leave them null for unlimited)
+      minutesLimit: data.minutesLimit !== undefined ? data.minutesLimit : (data.status === 'active' ? undefined : '180'),
       sessionHistory: data.sessionHistory || []
     }).returning();
     return subscription;

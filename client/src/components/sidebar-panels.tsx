@@ -10,7 +10,7 @@ import { getProductReference, getPartnerServiceRecommendations, getRelationshipO
 import { apiRequest } from "@/lib/queryClient";
 import { PartnerServiceRecommendation, ProductReference } from "@shared/schema";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronUp, Download, Calendar, Clock, Users, Building2, Target, MessageSquare, CheckCircle2, TrendingUp, ListTodo, CalendarClock, FileText as FileTextIcon, StickyNote, Copy, RefreshCw, Edit, Save, Upload, AlertCircle } from "lucide-react";
+import { ChevronDown, ChevronUp, Download, Calendar, Clock, Users, Building2, Target, MessageSquare, CheckCircle2, TrendingUp, ListTodo, CalendarClock, FileText as FileTextIcon, StickyNote, Copy, RefreshCw, Edit, Save, Upload, AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import pdfBannerUrl from '@assets/IMG_20251213_202308_1765637622298.jpg';
@@ -920,7 +920,7 @@ ${meetingMinutes.notes || ''}
             </CardHeader>
             <CollapsibleContent>
               <CardContent>
-          <div className="space-y-3">
+          <div className="space-y-3 pt-2">
             {/* Search Input */}
             <div className="relative">
               <Input
@@ -936,8 +936,12 @@ ${meetingMinutes.notes || ''}
             {/* Module List */}
             <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-hide">
               {filteredModules.length === 0 ? (
-                <div className="text-center py-4">
-                  <p className="text-xs text-muted-foreground">No products found matching "{searchTerm}"</p>
+                <div className="flex flex-col items-center justify-center py-12 px-4 bg-gradient-to-br from-purple-50/50 to-indigo-50/50 dark:from-purple-950/20 dark:to-indigo-950/20 rounded-lg border border-dashed border-purple-200 dark:border-purple-800">
+                  <svg className="w-12 h-12 text-purple-400 dark:text-purple-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  <p className="text-sm font-medium text-center text-foreground mb-1">No products found</p>
+                  <p className="text-xs text-center text-muted-foreground">No matches for "{searchTerm}"</p>
                 </div>
               ) : (
                 filteredModules.map((module: ProductReference) => (
@@ -980,7 +984,7 @@ ${meetingMinutes.notes || ''}
         </Card>
 
         {/* Product/Service Recommendation */}
-        <Card className="card-shadow-lg border-border/50">
+        <Card className="card-shadow-lg border-border/50 mt-6">
           <Collapsible open={isRecommendationOpen} onOpenChange={setIsRecommendationOpen}>
             <CardHeader className="bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent border-b border-border/50 pb-4">
               <CollapsibleTrigger className="w-full flex items-center justify-between text-left" data-testid="toggle-recommendation">
@@ -999,15 +1003,20 @@ ${meetingMinutes.notes || ''}
               <p className="text-xs text-muted-foreground mt-1">Smart, consultant-driven recommendations tailored to your needs</p>
             </CardHeader>
             <CollapsibleContent>
-              <CardContent>
+              <CardContent className="p-6">
             <div className="space-y-3">
               {isLoadingServices ? (
-                <div className="text-center py-4">
-                  <p className="text-xs text-muted-foreground">Analyzing conversation to identify best-fit solutions...</p>
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-500 mb-3" />
+                  <p className="text-sm text-muted-foreground">Analyzing conversation...</p>
                 </div>
               ) : recommendations.length === 0 ? (
-                <div className="text-center py-4">
-                  <p className="text-xs text-muted-foreground">Continue the discovery conversation to receive tailored product and service recommendations</p>
+                <div className="flex flex-col items-center justify-center py-12 px-4 bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-950/20 dark:to-teal-950/20 rounded-lg border border-dashed border-emerald-200 dark:border-emerald-800 min-h-[200px]">
+                  <svg className="w-12 h-12 text-emerald-400 dark:text-emerald-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-sm font-medium text-center text-foreground mb-1">No Recommendations Yet</p>
+                  <p className="text-xs text-center text-muted-foreground max-w-xs">Continue the discovery conversation to receive tailored product and service recommendations</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-hide">
@@ -1142,12 +1151,17 @@ ${meetingMinutes.notes || ''}
             <CardContent>
           <div className="space-y-3">
             {isLoadingOneLiners ? (
-              <div className="text-center py-4">
-                <p className="text-xs text-muted-foreground">Generating suggestions...</p>
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-pink-500 mb-3" />
+                <p className="text-sm text-muted-foreground">Generating suggestions...</p>
               </div>
             ) : oneLiners.length === 0 ? (
-              <div className="text-center py-4">
-                <p className="text-xs text-muted-foreground">Continue the conversation to receive personalized relationship-building suggestions</p>
+              <div className="flex flex-col items-center justify-center py-12 px-4 bg-gradient-to-br from-pink-50/50 to-rose-50/50 dark:from-pink-950/20 dark:to-rose-950/20 rounded-lg border border-dashed border-pink-200 dark:border-pink-800">
+                <svg className="w-12 h-12 text-pink-400 dark:text-pink-600 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                <p className="text-sm font-medium text-center text-foreground mb-1">No Suggestions Yet</p>
+                <p className="text-xs text-center text-muted-foreground max-w-xs">Continue the conversation to receive personalized relationship-building suggestions</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1361,12 +1375,10 @@ ${meetingMinutes.notes || ''}
             <CollapsibleContent>
               <CardContent>
                 {isLoadingMinutes ? (
-                  <div className="flex flex-col items-center justify-center space-y-4 py-8">
-                    <svg className="animate-spin h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <p className="text-sm text-muted-foreground">Generating meeting minutes...</p>
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Loader2 className="h-10 w-10 animate-spin text-indigo-500 mb-3" />
+                    <p className="text-sm font-medium text-muted-foreground">Generating meeting minutes...</p>
+                    <p className="text-xs text-muted-foreground mt-1">This may take a moment</p>
                   </div>
                 ) : meetingMinutes && editedMinutes ? (
                   <MeetingMinutesContent 
@@ -1376,21 +1388,27 @@ ${meetingMinutes.notes || ''}
                     setEditedMinutes={setEditedMinutes}
                   />
                 ) : (
-                  <div className="space-y-3">
-                    <p className="text-xs text-muted-foreground">
-                      Click the button below to generate professional meeting minutes including BANT analysis, key challenges, summary, and next steps.
-                    </p>
-                    <Button
-                      onClick={handleGenerateMinutes}
-                      disabled={isLoadingMinutes}
-                      className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
-                      data-testid="button-generate-minutes"
-                    >
-                      <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  <div className="flex flex-col items-center justify-center py-12 px-4">
+                    <div className="bg-gradient-to-br from-indigo-50/80 to-purple-50/80 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-xl p-8 text-center border border-indigo-200/50 dark:border-indigo-800/50">
+                      <svg className="w-14 h-14 text-indigo-500 dark:text-indigo-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
-                      Generate Meeting Minutes
-                    </Button>
+                      <p className="text-sm font-medium text-foreground mb-2">Ready to Generate Minutes</p>
+                      <p className="text-xs text-muted-foreground mb-6 max-w-sm">
+                        Click below to create professional meeting minutes including BANT analysis, key challenges, summary, and next steps.
+                      </p>
+                      <Button
+                        onClick={handleGenerateMinutes}
+                        disabled={isLoadingMinutes}
+                        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 shadow-lg"
+                        data-testid="button-generate-minutes"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Generate Meeting Minutes
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardContent>

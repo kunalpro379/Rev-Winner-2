@@ -76,7 +76,6 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(0);
   const [lastPitchUpdateTime, setLastPitchUpdateTime] = useState<number>(0);
   const [isPitchesOpen, setIsPitchesOpen] = useState(false);
-  const [isOpen, setIsOpen] = useState(true);
   const [isAutoPaused, setIsAutoPaused] = useState(false);
   const [isPitchesAutoPaused, setIsPitchesAutoPaused] = useState(false);
   const [hasReceivedFirstTip, setHasReceivedFirstTip] = useState(false);
@@ -100,7 +99,6 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
       setLastPitchTranscript("");
       setLastUpdateTime(0);
       setLastPitchUpdateTime(0);
-      setIsOpen(true);
       setIsPitchesOpen(false);
       setIsAutoPaused(false);
       setIsPitchesAutoPaused(false);
@@ -204,6 +202,17 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
       setLastPitchUpdateTime(Date.now());
     }
   });
+
+  const formatPitchText = (text: string) => {
+    if (!text) return { formatted: "", hasSections: false };
+    const cleaned = text
+      .replace(/\[(SOLUTION|VALUE|TECHNICAL|CASE STUDY|COMPETITOR|WHY BETTER)\]\s*/gi, "\n$1: ")
+      .replace(/\s+\n/g, "\n")
+      .trim();
+
+    const hasSections = /SOLUTION:|VALUE:|TECHNICAL:|CASE STUDY:|COMPETITOR:|WHY BETTER:/i.test(cleaned);
+    return { formatted: cleaned, hasSections };
+  };
 
   // Auto-update logic for tips: trigger when transcript changes significantly
   // OPTIMIZED: Near real-time updates (3s throttle + 1s debounce = ~4s response time)
@@ -378,7 +387,7 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
 
   if (!transcriptText.trim()) {
     return (
-      <Card className="shadow-lg border-2 border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-indigo-950/30 dark:to-purple-950/20">
+      <Card className="shadow-lg border-2 border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-indigo-950/30 dark:to-purple-950/20 h-full flex flex-col">
         <CardHeader className="pb-4 border-b border-indigo-200/50 dark:border-indigo-800/50">
           <CardTitle className="text-xl flex items-center gap-2.5 font-bold text-indigo-900 dark:text-indigo-100">
             <div className="p-2 bg-indigo-600 dark:bg-indigo-500 rounded-lg shadow-md">
@@ -390,48 +399,44 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
             Real-time tips to close deals faster
           </p>
         </CardHeader>
-        <CardContent className="pt-6">
-          <p className="text-center text-muted-foreground text-sm py-6">
-            Start your conversation to get smart, actionable tips
-          </p>
+        <CardContent className="pt-6 flex-1">
+          <div className="flex items-center justify-center h-full min-h-[200px]">
+            <p className="text-center text-muted-foreground text-sm">
+              Start your conversation to get smart, actionable tips
+            </p>
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="shadow-lg border-2 border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-indigo-950/30 dark:to-purple-950/20">
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CardHeader className="pb-4 border-b border-indigo-200/50 dark:border-indigo-800/50">
-          <div className="flex items-center justify-between gap-3">
-            <CollapsibleTrigger className="flex-1 flex items-start gap-3 text-left group" data-testid="toggle-shift-gears">
-              <div className="p-2 bg-indigo-600 dark:bg-indigo-500 rounded-lg shadow-md group-hover:scale-105 transition-transform">
-                <Zap className="h-5 w-5 text-white" />
+    <Card className="shadow-lg border-2 border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-indigo-950/30 dark:to-purple-950/20 h-full flex flex-col min-h-[500px]">
+      <CardHeader className="pb-4 border-b border-indigo-200/50 dark:border-indigo-800/50">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex-1 flex items-start gap-3 text-left">
+            <div className="p-2 bg-indigo-600 dark:bg-indigo-500 rounded-lg shadow-md">
+              <Zap className="h-5 w-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <CardTitle className="text-xl font-bold text-indigo-900 dark:text-indigo-100">
+                  Shift Gears
+                </CardTitle>
+                {isAutoPaused && tips.length > 0 && (
+                  <Badge className="bg-yellow-500 text-white text-xs animate-pulse">PAUSED</Badge>
+                )}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <CardTitle className="text-xl font-bold text-indigo-900 dark:text-indigo-100">
-                    Shift Gears
-                  </CardTitle>
-                  {isAutoPaused && tips.length > 0 && (
-                    <Badge className="bg-yellow-500 text-white text-xs animate-pulse">PAUSED</Badge>
-                  )}
-                </div>
-                <p className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">
-                  {fetchTipsMutation.isPending 
-                    ? "Analyzing conversation..." 
-                    : isAutoPaused && tips.length > 0
-                      ? "Click Play to detect next conversation shift"
-                      : "Smart tips to move the deal forward"}
-                </p>
-              </div>
-              {isOpen ? (
-                <ChevronUp className="h-5 w-5 text-indigo-600 dark:text-indigo-400 mt-2 flex-shrink-0" />
-              ) : (
-                <ChevronDown className="h-5 w-5 text-indigo-600 dark:text-indigo-400 mt-2 flex-shrink-0" />
-              )}
-            </CollapsibleTrigger>
-            <div className="flex items-center gap-2">
+              <p className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">
+                {fetchTipsMutation.isPending 
+                  ? "Analyzing conversation..." 
+                  : isAutoPaused && tips.length > 0
+                    ? "Click Play to detect next conversation shift"
+                    : "Smart tips to move the deal forward"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -457,15 +462,16 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
               >
                 <RefreshCw className={`h-4 w-4 ${fetchTipsMutation.isPending ? 'animate-spin' : ''}`} />
               </Button>
-            </div>
           </div>
-        </CardHeader>
-        <CollapsibleContent>
-          <CardContent className="pt-6">
+        </div>
+      </CardHeader>
+      <CardContent className="pt-6 flex-1">
         {tips.length === 0 && !fetchTipsMutation.isPending ? (
-          <p className="text-center text-muted-foreground text-sm py-8">
-            Continue the conversation to get smart tips
-          </p>
+          <div className="flex items-center justify-center h-full min-h-[200px]">
+            <p className="text-center text-muted-foreground text-sm">
+              Continue the conversation to get smart tips
+            </p>
+          </div>
         ) : (
           <div className="space-y-3">
             {tips.map((tip, index) => {
@@ -615,9 +621,17 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
 
                                 {/* Pitch Response */}
                                 <div className="bg-white/50 dark:bg-black/20 p-3 rounded-md">
-                                  <p className="text-sm leading-relaxed" data-testid={`pitch-response-${index}`}>
-                                    {pitch.pitch}
-                                  </p>
+                                  {(() => {
+                                    const { formatted, hasSections } = formatPitchText(pitch.pitch);
+                                    return (
+                                      <p
+                                        className={`text-sm leading-relaxed ${hasSections ? "whitespace-pre-line" : ""}`}
+                                        data-testid={`pitch-response-${index}`}
+                                      >
+                                        {formatted || pitch.pitch}
+                                      </p>
+                                    );
+                                  })()}
                                 </div>
 
                                 {/* Key Points */}
@@ -646,9 +660,7 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
             </Collapsible>
           </div>
         )}
-        </CardContent>
-        </CollapsibleContent>
-      </Collapsible>
+      </CardContent>
     </Card>
   );
 }

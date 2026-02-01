@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 
 interface FloatingAssistantProps {
   conversationId?: string;
+  variant?: "floating" | "embedded";
 }
 
 type AdviceType = "proverbs" | "humor" | "coaching";
@@ -27,7 +28,7 @@ interface AssistantPreferences {
   visible: boolean;
 }
 
-export function FloatingAssistant({ conversationId }: FloatingAssistantProps) {
+export function FloatingAssistant({ conversationId, variant = "floating" }: FloatingAssistantProps) {
   const [activeAdvice, setActiveAdvice] = useState<{
     type: AdviceType;
     content: string;
@@ -111,22 +112,117 @@ export function FloatingAssistant({ conversationId }: FloatingAssistantProps) {
 
   const enabledIcons = icons.filter(icon => preferences.enabled[icon.type]);
 
+  // Embedded variant - inline chat interface
+  if (variant === "embedded") {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex-1 overflow-y-auto space-y-3 p-4">
+          {enabledIcons.map(({ type, Icon, label, description, color }) => (
+            <div key={type} className="space-y-2">
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-2 h-auto py-3"
+                onClick={() => handleAdviceClick(type)}
+                disabled={adviceMutation.isPending}
+              >
+                <Icon className={`h-5 w-5 ${color}`} />
+                <div className="text-left flex-1">
+                  <div className="font-medium">{label}</div>
+                  <div className="text-xs text-muted-foreground">{description}</div>
+                </div>
+              </Button>
+              
+              {adviceMutation.isPending && openPopover === type ? (
+                <div className="flex items-center justify-center py-4 bg-muted/50 rounded-md">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : activeAdvice && activeAdvice.type === type ? (
+                <div className="p-3 bg-muted/50 rounded-md space-y-2">
+                  <p className="text-sm leading-relaxed whitespace-pre-line">
+                    {activeAdvice.content}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleAdviceClick(type)}
+                    className="w-full"
+                  >
+                    Get New Advice
+                  </Button>
+                </div>
+              ) : adviceMutation.isError ? (
+                <div className="p-3 bg-destructive/10 rounded-md space-y-2">
+                  <p className="text-sm text-destructive">
+                    Failed to generate advice. Please try again.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleAdviceClick(type)}
+                    className="w-full"
+                  >
+                    Retry
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+        
+        {/* Settings footer */}
+        <div className="border-t p-3 bg-muted/30">
+          <Popover open={showSettings} onOpenChange={setShowSettings}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-full justify-start gap-2" size="sm">
+                <Settings className="h-4 w-4" />
+                Configure Assistant
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent side="top" className="w-72 p-4">
+              <div className="space-y-4">
+                <h3 className="font-semibold text-sm">Sales Assistant Settings</h3>
+                <div className="space-y-3">
+                  {icons.map(({ type, Icon, label, color }) => (
+                    <div key={type} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Icon className={`h-4 w-4 ${color}`} />
+                        <Label htmlFor={`toggle-${type}`} className="text-sm cursor-pointer">
+                          {label}
+                        </Label>
+                      </div>
+                      <Switch
+                        id={`toggle-${type}`}
+                        checked={preferences.enabled[type]}
+                        onCheckedChange={() => toggleIcon(type)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+    );
+  }
+
+  // Floating variant - original bottom-right UI
   return (
-    <div className="fixed bottom-6 right-6 flex flex-col gap-2 z-50">
+    <div className="fixed bottom-8 right-8 flex flex-col gap-3 z-50">
       {/* Toggle visibility button */}
       <div className="relative ml-auto">
         <Button
           size="icon"
           variant="outline"
-          className="h-10 w-10 rounded-full shadow-lg bg-white dark:bg-gray-900"
+          className="h-12 w-12 rounded-full shadow-xl bg-white dark:bg-gray-900 border-2 border-indigo-200 dark:border-indigo-800 hover:border-indigo-400 dark:hover:border-indigo-600 transition-all hover:scale-105"
           onClick={toggleVisibility}
           data-testid="toggle-assistant-visibility"
           title={preferences.visible ? "Hide assistant" : "Show assistant"}
         >
-          <ChevronUp className={`h-4 w-4 transition-transform ${preferences.visible ? '' : 'rotate-180'}`} />
+          <ChevronUp className={`h-5 w-5 text-indigo-600 dark:text-indigo-400 transition-transform duration-300 ${preferences.visible ? '' : 'rotate-180'}`} />
         </Button>
-        <span className="absolute -top-1 -right-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
-          New
+        <span className="absolute -top-1 -right-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md">
+          AI
         </span>
       </div>
 
@@ -138,14 +234,14 @@ export function FloatingAssistant({ conversationId }: FloatingAssistantProps) {
               <Button
                 size="icon"
                 variant="outline"
-                className="h-10 w-10 rounded-full shadow-lg bg-white dark:bg-gray-900 ml-auto"
+                className="h-12 w-12 rounded-full shadow-xl bg-white dark:bg-gray-900 ml-auto border-2 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 transition-all hover:scale-105"
                 data-testid="assistant-settings"
                 title="Configure assistant"
               >
-                <Settings className="h-4 w-4" />
+                <Settings className="h-5 w-5 text-gray-600 dark:text-gray-400" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent side="left" className="w-72 p-4">
+            <PopoverContent side="left" className="w-72 p-4 shadow-xl">
               <div className="space-y-4">
                 <h3 className="font-semibold text-sm">Sales Assistant Settings</h3>
                 <div className="space-y-3">
@@ -186,17 +282,17 @@ export function FloatingAssistant({ conversationId }: FloatingAssistantProps) {
             <Button
               size="icon"
               variant="outline"
-              className={`h-14 w-14 rounded-full shadow-lg border-2 ${hoverColor} transition-all hover:scale-110 bg-white dark:bg-gray-900`}
+              className={`h-16 w-16 rounded-full shadow-xl border-2 ${hoverColor} transition-all hover:scale-110 bg-white dark:bg-gray-900 hover:shadow-2xl`}
               onClick={() => handleAdviceClick(type)}
               data-testid={`floating-assistant-${type}`}
               title={description}
             >
-              <Icon className={`h-6 w-6 ${color}`} />
+              <Icon className={`h-7 w-7 ${color}`} />
             </Button>
           </PopoverTrigger>
           <PopoverContent
             side="left"
-            className="w-80 p-4"
+            className="w-80 p-4 shadow-xl"
             data-testid={`popover-${type}`}
           >
             <div className="space-y-2">

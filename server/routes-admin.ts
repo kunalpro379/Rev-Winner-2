@@ -3468,4 +3468,68 @@ const refreshToken = generateRefreshToken({
       res.status(500).json({ message: "Failed to activate terms version" });
     }
   });
+
+  // ========================================
+  // FIX SUBSCRIPTION LIMITS (Admin Data Migration)
+  // ========================================
+  app.post("/api/admin/fix-subscription-limits", authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      console.log('[Admin] Starting subscription limits fix...');
+      
+      // Find all paid subscriptions that have trial limits set
+      const subscriptions = await db.query.subscriptions.findMany();
+      
+      let fixedCount = 0;
+      const updates: any[] = [];
+      
+      for (const sub of subscriptions) {
+        // Check if this is a paid subscription with trial limits
+        if (sub.status === 'active' && sub.planType === 'monthly') {
+          // Paid subscriptions should have null limits (unlimited)
+          if (sub.sessionsLimit !== null || sub.minutesLimit !== null) {
+            console.log(`[Admin Fix] Found paid subscription with trial limits: ${sub.id}, user: ${sub.userId}`);
+            console.log(`  Current limits - sessions: ${sub.sessionsLimit}, minutes: ${sub.minutesLimit}`);
+            
+            // Update to null limits (unlimited)
+            await authStorage.updateSubscription(sub.id, {
+              sessionsLimit: null,
+              minutesLimit: null,
+            });
+            
+            fixedCount++;
+            updates.push({
+              subscriptionId: sub.id,
+              userId: sub.userId,
+              oldLimits: { sessions: sub.sessionsLimit, minutes: sub.minutesLimit },
+              newLimits: { sessions: null, minutes: null },
+            });
+            
+            console.log(`[Admin Fix] Updated subscription ${sub.id} to unlimited access`);
+          }
+        }
+      }
+      
+      // Log audit
+      await eventLogger.log({
+        actorId: req.jwtUser?.userId,
+        action: 'subscription.fix_limits',
+        targetType: 'subscription',
+        targetId: 'bulk',
+        metadata: { fixedCount, updates },
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      });
+      
+      console.log(`[Admin Fix] Subscription fix completed: ${fixedCount} subscriptions updated`);
+      
+      res.json({
+        message: `Successfully fixed ${fixedCount} subscription limits`,
+        fixedCount,
+        updates,
+      });
+    } catch (error) {
+      console.error("Fix subscription limits error:", error);
+      res.status(500).json({ message: "Failed to fix subscription limits" });
+    }
+  });
 }

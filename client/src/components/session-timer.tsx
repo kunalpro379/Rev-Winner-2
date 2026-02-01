@@ -16,16 +16,18 @@ interface SessionTimerProps {
 
 export function SessionTimer({ currentSessionTime, totalUsage, isRunning }: SessionTimerProps) {
   const formatTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+    const safeSeconds = Number.isFinite(seconds) ? seconds : 0;
+    const hrs = Math.floor(safeSeconds / 3600);
+    const mins = Math.floor((safeSeconds % 3600) / 60);
+    const secs = safeSeconds % 60;
     return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   const formatDuration = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+    const safeSeconds = Number.isFinite(seconds) ? seconds : 0;
+    const hrs = Math.floor(safeSeconds / 3600);
+    const mins = Math.floor((safeSeconds % 3600) / 60);
+    const secs = safeSeconds % 60;
     
     if (hrs > 0) {
       return `${hrs}h ${mins}m`;
@@ -66,7 +68,7 @@ export function SessionTimer({ currentSessionTime, totalUsage, isRunning }: Sess
                   {formatDuration(totalUsage.totalSeconds)}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {totalUsage.totalSessions} session{totalUsage.totalSessions !== 1 ? "s" : ""}
+                  {(Number.isFinite(totalUsage.totalSessions) ? totalUsage.totalSessions : 0)} session{(Number.isFinite(totalUsage.totalSessions) ? totalUsage.totalSessions : 0) !== 1 ? "s" : ""}
                 </p>
               </div>
             </div>
