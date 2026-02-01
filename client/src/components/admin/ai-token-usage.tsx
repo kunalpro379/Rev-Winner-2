@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -7,8 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Loader2, RefreshCw, Cpu, TrendingUp, Zap, Hash } from "lucide-react";
 import { format, subDays, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
+import { apiRequest } from "@/lib/queryClient";
 
 interface ProviderUsage {
   provider: string;
@@ -30,6 +34,14 @@ interface TokenUsageSummary {
   };
 }
 
+interface DailyUsage {
+  day: string;
+  total_tokens: string;
+  prompt_tokens: string;
+  completion_tokens: string;
+  request_count: string;
+}
+
 const providerColors: Record<string, string> = {
   deepseek: "bg-blue-500",
   gemini: "bg-yellow-500",
@@ -37,6 +49,7 @@ const providerColors: Record<string, string> = {
   chatgpt: "bg-green-500",
   grok: "bg-purple-500",
   "kimi-k2": "bg-pink-500",
+  kimi: "bg-pink-500",
   openai: "bg-emerald-500",
 };
 
@@ -47,6 +60,7 @@ const providerLabels: Record<string, string> = {
   chatgpt: "ChatGPT",
   grok: "Grok",
   "kimi-k2": "Kimi K2",
+  kimi: "Kimi",
   openai: "OpenAI",
 };
 
@@ -55,15 +69,19 @@ export function AITokenUsage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [selectedProvider, setSelectedProvider] = useState("all");
+  const [detailProvider, setDetailProvider] = useState<ProviderUsage | null>(null);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
+  const [detailProviderFilter, setDetailProviderFilter] = useState("all");
 
-  const getDateParams = () => {
-    const now = new Date();
+  // Memoize date calculations to prevent constant refetches
+  const { start, end } = useMemo(() => {
     let start: Date | undefined;
     let end: Date | undefined;
 
     switch (dateRange) {
       case "today":
-        start = new Date(now.setHours(0, 0, 0, 0));
+        const today = new Date();
+        start = new Date(today.setHours(0, 0, 0, 0));
         end = new Date();
         break;
       case "last-7":
@@ -92,9 +110,7 @@ export function AITokenUsage() {
     }
 
     return { start, end };
-  };
-
-  const { start, end } = getDateParams();
+  }, [dateRange, startDate, endDate]);
 
   const buildQueryString = () => {
     const params = new URLSearchParams();
@@ -144,6 +160,29 @@ export function AITokenUsage() {
     },
     retry: false, // Don't retry on failure
     refetchOnWindowFocus: false, // Don't refetch when window gains focus
+    staleTime: 5 * 60 * 1000, // Data is fresh for 5 minutes
+    gcTime: 10 * 60 * 1000, // Cache for 10 minutes
+    refetchInterval: false, // Disable automatic refetching
+  });
+
+  const { data: dailyData, isLoading: dailyLoading } = useQuery<{ daily: DailyUsage[] }>({
+    queryKey: [
+      "/api/admin/ai-token-usage/daily",
+      { startDate: start?.toISOString(), endDate: end?.toISOString(), provider: detailProviderFilter }
+    ],
+    enabled: showDetailDialog,
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (start) params.append('startDate', start.toISOString());
+      if (end) params.append('endDate', end.toISOString());
+      if (detailProviderFilter && detailProviderFilter !== "all") params.append('provider', detailProviderFilter);
+      const queryString = params.toString();
+      const response = await apiRequest("GET", `/api/admin/ai-token-usage/daily${queryString ? `?${queryString}` : ""}`);
+      return response.json();
+    },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   const formatNumber = (value: string | number | undefined) => {
@@ -159,6 +198,12 @@ export function AITokenUsage() {
         {label}
       </Badge>
     );
+  };
+
+  const openProviderDetails = (provider: ProviderUsage) => {
+    setDetailProvider(provider);
+    setDetailProviderFilter(provider.provider || "all");
+    setShowDetailDialog(true);
   };
 
   return (
@@ -342,6 +387,7 @@ export function AITokenUsage() {
                   <TableHead className="text-right">Prompt Tokens</TableHead>
                   <TableHead className="text-right">Completion Tokens</TableHead>
                   <TableHead className="text-right">Requests</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -362,6 +408,16 @@ export function AITokenUsage() {
                       <TableCell className="text-right">
                         {formatNumber(provider.request_count)}
                       </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openProviderDetails(provider)}
+                          data-testid={`btn-view-provider-${provider.provider}`}
+                        >
+                          View
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
               </TableBody>
@@ -369,6 +425,112 @@ export function AITokenUsage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
+        <DialogContent className="max-w-3xl" data-testid="dialog-provider-details">
+          <DialogHeader>
+            <DialogTitle>Provider Usage Details</DialogTitle>
+            <DialogDescription>
+              {detailProvider ? `${providerLabels[detailProvider.provider] || detailProvider.provider} usage by day` : "Daily usage breakdown"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="detail-provider">Provider</Label>
+                <Select value={detailProviderFilter} onValueChange={setDetailProviderFilter}>
+                  <SelectTrigger className="w-[200px]" id="detail-provider" data-testid="select-detail-provider">
+                    <SelectValue placeholder="All Providers" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Providers</SelectItem>
+                    <SelectItem value="deepseek">DeepSeek</SelectItem>
+                    <SelectItem value="gemini">Gemini</SelectItem>
+                    <SelectItem value="claude">Claude</SelectItem>
+                    <SelectItem value="chatgpt">ChatGPT</SelectItem>
+                    <SelectItem value="grok">Grok</SelectItem>
+                    <SelectItem value="kimi-k2">Kimi K2</SelectItem>
+                    <SelectItem value="kimi">Kimi</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="rounded-lg border p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm text-muted-foreground">Daily Tokens</div>
+                {detailProviderFilter !== "all" && getProviderBadge(detailProviderFilter)}
+              </div>
+              {dailyLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : !dailyData?.daily?.length ? (
+                <div className="text-center text-sm text-muted-foreground py-8">
+                  No daily data available for this range.
+                </div>
+              ) : (
+                <ChartContainer
+                  config={{
+                    total: { label: "Total Tokens", color: "hsl(var(--chart-1))" },
+                  }}
+                  className="h-[280px] w-full"
+                >
+                  <LineChart data={dailyData.daily}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="day"
+                      tickFormatter={(value) => format(new Date(value), "MMM d")}
+                    />
+                    <YAxis tickFormatter={(value) => Number(value).toLocaleString()} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Line
+                      type="monotone"
+                      dataKey="total_tokens"
+                      stroke="var(--color-total)"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ChartContainer>
+              )}
+            </div>
+
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Total Tokens</TableHead>
+                    <TableHead className="text-right">Prompt Tokens</TableHead>
+                    <TableHead className="text-right">Completion Tokens</TableHead>
+                    <TableHead className="text-right">Requests</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(dailyData?.daily || []).map((row) => (
+                    <TableRow key={row.day}>
+                      <TableCell>{format(new Date(row.day), "MMM d, yyyy")}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatNumber(row.total_tokens)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatNumber(row.prompt_tokens)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatNumber(row.completion_tokens)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatNumber(row.request_count)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

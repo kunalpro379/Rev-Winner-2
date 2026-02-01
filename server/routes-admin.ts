@@ -1630,8 +1630,8 @@ const refreshToken = generateRefreshToken({
       // Get transaction details
       let transaction: any;
       let razorpayPaymentId;
-      let refundAmountInPaise;
-      let originalAmountInPaise;
+      let refundAmountInPaise: number | undefined;
+      let originalAmountInPaise: number | undefined;
       
       if (transactionType === 'payment' || transactionType === 'subscription_payment') {
         transaction = await authStorage.getPaymentById(transactionId);
@@ -1721,16 +1721,23 @@ const refreshToken = generateRefreshToken({
         }
       }
       
+      if (typeof refundAmountInPaise !== "number" || typeof originalAmountInPaise !== "number") {
+        return res.status(400).json({ message: "Refund amount or original amount is missing" });
+      }
+
+      const refundAmount = refundAmountInPaise;
+      const originalAmount = originalAmountInPaise;
+
       // Validate refund amount
-      if (refundAmountInPaise <= 0) {
+      if (refundAmount <= 0) {
         return res.status(400).json({ message: "Refund amount must be greater than zero" });
       }
       
-      if (refundAmountInPaise > originalAmountInPaise) {
+      if (refundAmount > originalAmount) {
         return res.status(400).json({ 
           message: "Refund amount cannot exceed the original transaction amount",
-          refundAmount: refundAmountInPaise,
-          originalAmount: originalAmountInPaise,
+          refundAmount,
+          originalAmount,
         });
       }
       
@@ -1746,13 +1753,13 @@ const refreshToken = generateRefreshToken({
         key_secret: keySecret,
       });
       
-      const refundAmountInSmallestUnit = Math.round(refundAmountInPaise); // Amount is already in paise/cents
+      const refundAmountInSmallestUnit = Math.round(refundAmount); // Amount is already in paise/cents
       
       console.log(`[Refund] Calling Razorpay API with:`);
       console.log(`  - Payment ID: ${razorpayPaymentId}`);
       console.log(`  - Currency: ${transaction.currency}`);
       console.log(`  - Amount: ${refundAmountInSmallestUnit} (smallest unit)`);
-      console.log(`  - Amount (display): ${transaction.currency === 'INR' ? '₹' : '$'}${(refundAmountInPaise / 100).toFixed(2)}`);
+      console.log(`  - Amount (display): ${transaction.currency === 'INR' ? '₹' : '$'}${(refundAmount / 100).toFixed(2)}`);
       console.log(`  - Using credentials: ${keyId?.substring(0, 10)}...`);
       
       let refundResponse;
@@ -1793,7 +1800,7 @@ const refreshToken = generateRefreshToken({
       // Update transaction in database
       const refundData = {
         refundedAt: new Date(),
-        refundAmount: refundAmountInPaise.toString(),
+        refundAmount: refundAmount.toString(),
         refundReason: reason,
         razorpayRefundId: refundResponse.id,
         gatewayRefundId: refundResponse.id, // For addon purchases
@@ -1817,8 +1824,8 @@ const refreshToken = generateRefreshToken({
         targetType: transactionType,
         targetId: transactionId,
         metadata: {
-          refundAmount: refundAmountInPaise.toString(),
-          refundAmountInDollars: (refundAmountInPaise).toFixed(2),
+          refundAmount: refundAmount.toString(),
+          refundAmountInDollars: refundAmount.toFixed(2),
           reason,
           razorpayRefundId: refundResponse.id,
         },
@@ -3138,10 +3145,24 @@ const refreshToken = generateRefreshToken({
     }
   });
 
-  // Get AI token usage summary by provider
+  // Simple in-memory cache for AI token usage summary
+  const aiTokenCache = new Map<string, { data: any; timestamp: number }>();
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  // Get AI token usage summary by provider (optimized with caching)
   app.get("/api/admin/ai-token-usage/summary", authenticateToken, requireAdmin, async (req: Request, res: Response) => {
     try {
       const { startDate, endDate, provider } = req.query;
+      
+      // Create cache key
+      const cacheKey = `${startDate || 'null'}_${endDate || 'null'}_${provider || 'all'}`;
+      
+      // Check cache
+      const cached = aiTokenCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+        console.log('[AI Token Usage] Returning cached data');
+        return res.json(cached.data);
+      }
       
       let whereClause = sql`1=1`;
       if (startDate) {
@@ -3154,54 +3175,108 @@ const refreshToken = generateRefreshToken({
         whereClause = sql`${whereClause} AND provider = ${provider as string}`;
       }
       
-      const summary = await db.execute(sql`
+      // Combine both queries into a single optimized query with CTE
+      const result = await db.execute(sql`
+        WITH provider_summary AS (
+          SELECT 
+            provider,
+            COALESCE(SUM(total_tokens), 0) as total_tokens,
+            COALESCE(SUM(prompt_tokens), 0) as prompt_tokens,
+            COALESCE(SUM(completion_tokens), 0) as completion_tokens,
+            COUNT(*) as request_count,
+            MIN(created_at) as first_usage,
+            MAX(created_at) as last_usage
+          FROM ai_token_usage
+          WHERE ${whereClause}
+          GROUP BY provider
+        )
         SELECT 
-          provider,
-          COALESCE(SUM(total_tokens), 0)::text as total_tokens,
-          COALESCE(SUM(prompt_tokens), 0)::text as prompt_tokens,
-          COALESCE(SUM(completion_tokens), 0)::text as completion_tokens,
-          COUNT(*)::text as request_count,
-          MIN(created_at) as first_usage,
-          MAX(created_at) as last_usage
-        FROM ai_token_usage
-        WHERE ${whereClause}
-        GROUP BY provider
-        ORDER BY total_tokens DESC
+          json_build_object(
+            'byProvider', COALESCE(json_agg(
+              json_build_object(
+                'provider', provider,
+                'total_tokens', total_tokens::text,
+                'prompt_tokens', prompt_tokens::text,
+                'completion_tokens', completion_tokens::text,
+                'request_count', request_count::text,
+                'first_usage', first_usage,
+                'last_usage', last_usage
+              ) ORDER BY total_tokens DESC
+            ), '[]'::json),
+            'totals', json_build_object(
+              'total_tokens', COALESCE(SUM(total_tokens), 0)::text,
+              'prompt_tokens', COALESCE(SUM(prompt_tokens), 0)::text,
+              'completion_tokens', COALESCE(SUM(completion_tokens), 0)::text,
+              'request_count', COALESCE(SUM(request_count), 0)::text
+            )
+          ) as result
+        FROM provider_summary
       `);
       
-      const total = await db.execute(sql`
-        SELECT 
-          COALESCE(SUM(total_tokens), 0)::text as total_tokens,
-          COALESCE(SUM(prompt_tokens), 0)::text as prompt_tokens,
-          COALESCE(SUM(completion_tokens), 0)::text as completion_tokens,
-          COUNT(*)::text as request_count
-        FROM ai_token_usage
-        WHERE ${whereClause}
-      `);
-      
-      // Ensure we always return proper data structure even with no records
-      const totalsRow = total.rows[0];
-      const totalsData = totalsRow ? {
-        total_tokens: totalsRow.total_tokens || "0",
-        prompt_tokens: totalsRow.prompt_tokens || "0",
-        completion_tokens: totalsRow.completion_tokens || "0",
-        request_count: totalsRow.request_count || "0"
-      } : {
-        total_tokens: "0",
-        prompt_tokens: "0",
-        completion_tokens: "0",
-        request_count: "0"
+      const responseData = result.rows[0]?.result || {
+        byProvider: [],
+        totals: {
+          total_tokens: "0",
+          prompt_tokens: "0",
+          completion_tokens: "0",
+          request_count: "0"
+        }
       };
 
-      res.json({
-        byProvider: summary.rows || [],
-        totals: totalsData
-      });
+      // Cache the result
+      aiTokenCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
+      
+      // Clear old cache entries (simple cleanup)
+      if (aiTokenCache.size > 100) {
+        const entries = Array.from(aiTokenCache.entries());
+        entries.slice(0, 50).forEach(([key]) => aiTokenCache.delete(key));
+      }
+
+      res.json(responseData);
     } catch (error: any) {
       console.error("Get AI token usage summary error:", error);
       res.status(500).json({ 
         success: false,
         message: error.message || "Failed to fetch AI token usage summary" 
+      });
+    }
+  });
+
+  // Get AI token usage daily breakdown (for charts)
+  app.get("/api/admin/ai-token-usage/daily", authenticateToken, requireAdmin, async (req: Request, res: Response) => {
+    try {
+      const { startDate, endDate, provider } = req.query;
+
+      let whereClause = sql`1=1`;
+      if (startDate) {
+        whereClause = sql`${whereClause} AND COALESCE(occurred_at, created_at) >= ${new Date(startDate as string)}`;
+      }
+      if (endDate) {
+        whereClause = sql`${whereClause} AND COALESCE(occurred_at, created_at) <= ${new Date(endDate as string)}`;
+      }
+      if (provider && provider !== 'all') {
+        whereClause = sql`${whereClause} AND provider = ${provider as string}`;
+      }
+
+      const result = await db.execute(sql`
+        SELECT
+          date_trunc('day', COALESCE(occurred_at, created_at)) as day,
+          COALESCE(SUM(total_tokens), 0) as total_tokens,
+          COALESCE(SUM(prompt_tokens), 0) as prompt_tokens,
+          COALESCE(SUM(completion_tokens), 0) as completion_tokens,
+          COUNT(*) as request_count
+        FROM ai_token_usage
+        WHERE ${whereClause}
+        GROUP BY day
+        ORDER BY day ASC
+      `);
+
+      res.json({ daily: result.rows });
+    } catch (error: any) {
+      console.error("Get AI token usage daily error:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to fetch AI token usage daily"
       });
     }
   });

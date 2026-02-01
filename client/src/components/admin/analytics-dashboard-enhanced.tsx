@@ -260,9 +260,7 @@ export function AnalyticsDashboardEnhanced() {
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const a = document.create
-
-Element("a");
+    const a = document.createElement("a");
     a.href = url;
     a.download = `analytics-export-${new Date().toISOString().split('T')[0]}.json`;
     document.body.appendChild(a);

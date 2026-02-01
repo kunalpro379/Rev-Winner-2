@@ -24,6 +24,7 @@ import { registerBibleRoutes } from "./routes-bible";
 import apiDocsRouter from "./routes-api-docs";
 import recordingsRouter from "./routes-recordings";
 import apiKeysRouter from "./routes-api-keys";
+import { setupPublicApiRoutes } from "./routes-public-api";
 import { authenticateToken } from "./middleware/auth";
 import { checkEntitlement } from "./middleware/entitlement";
 import { logSuperUserAccess } from "./utils/accessControl";
@@ -64,6 +65,9 @@ async function hasActiveEnterpriseLicense(userId: string): Promise<boolean> {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Public API endpoints (require API key authentication) - MUST be first before catch-all routes
+  setupPublicApiRoutes(app);
+  
   // Health check endpoint for deployment
   app.get("/health", (_req, res) => {
     res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
@@ -3897,6 +3901,7 @@ Crawl-delay: 1`;
   // API Keys management routes
   app.use("/api/api-keys", apiKeysRouter);
   console.log("🔑 API Keys routes registered");
+  
   setupSalesIntelligenceRoutes(app); // Sales Intelligence Agent for real-time suggestions
   registerBibleRoutes(app); // Rev Winner Bible PDF download
   app.use("/api/download", apiDocsRouter); // API Documentation PDF download

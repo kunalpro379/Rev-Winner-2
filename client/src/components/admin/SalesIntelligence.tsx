@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Brain, Download, Plus, CheckCircle, TrendingUp, MessageSquare, Zap, FileText, Database, BarChart3 } from "lucide-react";
+import { Brain, Download, Plus, CheckCircle, TrendingUp, MessageSquare, Zap, FileText, Database, BarChart3, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 
 interface KnowledgeEntry {
@@ -79,78 +79,63 @@ export function SalesIntelligence() {
     notes: ""
   });
 
-  const { data: intentTypes, error: intentTypesError } = useQuery<{ intentTypes: string[] }>({
+  const { data: intentTypes, error: intentTypesError, refetch: refetchIntentTypes } = useQuery<{ intentTypes: string[] }>({
     queryKey: ["/api/sales-intelligence/intent-types"],
     queryFn: async () => {
-      const accessToken = localStorage.getItem("accessToken");
-      const response = await fetch("/api/sales-intelligence/intent-types", {
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-        },
-      });
-      if (!response.ok) throw new Error("Failed to fetch intent types");
+      const response = await apiRequest("GET", "/api/sales-intelligence/intent-types");
       return response.json();
     },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    gcTime: 0,
   });
 
-  const { data: analyticsData, isLoading: analyticsLoading, error: analyticsError } = useQuery<Analytics>({
+  const { data: analyticsData, isLoading: analyticsLoading, error: analyticsError, refetch: refetchAnalytics } = useQuery<Analytics>({
     queryKey: ["/api/sales-intelligence/analytics"],
     queryFn: async () => {
-      const accessToken = localStorage.getItem("accessToken");
-      const response = await fetch("/api/sales-intelligence/analytics", {
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-        },
-      });
-      if (!response.ok) throw new Error("Failed to fetch analytics");
+      const response = await apiRequest("GET", "/api/sales-intelligence/analytics");
       return response.json();
     },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    gcTime: 0,
   });
 
-  const { data: knowledgeData, isLoading: knowledgeLoading, error: knowledgeError } = useQuery<{ knowledge: KnowledgeEntry[], intentTypes: string[] }>({
+  const { data: knowledgeData, isLoading: knowledgeLoading, error: knowledgeError, refetch: refetchKnowledge } = useQuery<{ knowledge: KnowledgeEntry[], intentTypes: string[] }>({
     queryKey: ["/api/sales-intelligence/knowledge", knowledgeFilter],
     queryFn: async () => {
-      const accessToken = localStorage.getItem("accessToken");
       const params = new URLSearchParams();
       if (knowledgeFilter.intentType) params.append("intentType", knowledgeFilter.intentType);
       if (knowledgeFilter.search) params.append("search", knowledgeFilter.search);
       
-      const response = await fetch(`/api/sales-intelligence/knowledge?${params.toString()}`, {
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-        },
-      });
-      if (!response.ok) throw new Error("Failed to fetch knowledge store");
+      const response = await apiRequest("GET", `/api/sales-intelligence/knowledge?${params.toString()}`);
       return response.json();
     },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    gcTime: 0,
   });
 
-  const { data: learningLogsData, isLoading: logsLoading, error: logsError } = useQuery<{ logs: LearningLog[], total: number }>({
+  const { data: learningLogsData, isLoading: logsLoading, error: logsError, refetch: refetchLogs } = useQuery<{ logs: LearningLog[], total: number }>({
     queryKey: ["/api/sales-intelligence/learning-logs"],
     queryFn: async () => {
-      const accessToken = localStorage.getItem("accessToken");
-      const response = await fetch("/api/sales-intelligence/learning-logs", {
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-        },
-      });
-      if (!response.ok) throw new Error("Failed to fetch learning logs");
+      const response = await apiRequest("GET", "/api/sales-intelligence/learning-logs");
       return response.json();
     },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    gcTime: 0,
   });
 
-  const { data: exportsData, error: exportsError } = useQuery<{ exports: any[] }>({
+  const { data: exportsData, error: exportsError, refetch: refetchExports } = useQuery<{ exports: any[] }>({
     queryKey: ["/api/sales-intelligence/exports"],
     queryFn: async () => {
-      const accessToken = localStorage.getItem("accessToken");
-      const response = await fetch("/api/sales-intelligence/exports", {
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-        },
-      });
-      if (!response.ok) throw new Error("Failed to fetch exports");
+      const response = await apiRequest("GET", "/api/sales-intelligence/exports");
       return response.json();
     },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   const addKnowledgeMutation = useMutation({
@@ -225,6 +210,18 @@ export function SalesIntelligence() {
     });
   };
 
+  const handleRefresh = () => {
+    refetchAnalytics();
+    refetchKnowledge();
+    refetchLogs();
+    refetchExports();
+    refetchIntentTypes();
+    toast({
+      title: "Refreshing",
+      description: "Fetching the latest Sales Intelligence data...",
+    });
+  };
+
   const handleExport = () => {
     exportMutation.mutate(exportForm);
   };
@@ -259,6 +256,10 @@ export function SalesIntelligence() {
           <p className="text-muted-foreground">Manage knowledge store, view analytics, and export data for research</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" className="gap-2" onClick={handleRefresh} data-testid="button-refresh-si">
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </Button>
           <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2" data-testid="button-export-data">

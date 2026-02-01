@@ -817,7 +817,14 @@ export function AdminBillingPortal() {
                     {transactionsData.transactions.map((transaction) => (
                       <TableRow key={transaction.id} data-testid={`row-transaction-${transaction.id}`}>
                         <TableCell className="text-sm">
-                          {formatDate(transaction.createdAt)}
+                          <div className="flex flex-col">
+                            <span className="text-xs font-medium whitespace-nowrap">
+                              {formatDate(transaction.createdAt, "MMM d, yyyy")}
+                            </span>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {formatDate(transaction.createdAt, "HH:mm")}
+                            </span>
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="text-sm font-medium text-gray-900 dark:text-gray-100">

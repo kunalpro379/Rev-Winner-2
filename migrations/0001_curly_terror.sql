@@ -1,0 +1,2 @@
+CREATE INDEX "idx_ai_token_usage_created_at" ON "ai_token_usage" USING btree ("created_at");--> statement-breakpoint
+CREATE INDEX "idx_ai_token_usage_provider_created" ON "ai_token_usage" USING btree ("provider","created_at");

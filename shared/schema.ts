@@ -615,7 +615,9 @@ export const aiTokenUsage = pgTable("ai_token_usage", {
   index("idx_ai_token_usage_org").on(table.organizationId),
   index("idx_ai_token_usage_provider").on(table.provider),
   index("idx_ai_token_usage_occurred_at").on(table.occurredAt),
+  index("idx_ai_token_usage_created_at").on(table.createdAt),
   index("idx_ai_token_usage_user_provider_date").on(table.userId, table.provider, table.occurredAt),
+  index("idx_ai_token_usage_provider_created").on(table.provider, table.createdAt), // For admin queries
 ]);
 
 // ========================================

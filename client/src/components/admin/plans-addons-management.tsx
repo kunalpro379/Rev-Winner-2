@@ -73,13 +73,19 @@ export function PlansAddonsManagement() {
   const [deletingAddonId, setDeletingAddonId] = useState<string | null>(null);
 
   // Fetch subscription plans
-  const { data: plansData, isLoading: plansLoading } = useQuery({
+  const { data: plansData, isLoading: plansLoading, refetch: refetchPlans } = useQuery({
     queryKey: ["/api/admin/subscription-plans"],
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   // Fetch add-ons
-  const { data: addonsData, isLoading: addonsLoading } = useQuery({
+  const { data: addonsData, isLoading: addonsLoading, refetch: refetchAddons } = useQuery({
     queryKey: ["/api/admin/addons"],
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   const plans = (plansData as any)?.plans || [];
@@ -132,6 +138,7 @@ export function PlansAddonsManagement() {
     onSuccess: (data) => {
       console.log("Plan mutation successful:", data);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/subscription-plans"] });
+      refetchPlans();
       toast({
         title: editingPlan ? "Plan updated" : "Plan created",
         description: editingPlan
@@ -165,6 +172,7 @@ export function PlansAddonsManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/addons"] });
+      refetchAddons();
       toast({
         title: editingAddon ? "Add-on updated" : "Add-on created",
         description: editingAddon
@@ -191,6 +199,7 @@ export function PlansAddonsManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/subscription-plans"] });
+      refetchPlans();
       toast({
         title: "Plan deleted",
         description: "Subscription plan has been deleted successfully.",
@@ -214,6 +223,7 @@ export function PlansAddonsManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/addons"] });
+      refetchAddons();
       toast({
         title: "Add-on deleted",
         description: "Add-on has been deleted successfully.",

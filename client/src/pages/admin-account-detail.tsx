@@ -80,9 +80,12 @@ export default function AdminAccountDetail() {
   const [newManagerEmail, setNewManagerEmail] = useState("");
   const [changeManagerReason, setChangeManagerReason] = useState("");
   
-  const { data, isLoading, error } = useQuery<OrganizationDetailResponse>({
+  const { data, isLoading, error, refetch } = useQuery<OrganizationDetailResponse>({
     queryKey: ["/api/admin/organizations", orgId],
     enabled: !!orgId,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    gcTime: 0,
   });
   
   const suspendMutation = useMutation({
@@ -97,6 +100,7 @@ export default function AdminAccountDetail() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations", orgId] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations"] });
+      refetch();
       toast({
         title: "Success",
         description: data.message || "Organization status updated successfully",
@@ -128,6 +132,7 @@ export default function AdminAccountDetail() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations", orgId] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations"] });
+      refetch();
       toast({
         title: "Success",
         description: data.message || "Seats added successfully",
@@ -160,6 +165,7 @@ export default function AdminAccountDetail() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations", orgId] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations"] });
+      refetch();
       toast({
         title: "Success",
         description: data.message || "License assigned successfully",
@@ -192,6 +198,7 @@ export default function AdminAccountDetail() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations", orgId] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations"] });
+      refetch();
       toast({
         title: "Success",
         description: data.message || "License revoked successfully",
@@ -224,6 +231,7 @@ export default function AdminAccountDetail() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations", orgId] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations"] });
+      refetch();
       toast({
         title: "Success",
         description: data.message || "License Manager changed successfully",
@@ -281,6 +289,10 @@ export default function AdminAccountDetail() {
   const users = orgData.users || [];
   const addons = orgData.addons || [];
   const billingHistory = orgData.billingHistory || [];
+  const assignedSeats = orgData.assignedSeats ?? 0;
+  const totalSeats = orgData.totalSeats ?? 0;
+  const availableSeats = orgData.availableSeats ?? Math.max(totalSeats - assignedSeats, 0);
+  const seatUsagePercent = totalSeats > 0 ? Math.min(100, Math.round((assignedSeats / totalSeats) * 100)) : 0;
   
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -392,16 +404,24 @@ export default function AdminAccountDetail() {
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-purple-600" />
                 <span className="text-2xl font-bold" data-testid="text-assigned-seats">
-                  {orgData.assignedSeats}
+                  {assignedSeats}
                 </span>
                 <span className="text-slate-400">/</span>
                 <span className="text-xl" data-testid="text-total-seats">
-                  {orgData.totalSeats}
+                  {totalSeats}
                 </span>
               </div>
-              <p className="text-sm text-slate-500 mt-1">
-                {orgData.availableSeats} available
-              </p>
+              <div className="mt-2">
+                <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-purple-600"
+                    style={{ width: `${seatUsagePercent}%` }}
+                  />
+                </div>
+                <p className="text-sm text-slate-500 mt-2">
+                  {availableSeats} available
+                </p>
+              </div>
             </CardContent>
           </Card>
           
@@ -412,17 +432,25 @@ export default function AdminAccountDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2">
-                <Package className="h-5 w-5 text-purple-600" />
-                <span className="text-lg font-semibold" data-testid="text-package-type">
-                  {licensePackage?.packageType || "No Package"}
-                </span>
-              </div>
-              {licensePackage?.endDate && (
-                <p className="text-sm text-slate-500 mt-1 flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  Expires: {format(new Date(licensePackage.endDate), "MMM d, yyyy")}
-                </p>
+              {licensePackage ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Package className="h-5 w-5 text-purple-600" />
+                    <span className="text-lg font-semibold" data-testid="text-package-type">
+                      {licensePackage.packageType}
+                    </span>
+                  </div>
+                  <p className="text-sm text-slate-500 mt-1 flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    Expires: {licensePackage.endDate
+                      ? format(new Date(licensePackage.endDate), "MMM d, yyyy")
+                      : "No expiry"}
+                  </p>
+                </>
+              ) : (
+                <div className="text-sm text-slate-500" data-testid="text-no-package-summary">
+                  No package assigned
+                </div>
               )}
             </CardContent>
           </Card>
@@ -434,17 +462,25 @@ export default function AdminAccountDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2">
-                <RefreshCw className="h-5 w-5 text-purple-600" />
-                <span className="text-lg font-semibold" data-testid="text-auto-renew">
-                  {licensePackage?.autoRenew ? "Enabled" : "Disabled"}
-                </span>
-              </div>
-              {licensePackage?.renewalDate && (
-                <p className="text-sm text-slate-500 mt-1 flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  Next: {format(new Date(licensePackage.renewalDate), "MMM d, yyyy")}
-                </p>
+              {licensePackage ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="h-5 w-5 text-purple-600" />
+                    <span className="text-lg font-semibold" data-testid="text-auto-renew">
+                      {licensePackage.autoRenew ? "Enabled" : "Disabled"}
+                    </span>
+                  </div>
+                  <p className="text-sm text-slate-500 mt-1 flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Next: {licensePackage.renewalDate
+                      ? format(new Date(licensePackage.renewalDate), "MMM d, yyyy")
+                      : "Not scheduled"}
+                  </p>
+                </>
+              ) : (
+                <div className="text-sm text-slate-500" data-testid="text-no-renewal">
+                  Not available
+                </div>
               )}
             </CardContent>
           </Card>
@@ -856,7 +892,11 @@ export default function AdminAccountDetail() {
                             </TableCell>
                             <TableCell data-testid={`billing-status-${item.id}`}>
                               <Badge 
-                                variant={item.status === "succeeded" ? "default" : "secondary"}
+                                variant={
+                                  ["succeeded", "completed", "paid"].includes(item.status)
+                                    ? "default"
+                                    : "secondary"
+                                }
                               >
                                 {item.status}
                               </Badge>

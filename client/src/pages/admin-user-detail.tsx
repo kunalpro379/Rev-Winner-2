@@ -69,27 +69,67 @@ export default function AdminUserDetail() {
   const [refundReason, setRefundReason] = useState("");
   
   // Fetch comprehensive user profile
-  const { data: profileData, isLoading } = useQuery({
+  const { data: profileData, isLoading, refetch: refetchProfile } = useQuery({
     queryKey: ["/api/admin/users", userId, "detailed"],
     enabled: !!userId,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/admin/users/${userId}/detailed`);
+      return res.json();
+    },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    gcTime: 0,
   });
   
   // Fetch session history
-  const { data: sessionData } = useQuery({
+  const { data: sessionData, refetch: refetchSessions } = useQuery({
     queryKey: ["/api/admin/users", userId, "session-history"],
     enabled: !!userId,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/admin/users/${userId}/session-history`);
+      return res.json();
+    },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    gcTime: 0,
   });
   
   // Fetch time extensions
-  const { data: extensionsData } = useQuery({
+  const { data: extensionsData, refetch: refetchExtensions } = useQuery({
     queryKey: ["/api/admin/users", userId, "time-extensions"],
     enabled: !!userId,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/admin/users/${userId}/time-extensions`);
+      return res.json();
+    },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    gcTime: 0,
   });
   
   // Fetch refunds
-  const { data: refundsData } = useQuery({
+  const { data: refundsData, refetch: refetchRefunds } = useQuery({
     queryKey: ["/api/admin/users", userId, "refunds"],
     enabled: !!userId,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/admin/users/${userId}/refunds`);
+      return res.json();
+    },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    gcTime: 0,
+  });
+
+  const { data: basicUserData } = useQuery({
+    queryKey: ["/api/admin/users", userId],
+    enabled: !!userId,
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/admin/users/${userId}`);
+      return res.json();
+    },
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+    gcTime: 0,
   });
   
   // Update user status mutation
@@ -102,6 +142,7 @@ export default function AdminUserDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users", userId, "detailed"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users/detailed"] });
+      refetchProfile();
       toast({
         title: "Success",
         description: "User status updated successfully",
@@ -129,6 +170,8 @@ export default function AdminUserDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users", userId, "time-extensions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users/detailed"] });
+      refetchProfile();
+      refetchExtensions();
       toast({
         title: "Success",
         description: "Time extension granted successfully",
@@ -157,6 +200,8 @@ export default function AdminUserDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users", userId, "refunds"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users/detailed"] });
+      refetchProfile();
+      refetchRefunds();
       toast({
         title: "Success",
         description: "Refund issued successfully",
@@ -198,6 +243,8 @@ export default function AdminUserDetail() {
   const user = (profileData as any)?.user;
   const sessionStats = (profileData as any)?.sessionStats || {};
   const payments = (profileData as any)?.recentPayments || [];
+  const fallbackPayments = (basicUserData as any)?.payments || [];
+  const paymentList = payments.length ? payments : fallbackPayments;
   const activeExtensions = (profileData as any)?.activeExtensions || [];
   const userRefunds = (profileData as any)?.refunds || [];
   const sessions = (sessionData as any)?.sessions || [];
@@ -237,6 +284,13 @@ export default function AdminUserDetail() {
   
   const handleGrantExtension = () => {
     setIsTimeExtensionDialogOpen(true);
+  };
+
+  const handleRefreshData = () => {
+    refetchProfile();
+    refetchSessions();
+    refetchExtensions();
+    refetchRefunds();
   };
   
   const handleIssueRefund = (payment: any) => {
@@ -288,6 +342,10 @@ export default function AdminUserDetail() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={handleRefreshData} data-testid="btn-refresh-user">
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
           <Button variant="outline" onClick={handleUpdateStatus} data-testid="btn-change-status">
             {user.status === "active" ? (
               <>
@@ -511,7 +569,7 @@ export default function AdminUserDetail() {
               <CardDescription>All payment transactions for this user</CardDescription>
             </CardHeader>
             <CardContent>
-              {payments.length === 0 ? (
+              {paymentList.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8" data-testid="no-payments">No payments found</p>
               ) : (
                 <Table>
@@ -525,10 +583,12 @@ export default function AdminUserDetail() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {payments.map((payment: any) => (
+                    {paymentList.map((payment: any) => (
                       <TableRow key={payment.id}>
                         <TableCell>{format(new Date(payment.createdAt), "MMM d, yyyy")}</TableCell>
-                        <TableCell className="font-medium">₹{payment.amount}</TableCell>
+                        <TableCell className="font-medium">
+                          {(payment.currency || "INR") === "INR" ? "₹" : "$"}{payment.amount}
+                        </TableCell>
                         <TableCell>
                           <Badge 
                             variant={payment.status === "succeeded" ? "default" : payment.status === "refunded" ? "secondary" : "destructive"}

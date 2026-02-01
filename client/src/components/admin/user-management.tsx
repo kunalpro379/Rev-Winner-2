@@ -66,6 +66,8 @@ export default function UserManagement() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [planTypeFilter, setPlanTypeFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
 
   // Dialog states
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
@@ -205,7 +207,7 @@ export default function UserManagement() {
       case "active":
         return (
           <Badge
-            className="bg-green-500 dark:bg-green-600"
+            className="bg-emerald-500 dark:bg-emerald-600 hover:bg-emerald-600 dark:hover:bg-emerald-700 text-white border-0 text-[10px] px-2 py-0 h-5 whitespace-nowrap"
             data-testid="badge-status-active"
           >
             Active
@@ -213,19 +215,25 @@ export default function UserManagement() {
         );
       case "suspended":
         return (
-          <Badge variant="destructive" data-testid="badge-status-suspended">
+          <Badge 
+            className="bg-red-500 dark:bg-red-600 hover:bg-red-600 dark:hover:bg-red-700 text-white border-0 text-[10px] px-2 py-0 h-5 whitespace-nowrap"
+            data-testid="badge-status-suspended"
+          >
             Suspended
           </Badge>
         );
       case "pending":
         return (
-          <Badge variant="secondary" data-testid="badge-status-pending">
+          <Badge 
+            className="bg-amber-500 dark:bg-amber-600 hover:bg-amber-600 dark:hover:bg-amber-700 text-white border-0 text-[10px] px-2 py-0 h-5 whitespace-nowrap"
+            data-testid="badge-status-pending"
+          >
             Pending
           </Badge>
         );
       default:
         return (
-          <Badge variant="outline" data-testid="badge-status-default">
+          <Badge variant="outline" className="text-[10px] px-2 py-0 h-5 whitespace-nowrap" data-testid="badge-status-default">
             {status}
           </Badge>
         );
@@ -235,7 +243,11 @@ export default function UserManagement() {
   const getPlanTypeBadge = (planType: string | null) => {
     if (!planType)
       return (
-        <Badge variant="outline" data-testid="badge-plan-none">
+        <Badge 
+          variant="outline" 
+          className="text-[10px] bg-muted/30 px-2 py-0 h-5 whitespace-nowrap"
+          data-testid="badge-plan-none"
+        >
           No Plan
         </Badge>
       );
@@ -243,14 +255,26 @@ export default function UserManagement() {
     switch (planType) {
       case "free_trial":
         return (
-          <Badge variant="secondary" data-testid="badge-plan-trial">
+          <Badge 
+            className="bg-sky-500 dark:bg-sky-600 hover:bg-sky-600 dark:hover:bg-sky-700 text-white border-0 text-[10px] px-2 py-0 h-5 whitespace-nowrap"
+            data-testid="badge-plan-trial"
+          >
             Free Trial
+          </Badge>
+        );
+      case "monthly":
+        return (
+          <Badge
+            className="bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white border-0 text-[10px] px-2 py-0 h-5 whitespace-nowrap"
+            data-testid="badge-plan-monthly"
+          >
+            Monthly
           </Badge>
         );
       case "yearly":
         return (
           <Badge
-            className="bg-blue-500 dark:bg-blue-600"
+            className="bg-violet-500 dark:bg-violet-600 hover:bg-violet-600 dark:hover:bg-violet-700 text-white border-0 text-[10px] px-2 py-0 h-5 whitespace-nowrap"
             data-testid="badge-plan-yearly"
           >
             Yearly
@@ -259,7 +283,7 @@ export default function UserManagement() {
       case "three_year":
         return (
           <Badge
-            className="bg-purple-500 dark:bg-purple-600"
+            className="bg-purple-500 dark:bg-purple-600 hover:bg-purple-600 dark:hover:bg-purple-700 text-white border-0 text-[10px] px-2 py-0 h-5 whitespace-nowrap"
             data-testid="badge-plan-three-year"
           >
             3-Year
@@ -267,7 +291,11 @@ export default function UserManagement() {
         );
       default:
         return (
-          <Badge variant="outline" data-testid="badge-plan-default">
+          <Badge 
+            variant="outline" 
+            className="text-[10px] px-2 py-0 h-5 whitespace-nowrap"
+            data-testid="badge-plan-default"
+          >
             {planType}
           </Badge>
         );
@@ -394,6 +422,13 @@ export default function UserManagement() {
             </div>
           </div>
 
+          {/* Users Count */}
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              {users.length} {users.length === 1 ? 'user' : 'users'} found
+            </div>
+          </div>
+
           {/* Users Table */}
           {isLoading ? (
             <div
@@ -410,111 +445,102 @@ export default function UserManagement() {
               No users found
             </div>
           ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[200px]">User</TableHead>
-                    <TableHead className="w-[220px]">Email</TableHead>
-                    <TableHead className="w-[100px]">Status</TableHead>
-                    <TableHead className="w-[120px]">Plan</TableHead>
-                    <TableHead className="w-[100px]">AI Provider</TableHead>
-                    <TableHead className="w-[120px]">Sessions</TableHead>
-                    <TableHead className="w-[100px]">Minutes</TableHead>
-                    <TableHead className="w-[120px]">Joined</TableHead>
-                    <TableHead className="w-[80px] text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((user: any) => (
-                    <TableRow 
-                      key={user.id} 
-                      data-testid={`row-user-${user.id}`}
-                      className="hover:bg-muted/50 transition-colors"
-                    >
-                      <TableCell className="font-medium">
-                        <div className="flex flex-col gap-1">
-                          <span
-                            className="font-semibold text-sm"
-                            data-testid={`text-user-name-${user.id}`}
-                          >
-                            {user.first_name} {user.last_name}
-                          </span>
-                          <span
-                            className="text-xs text-muted-foreground"
-                            data-testid={`text-username-${user.id}`}
-                          >
-                            @{user.username}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm" data-testid={`text-email-${user.id}`}>
-                          {user.email}
-                        </span>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(user.status)}</TableCell>
-                      <TableCell>{getPlanTypeBadge(user.plan_type)}</TableCell>
-                      <TableCell>
-                        {user.ai_engine ? (
-                          <Badge
-                            variant="outline"
-                            className="text-xs"
-                            data-testid={`badge-ai-${user.id}`}
-                          >
-                            {user.ai_engine}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">
-                            Not set
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell data-testid={`text-sessions-${user.id}`}>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-semibold text-sm">
-                            {user.total_sessions || 0}
-                          </span>
-                          {user.active_sessions > 0 ? (
-                            <Badge 
-                              variant="outline" 
-                              className="text-xs bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800 w-fit"
-                            >
-                              {user.active_sessions} active
-                            </Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              {user.total_sessions > 0 ? 'all ended' : 'no sessions'}
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-card shadow-sm">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur z-10">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="font-semibold">User</TableHead>
+                        <TableHead className="font-semibold">Email</TableHead>
+                        <TableHead className="font-semibold">Status</TableHead>
+                        <TableHead className="font-semibold">Plan</TableHead>
+                        <TableHead className="font-semibold">AI Provider</TableHead>
+                        <TableHead className="font-semibold text-center">Sessions</TableHead>
+                        <TableHead className="font-semibold text-center">Minutes</TableHead>
+                        <TableHead className="font-semibold">Joined</TableHead>
+                        <TableHead className="font-semibold text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((user: any) => (
+                        <TableRow 
+                          key={user.id} 
+                          data-testid={`row-user-${user.id}`}
+                          className="hover:bg-muted/30 transition-all duration-150 border-b last:border-0"
+                        >
+                          <TableCell className="font-medium py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border-2 border-primary/20">
+                                <span className="text-sm font-bold text-primary">
+                                  {user.first_name?.[0]?.toUpperCase() || 'U'}{user.last_name?.[0]?.toUpperCase() || ''}
+                                </span>
+                              </div>
+                              <div className="flex flex-col gap-0.5">
+                                <span
+                                  className="font-semibold text-sm leading-tight"
+                                  data-testid={`text-user-name-${user.id}`}
+                                >
+                                  {user.first_name} {user.last_name}
+                                </span>
+                                <span
+                                  className="text-xs text-muted-foreground leading-tight"
+                                  data-testid={`text-username-${user.id}`}
+                                >
+                                  @{user.username}
+                                </span>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-4">
+                            <span className="text-sm font-mono text-muted-foreground" data-testid={`text-email-${user.id}`}>
+                              {user.email}
                             </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell data-testid={`text-minutes-${user.id}`}>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-semibold text-sm">
-                            {user.total_minutes_remaining || 0}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            remaining
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell data-testid={`text-joined-${user.id}`}>
-                        <span className="text-sm">
-                          {format(new Date(user.created_at), "MMM d, yyyy")}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              data-testid={`btn-actions-${user.id}`}
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
+                          </TableCell>
+                          <TableCell className="py-4">{getStatusBadge(user.status)}</TableCell>
+                          <TableCell className="py-4">{getPlanTypeBadge(user.plan_type)}</TableCell>
+                          <TableCell className="py-4">
+                            {user.ai_engine ? (
+                              <Badge
+                                variant="outline"
+                                className="text-xs"
+                                data-testid={`badge-ai-${user.id}`}
+                              >
+                                {user.ai_engine}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">
+                                Not set
+                              </span>
+                            )}
+                          </TableCell>
+                          <TableCell data-testid={`text-sessions-${user.id}`} className="py-4 text-center">
+                            <span className="font-bold text-base tabular-nums">
+                              {user.total_sessions || 0}
+                            </span>
+                          </TableCell>
+                          <TableCell data-testid={`text-minutes-${user.id}`} className="py-4 text-center">
+                            <span className="font-bold text-base tabular-nums">
+                              {user.total_minutes_remaining || 0}
+                            </span>
+                          </TableCell>
+                          <TableCell data-testid={`text-joined-${user.id}`} className="py-4">
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {format(new Date(user.created_at), "MMM d, yyyy")}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right py-4">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 hover:bg-primary/10"
+                                  data-testid={`btn-actions-${user.id}`}
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem
@@ -550,11 +576,63 @@ export default function UserManagement() {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              {/* Pagination */}
+              {users.length > itemsPerPage && (
+                <div className="flex items-center justify-between px-2">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, users.length)} of {users.length} users
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.ceil(users.length / itemsPerPage) }, (_, i) => i + 1)
+                        .filter(page => {
+                          const totalPages = Math.ceil(users.length / itemsPerPage);
+                          return page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1);
+                        })
+                        .map((page, idx, arr) => (
+                          <div key={page} className="flex items-center gap-1">
+                            {idx > 0 && arr[idx - 1] !== page - 1 && (
+                              <span className="px-2 text-muted-foreground">...</span>
+                            )}
+                            <Button
+                              variant={currentPage === page ? "default" : "outline"}
+                              size="sm"
+                              className="w-8 h-8 p-0"
+                              onClick={() => setCurrentPage(page)}
+                            >
+                              {page}
+                            </Button>
+                          </div>
+                        ))
+                      }
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(Math.ceil(users.length / itemsPerPage), p + 1))}
+                      disabled={currentPage >= Math.ceil(users.length / itemsPerPage)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
