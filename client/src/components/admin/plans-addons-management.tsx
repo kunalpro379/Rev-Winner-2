@@ -20,23 +20,34 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { insertSubscriptionPlanSchema, insertAddonSchema, type SubscriptionPlan, type Addon } from "@shared/schema";
 
-// Subscription Plan form schema
+// Subscription Plan form schema - updated to handle both JSON and array formats
 const planFormSchema = insertSubscriptionPlanSchema.extend({
-  features: z.string().transform((val) => {
-    try {
-      return JSON.parse(val);
-    } catch {
-      return [];
-    }
-  }),
-  requiredAddons: z.string().optional().transform((val) => {
-    if (!val || val.trim() === "") return [];
-    try {
-      return JSON.parse(val);
-    } catch {
-      return [];
-    }
-  }),
+  features: z.union([
+    z.string().transform((val) => {
+      if (!val || val.trim() === "") return [];
+      try {
+        return JSON.parse(val);
+      } catch {
+        return [];
+      }
+    }),
+    z.array(z.object({
+      value: z.string().min(1, "Feature cannot be empty")
+    })).transform((arr) => arr.map(item => item.value))
+  ]),
+  requiredAddons: z.union([
+    z.string().optional().transform((val) => {
+      if (!val || val.trim() === "") return [];
+      try {
+        return JSON.parse(val);
+      } catch {
+        return [];
+      }
+    }),
+    z.array(z.object({
+      value: z.string().min(1, "Add-on ID cannot be empty")
+    })).transform((arr) => arr.map(item => item.value))
+  ]).optional(),
 });
 
 type PlanFormValues = z.infer<typeof planFormSchema>;
@@ -100,13 +111,24 @@ export function PlansAddonsManagement() {
       listedPrice: undefined,
       currency: "INR",
       billingInterval: "monthly",
-      features: "[]",
-      requiredAddons: "[]",
+      features: [],
+      requiredAddons: [],
       isActive: true,
       publishedOnWebsite: false,
       availableUntil: undefined,
       razorpayPlanId: undefined,
     },
+  });
+
+  // Field arrays for dynamic inputs
+  const { fields: featureFields, append: appendFeature, remove: removeFeature } = useFieldArray({
+    control: planForm.control,
+    name: "features" as any,
+  });
+
+  const { fields: addonFields, append: appendAddon, remove: removeAddon } = useFieldArray({
+    control: planForm.control,
+    name: "requiredAddons" as any,
   });
 
   // Addon form
@@ -243,14 +265,25 @@ export function PlansAddonsManagement() {
   // Handle plan edit
   const handleEditPlan = (plan: SubscriptionPlan) => {
     setEditingPlan(plan);
+    
+    // Convert features array to field array format
+    const featuresArray = Array.isArray(plan.features) 
+      ? plan.features.map(feature => ({ value: feature }))
+      : [];
+    
+    // Convert required addons array to field array format  
+    const addonsArray = Array.isArray(plan.requiredAddons)
+      ? plan.requiredAddons.map(addon => ({ value: addon }))
+      : [];
+
     planForm.reset({
       name: plan.name,
       price: plan.price,
       listedPrice: plan.listedPrice || undefined,
       currency: plan.currency,
       billingInterval: plan.billingInterval,
-      features: JSON.stringify(plan.features || []),
-      requiredAddons: JSON.stringify(plan.requiredAddons || []),
+      features: featuresArray as any,
+      requiredAddons: addonsArray as any,
       isActive: plan.isActive ?? true,
       publishedOnWebsite: plan.publishedOnWebsite ?? false,
       availableUntil: plan.availableUntil,
@@ -301,7 +334,19 @@ export function PlansAddonsManagement() {
             setPlanDialogOpen(open);
             if (!open) {
               setEditingPlan(null);
-              planForm.reset();
+              planForm.reset({
+                name: "",
+                price: "",
+                listedPrice: undefined,
+                currency: "INR",
+                billingInterval: "monthly",
+                features: [],
+                requiredAddons: [],
+                isActive: true,
+                publishedOnWebsite: false,
+                availableUntil: undefined,
+                razorpayPlanId: undefined,
+              });
             }
           }}>
             <DialogTrigger asChild>
@@ -418,45 +463,111 @@ export function PlansAddonsManagement() {
                     />
                   </div>
 
-                  <FormField
-                    control={planForm.control}
-                    name="features"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Features (JSON Array)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder='["Feature 1", "Feature 2", "Feature 3"]'
-                            {...field}
-                            data-testid="textarea-plan-features"
-                            className="font-mono text-sm"
-                          />
-                        </FormControl>
-                        <FormDescription>Enter features as a JSON array</FormDescription>
-                        <FormMessage />
-                      </FormItem>
+                  {/* Features Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Features</FormLabel>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => appendFeature({ value: "" })}
+                        data-testid="button-add-feature"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Feature
+                      </Button>
+                    </div>
+                    
+                    {featureFields.length === 0 && (
+                      <div className="text-sm text-muted-foreground p-4 border border-dashed rounded-md text-center">
+                        No features added yet. Click "Add Feature" to get started.
+                      </div>
                     )}
-                  />
+                    
+                    {featureFields.map((field, index) => (
+                      <div key={field.id} className="flex items-center gap-2">
+                        <FormField
+                          control={planForm.control}
+                          name={`features.${index}.value` as any}
+                          render={({ field: inputField }) => (
+                            <FormItem className="flex-1">
+                              <FormControl>
+                                <Input
+                                  placeholder="Enter a feature (e.g., Unlimited sessions)"
+                                  {...inputField}
+                                  data-testid={`input-feature-${index}`}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFeature(index)}
+                          data-testid={`button-remove-feature-${index}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
 
-                  <FormField
-                    control={planForm.control}
-                    name="requiredAddons"
-                    render={({ field}) => (
-                      <FormItem>
-                        <FormLabel>Required Add-ons (JSON Array - Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder='["addon-id-1", "addon-id-2"]'
-                            {...field}
-                            data-testid="textarea-plan-required-addons"
-                            className="font-mono text-sm"
-                          />
-                        </FormControl>
-                        <FormDescription>Enter addon IDs as a JSON array</FormDescription>
-                        <FormMessage />
-                      </FormItem>
+                  {/* Required Add-ons Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Required Add-ons (Optional)</FormLabel>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => appendAddon({ value: "" })}
+                        data-testid="button-add-addon"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Add-on ID
+                      </Button>
+                    </div>
+                    
+                    {addonFields.length === 0 && (
+                      <div className="text-sm text-muted-foreground p-4 border border-dashed rounded-md text-center">
+                        No required add-ons. Click "Add Add-on ID" if this plan requires specific add-ons.
+                      </div>
                     )}
-                  />
+                    
+                    {addonFields.map((field, index) => (
+                      <div key={field.id} className="flex items-center gap-2">
+                        <FormField
+                          control={planForm.control}
+                          name={`requiredAddons.${index}.value` as any}
+                          render={({ field: inputField }) => (
+                            <FormItem className="flex-1">
+                              <FormControl>
+                                <Input
+                                  placeholder="Enter add-on ID (e.g., session-minutes)"
+                                  {...inputField}
+                                  data-testid={`input-addon-${index}`}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeAddon(index)}
+                          data-testid={`button-remove-addon-${index}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
 
                   <FormField
                     control={planForm.control}
@@ -524,7 +635,19 @@ export function PlansAddonsManagement() {
                       onClick={() => {
                         setPlanDialogOpen(false);
                         setEditingPlan(null);
-                        planForm.reset();
+                        planForm.reset({
+                          name: "",
+                          price: "",
+                          listedPrice: undefined,
+                          currency: "INR",
+                          billingInterval: "monthly",
+                          features: [],
+                          requiredAddons: [],
+                          isActive: true,
+                          publishedOnWebsite: false,
+                          availableUntil: undefined,
+                          razorpayPlanId: undefined,
+                        });
                       }}
                       data-testid="button-cancel-plan"
                     >
