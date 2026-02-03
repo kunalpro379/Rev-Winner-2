@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import path from "path";
 import { z } from "zod";
+import { verifyAccessToken } from "./utils/jwt";
 import { storage } from "./storage";
 import { authStorage } from "./storage-auth";
 import { generateSalesResponse, generateCallSummary, generateCoachingSuggestions } from "./services/openai";
@@ -18,6 +19,7 @@ import { setupBillingRoutes } from "./routes-billing";
 import { setupSupportRoutes } from "./routes-support";
 import { setupGameRoutes } from "./routes-game";
 import { registerBackupRoutes } from "./routes-backup";
+
 import { registerMarketingRoutes } from "./routes-marketing";
 import { setupSalesIntelligenceRoutes } from "./routes-sales-intelligence";
 import { registerBibleRoutes } from "./routes-bible";
@@ -99,9 +101,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/conversations", async (req, res) => {
     try {
       const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Try to get authenticated user ID, but allow anonymous conversations
+      let userId = null;
+      try {
+        const token = req.headers.authorization?.replace('Bearer ', '');
+        if (token) {
+          const decoded = verifyAccessToken(token);
+          userId = decoded.userId;
+          console.log(`✅ Authenticated user creating conversation: ${userId}`);
+        }
+      } catch (error) {
+        // Continue with anonymous conversation if token is invalid
+        console.log("Creating anonymous conversation - no valid token provided");
+      }
+      
       const conversationData = {
         sessionId,
-        userId: null,
+        userId: userId,
         clientName: req.body.clientName || null
       };
       
@@ -193,6 +210,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch conversation", error: error.message });
+    }
+  });
+
+  // Get all conversations for a user (for profile page)
+  app.get("/api/conversations", authenticateToken, async (req, res) => {
+    try {
+      if (!req.jwtUser?.id) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      // Get conversations from database
+      const userConversations = await db.select()
+        .from(conversations)
+        .where(eq(conversations.userId, req.jwtUser.id))
+        .orderBy(desc(conversations.createdAt))
+        .limit(50); // Limit to last 50 conversations
+
+      // Transform to session history format
+      const sessionHistory = userConversations.map(conv => ({
+        sessionId: conv.sessionId,
+        startTime: conv.createdAt?.toISOString() || new Date().toISOString(),
+        endTime: conv.endedAt ? conv.endedAt.toISOString() : new Date().toISOString(),
+        durationMinutes: conv.endedAt && conv.createdAt
+          ? Math.round((conv.endedAt.getTime() - conv.createdAt.getTime()) / (1000 * 60))
+          : conv.createdAt
+          ? Math.round((new Date().getTime() - conv.createdAt.getTime()) / (1000 * 60))
+          : 0
+      }));
+
+      res.json({ conversations: userConversations, sessionHistory });
+    } catch (error: any) {
+      console.error("Error fetching user conversations:", error);
+      res.status(500).json({ message: "Failed to get conversations", error: error.message });
     }
   });
 
@@ -2046,6 +2096,33 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
           price: planDetails.price,
         } : 'NULL');
       }
+
+      // Get actual conversation history from database
+      let sessionHistory = [];
+      try {
+        const userConversations = await db.select()
+          .from(conversations)
+          .where(eq(conversations.userId, userId))
+          .orderBy(desc(conversations.createdAt))
+          .limit(50);
+
+        sessionHistory = userConversations.map(conv => ({
+          sessionId: conv.sessionId,
+          startTime: conv.createdAt?.toISOString() || new Date().toISOString(),
+          endTime: conv.endedAt ? conv.endedAt.toISOString() : new Date().toISOString(),
+          durationMinutes: conv.endedAt && conv.createdAt
+            ? Math.round((conv.endedAt.getTime() - conv.createdAt.getTime()) / (1000 * 60))
+            : conv.createdAt
+            ? Math.round((new Date().getTime() - conv.createdAt.getTime()) / (1000 * 60))
+            : 0
+        }));
+
+        console.log(`[DEBUG] Found ${sessionHistory.length} conversations for user ${userId}`);
+      } catch (error) {
+        console.error(`[DEBUG] Error fetching conversations:`, error);
+        // Fall back to subscription session history if database query fails
+        sessionHistory = subscription.sessionHistory || [];
+      }
       
       res.json({
         id: subscription.id,
@@ -2057,7 +2134,7 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
         sessionsLimit: subscription.sessionsLimit,
         minutesUsed: subscription.minutesUsed,
         minutesLimit: subscription.minutesLimit,
-        sessionHistory: subscription.sessionHistory || [],
+        sessionHistory: sessionHistory,
         canceledAt: subscription.canceledAt,
         createdAt: subscription.createdAt,
         plan: planDetails ? {
