@@ -296,7 +296,7 @@ export class TrainMeIntelligence {
         crossDomainBlocked = true;
         matchType = 'domain_strict';
       } else if (allowUniversalFallback) {
-        console.log(`📚 Domain "${targetDomain.name}" has no matching entries - falling back to universal`);
+        console.log(`Domain "${targetDomain.name}" has no matching entries - falling back to universal`);
       }
     }
     
@@ -316,7 +316,7 @@ export class TrainMeIntelligence {
           entries = universalEntries.slice(0, limit);
         }
         matchType = 'universal';
-        console.log(`📚 Train Me: Using universal knowledge base (${entries.length} entries)`);
+        console.log(`Train Me: Using universal knowledge base (${entries.length} entries)`);
       }
     }
     

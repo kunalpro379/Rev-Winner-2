@@ -150,9 +150,9 @@ payment + invoice logs
 
 Success Criteria
 
-✅ Current Rev Winner flow remains unchanged
-✅ Enterprise Admins can self-manage licenses
-✅ Ability to add seats anytime
-✅ Invite / revoke / reassign seats
-✅ Billing + invoices included
-✅ Secure & access-controlled admin panel
+Current Rev Winner flow remains unchanged
+Enterprise Admins can self-manage licenses
+Ability to add seats anytime
+Invite / revoke / reassign seats
+Billing + invoices included
+Secure & access-controlled admin panel

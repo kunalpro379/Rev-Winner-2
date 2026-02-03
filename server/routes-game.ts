@@ -20,7 +20,7 @@ if (GMAIL_APP_PASSWORD) {
       pass: GMAIL_APP_PASSWORD,
     },
   });
-  console.log('📧 Game email transporter configured with:', GMAIL_USER);
+  console.log('Game email transporter configured with:', GMAIL_USER);
 } else {
   console.warn('⚠️ GMAIL_APP_PASSWORD not set - game emails will be logged to console only');
 }
@@ -407,7 +407,7 @@ async function sendLeadEmail(leadData: z.infer<typeof submitLeadSchema>): Promis
 
   try {
     const info = await gameEmailTransporter.sendMail(mailOptions);
-    console.log(`✅ Lead email sent for ${leadData.email} - Message ID: ${info.messageId}`);
+    console.log(`Lead email sent for ${leadData.email} - Message ID: ${info.messageId}`);
   } catch (error) {
     console.error("❌ Error sending lead email:", error);
     throw error;
@@ -460,7 +460,7 @@ async function sendDoorsLeadEmail(leadData: z.infer<typeof doorsLeadSchema>): Pr
 
   try {
     const info = await gameEmailTransporter.sendMail(mailOptions);
-    console.log(`✅ Doors lead email sent for ${leadData.email} - Message ID: ${info.messageId}`);
+    console.log(`Doors lead email sent for ${leadData.email} - Message ID: ${info.messageId}`);
   } catch (error) {
     console.error("❌ Error sending doors lead email:", error);
     throw error;
@@ -528,7 +528,7 @@ async function sendDemoRequestEmail(leadData: z.infer<typeof demoRequestSchema>)
 
   try {
     const info = await gameEmailTransporter.sendMail(mailOptions);
-    console.log(`✅ Demo request email sent for ${leadData.email} - Message ID: ${info.messageId}`);
+    console.log(`Demo request email sent for ${leadData.email} - Message ID: ${info.messageId}`);
   } catch (error) {
     console.error("❌ Error sending demo request email:", error);
     throw error;

@@ -67,7 +67,7 @@ export async function recordTokenUsage(
       },
     });
 
-    console.log(`✅ Recorded ${totalTokens} tokens (${promptTokens} prompt + ${completionTokens} completion) for ${provider} - ${feature}`);
+    console.log(`Recorded ${totalTokens} tokens (${promptTokens} prompt + ${completionTokens} completion) for ${provider} - ${feature}`);
   } catch (error) {
     // Don't fail the request if token tracking fails
     console.error(`❌ Failed to record token usage for ${provider}:`, error);

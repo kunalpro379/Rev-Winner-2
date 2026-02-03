@@ -120,12 +120,12 @@ app.use((req, res, next) => {
       const [result] = await db.select({ total: count() }).from(conversationMinutesBackup);
       
       if (result.total === 0) {
-        console.log('📊 No marketing backup data found - auto-seeding dummy data...');
+        console.log(' No marketing backup data found - auto-seeding dummy data...');
         const { seedMarketingDummyData } = await import('./data/dummy-backups/seed-marketing-data');
         const seedResult = await seedMarketingDummyData();
-        console.log(`✅ Seeded ${seedResult.backupsCreated} backups across ${seedResult.domainsCreated} domains`);
+        console.log(`Seeded ${seedResult.backupsCreated} backups across ${seedResult.domainsCreated} domains`);
       } else {
-        console.log(`📊 Marketing data exists: ${result.total} backups in database`);
+        console.log(` Marketing data exists: ${result.total} backups in database`);
       }
     } catch (error: any) {
       // Check if it's a DNS/connection error
@@ -173,30 +173,30 @@ app.use((req, res, next) => {
           );
           
           if (domainsNeedingRebuild.length > 0) {
-            console.log(`📚 AUTO-REBUILD: Found ${domainsNeedingRebuild.length} domains with unprocessed documents`);
+            console.log(`AUTO-REBUILD: Found ${domainsNeedingRebuild.length} domains with unprocessed documents`);
             
             const { rebuildKnowledgeBase } = await import('./services/knowledgeExtraction');
             const { invalidateTrainingContextCache } = await import('./services/openai');
             
             for (const domain of domainsNeedingRebuild) {
               try {
-                console.log(`🔄 Processing unprocessed documents for domain "${domain.name}" (${domain.unprocessed_doc_count} unprocessed)...`);
+                console.log(`Processing unprocessed documents for domain "${domain.name}" (${domain.unprocessed_doc_count} unprocessed)...`);
                 const result = await rebuildKnowledgeBase(domain.id, domain.user_id, false); // Incremental only
-                console.log(`✅ Knowledge extraction completed for "${domain.name}": ${result.newEntriesAdded} entries created`);
+                console.log(`Knowledge extraction completed for "${domain.name}": ${result.newEntriesAdded} entries created`);
                 invalidateTrainingContextCache(domain.user_id);
               } catch (rebuildError: any) {
                 console.error(`❌ Knowledge extraction failed for "${domain.name}":`, rebuildError.message);
               }
             }
           } else {
-            console.log('📚 All documents processed - no auto-rebuild needed');
+            console.log('All documents processed - no auto-rebuild needed');
           }
         } catch (error: any) {
           console.error('Knowledge auto-rebuild check failed:', error.message);
         }
       });
     } else {
-      console.log('📚 AUTO-REBUILD: Disabled in development mode to save API tokens');
+      console.log('AUTO-REBUILD: Disabled in development mode to save API tokens');
     }
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -224,7 +224,7 @@ app.use((req, res, next) => {
     const buildDir = path.default.resolve(import.meta.dirname, 'public');
     const buildExists = fs.default.existsSync(buildDir);
     
-    console.log(`🔍 Environment check:`);
+    console.log(` Environment check:`);
     console.log(`  NODE_ENV: ${process.env.NODE_ENV}`);
     console.log(`  isDevelopment: ${isDevelopment}`);
     console.log(`  Build directory exists: ${buildExists}`);

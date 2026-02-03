@@ -325,7 +325,7 @@ export async function activateIndividualSubscription(
         }).catch(err => console.error("Email send failed:", err));
       }
 
-      console.log(`✅ Subscription activated successfully: ${subscription.id}`);
+      console.log(`Subscription activated successfully: ${subscription.id}`);
 
       return {
         success: true,
@@ -444,7 +444,7 @@ export async function activateEnterpriseLicense(
         }).catch(err => console.error("Email send failed:", err));
       }
 
-      console.log(`✅ Enterprise license activated successfully: ${licensePackage.id}`);
+      console.log(`Enterprise license activated successfully: ${licensePackage.id}`);
 
       return {
         success: true,
@@ -659,7 +659,7 @@ async function sendSubscriptionActivationEmail(
 
   try {
     await sendEmail({ to: email, subject, html });
-    console.log(`✅ Subscription activation email sent to ${email}`);
+    console.log(`Subscription activation email sent to ${email}`);
   } catch (error) {
     console.error(`❌ Failed to send activation email to ${email}:`, error);
   }
@@ -686,7 +686,7 @@ async function sendEnterpriseLicenseActivationEmail(
 
   try {
     await sendEmail({ to: email, subject, html });
-    console.log(`✅ Enterprise license activation email sent to ${email}`);
+    console.log(`Enterprise license activation email sent to ${email}`);
   } catch (error) {
     console.error(`❌ Failed to send enterprise activation email to ${email}:`, error);
   }
@@ -712,7 +712,7 @@ async function sendLicenseAssignmentEmail(
 
   try {
     await sendEmail({ to: email, subject, html });
-    console.log(`✅ License assignment email sent to ${email}`);
+    console.log(`License assignment email sent to ${email}`);
   } catch (error) {
     console.error(`❌ Failed to send license assignment email to ${email}:`, error);
   }

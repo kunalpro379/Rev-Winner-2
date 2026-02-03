@@ -17,7 +17,7 @@ But the answer you shared talks about:
 
 So the response is factually wrong, misleading, and risky for enterprise credibility.
 
-✅ What Integris actually offers (accurate)
+What Integris actually offers (accurate)
 
 Integris = Managed IT & Cybersecurity Services
 
@@ -45,7 +45,7 @@ Sales workflow automation tools
 
 Proprietary analytics software
 
-✅ Corrected, accurate response (sales-ready)
+Corrected, accurate response (sales-ready)
 
 Here’s how the answer should look if the domain expertise is Integris:
 
@@ -79,10 +79,10 @@ This happens when:
 
 Your Replit fix prompt is 100% justified.
 
-✅ Final verdict
+Final verdict
 
 Accuracy: ❌ Incorrect
 
 Risk: ❌ High (enterprise trust loss)
 
-Fix needed: ✅ Mandatory (domain-aware gating)
+Fix needed: Mandatory (domain-aware gating)

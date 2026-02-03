@@ -1158,6 +1158,8 @@ export function setupBillingRoutes(app: Router) {
         return res.json({
           hasActiveMinutes: true,
           totalMinutesRemaining: Infinity,
+          totalMinutes: Infinity,
+          usedMinutes: 0,
           nextExpiryDate: null,
           superUserAccess: true,
         });
@@ -1166,9 +1168,20 @@ export function setupBillingRoutes(app: Router) {
       // Get session minutes balance from database
       const balance = await billingStorage.getSessionMinutesBalance(userId);
       
+      // Also get subscription data to get actual usage
+      const subscription = await authStorage.getSubscriptionByUserId(userId);
+      const actualUsedMinutes = subscription?.minutesUsed ? parseInt(subscription.minutesUsed) : 0;
+      
+      // Use the actual used minutes from subscription if available, otherwise use balance
+      const usedMinutes = actualUsedMinutes > 0 ? actualUsedMinutes : balance.usedMinutes;
+      const totalMinutes = balance.totalMinutes;
+      const remainingMinutes = Math.max(0, totalMinutes - usedMinutes);
+      
       res.json({
-        hasActiveMinutes: balance.remainingMinutes > 0,
-        totalMinutesRemaining: balance.remainingMinutes,
+        hasActiveMinutes: remainingMinutes > 0,
+        totalMinutesRemaining: remainingMinutes,
+        totalMinutes: totalMinutes,
+        usedMinutes: usedMinutes,
         nextExpiryDate: balance.expiresAt ? balance.expiresAt.toISOString() : null,
         superUserAccess: false,
       });
@@ -3416,7 +3429,7 @@ export function setupBillingRoutes(app: Router) {
         const amount = parseFloat(order.order_amount);
         const currency = order.order_currency;
 
-        console.log(`💰 Payment success: ${paymentId} for order ${orderId}, amount: ${amount} ${currency}`);
+        console.log(` Payment success: ${paymentId} for order ${orderId}, amount: ${amount} ${currency}`);
 
         // Find pending order by gateway order ID
         const pendingOrder = await billingStorage.getPendingOrder(orderId);
@@ -3441,7 +3454,7 @@ export function setupBillingRoutes(app: Router) {
           const result = await activateCartCheckout(pendingOrder, paymentId, req);
           
           if (result.success) {
-            console.log(`✅ Cart checkout activated: ${result.activatedAddons.length} items`);
+            console.log(`Cart checkout activated: ${result.activatedAddons.length} items`);
             return res.json({ status: "success", message: "Cart checkout processed", itemCount: result.activatedAddons.length });
           } else {
             console.error(`❌ Failed to activate cart checkout: ${result.message}`);
@@ -3474,7 +3487,7 @@ export function setupBillingRoutes(app: Router) {
           );
 
           if (result.success) {
-            console.log(`✅ Enterprise license activated: ${result.licensePackageId}`);
+            console.log(`Enterprise license activated: ${result.licensePackageId}`);
           } else {
             console.error(`❌ Failed to activate enterprise license: ${result.message}`);
           }
@@ -3495,7 +3508,7 @@ export function setupBillingRoutes(app: Router) {
           );
 
           if (result.success) {
-            console.log(`✅ Individual subscription activated: ${result.subscriptionId}`);
+            console.log(`Individual subscription activated: ${result.subscriptionId}`);
           } else {
             console.error(`❌ Failed to activate subscription: ${result.message}`);
           }
@@ -3546,7 +3559,7 @@ export function setupBillingRoutes(app: Router) {
         ...envInfo,
         message: envInfo.isProduction 
           ? "⚠️ PRODUCTION MODE - Real refunds will be processed" 
-          : "✅ TEST MODE - Test refunds will be processed"
+          : "TEST MODE - Test refunds will be processed"
       });
     } catch (error: any) {
       console.error("Get refund environment error:", error);

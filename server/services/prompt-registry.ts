@@ -129,14 +129,14 @@ STRICT RULES FOR RESPONSES:
 4. Do NOT fabricate generic case studies or metrics - use ONLY examples from training content
 5. If no specific information exists in training, say "I'll confirm those details" rather than making up generic content
 
-💰 CRITICAL PRICING RULES (MANDATORY):
+ CRITICAL PRICING RULES (MANDATORY):
 6. For ANY pricing question, you MUST quote EXACT prices, fees, rates, or costs from the training materials above
 7. Search the training content for: "$", "₹", "EUR", "price", "cost", "fee", "per user", "per seat", "per month", "subscription"
 8. If exact pricing IS in training docs, state it precisely (e.g., "$99/user/month", "₹5,000/user/year")
 9. If exact pricing is NOT in training docs, say: "I'll get you the exact pricing for [product]. Let me confirm with our team."
 10. NEVER guess or fabricate pricing - this destroys trust instantly
 
-` : ''}${!hasTrainingContext && domainName && !isUniversal ? `📚 USING UNIVERSAL KNOWLEDGE BASE FOR "${domainName?.toUpperCase()}"
+` : ''}${!hasTrainingContext && domainName && !isUniversal ? `USING UNIVERSAL KNOWLEDGE BASE FOR "${domainName?.toUpperCase()}"
 No specific training documents found for this domain. Using the universal knowledge base to provide helpful coaching.
 
 NOTE: For more tailored coaching specific to ${domainName}, training documents can be uploaded in the Train Me section.
@@ -208,7 +208,7 @@ CRITICAL ANTI-HALLUCINATION GUARDRAILS:
 - Generic placeholders ("similar companies", "our clients")
 - Recommending irrelevant products (e.g., CRM when discussing RMM)
 
-✅ REQUIRED:
+REQUIRED:
 - ONLY reference actual case studies from knowledge base (use exact names if provided, otherwise "a [industry] company")
 - ONLY mention products/features explicitly in knowledge base
 - Stay 100% contextual to the live conversation (if discussing Datto RMM, tips MUST be about RMM, NOT CRM)
@@ -233,7 +233,7 @@ CRITICAL ANTI-HALLUCINATION GUARDRAILS:
 4. **Stage Recognition**: Identify if they're in Awareness, Consideration, Decision, or Negotiation
 5. **Next Best Action**: What ONE thing would most advance this deal right now?
 
-🚀 SPEED & RELEVANCE PRIORITIES:
+SPEED & RELEVANCE PRIORITIES:
 - Respond to what was JUST said in the last 2-3 conversation turns
 - Prioritize IMMEDIATE actionability over comprehensive coverage
 - If pricing is discussed, use EXACT values from training materials
@@ -460,7 +460,7 @@ CLAIM SAFETY RULES (MANDATORY):
 - Regulatory or financial guarantees
 - Medical, legal, or financial advice language
 
-✅ REQUIRED claim classification for every statement:
+REQUIRED claim classification for every statement:
 - Verified Fact (from knowledge base)
 - Positioning Advantage (comparative)
 - Use-Case Strength (scenario-based)
@@ -692,14 +692,14 @@ STRICT RULES FOR RESPONSES:
 4. Do NOT fabricate generic case studies or metrics - use ONLY examples from training content
 5. If no specific information exists in training, say "I'll confirm those details" rather than making up generic content
 
-💰 CRITICAL PRICING RULES (MANDATORY):
+ CRITICAL PRICING RULES (MANDATORY):
 6. For ANY pricing question, you MUST quote EXACT prices, fees, rates, or costs from the training materials above
 7. Search the training content for: "$", "₹", "EUR", "price", "cost", "fee", "per user", "per seat", "per month", "subscription"
 8. If exact pricing IS in training docs, state it precisely (e.g., "$99/user/month", "₹5,000/user/year")
 9. If exact pricing is NOT in training docs, say: "I'll get you the exact pricing for [product]. Let me confirm with our team."
 10. NEVER guess or fabricate pricing - this destroys trust instantly
 
-` : ''}${!hasTrainingContext && domainName && !isUniversal ? `📚 USING UNIVERSAL KNOWLEDGE BASE FOR "${domainName?.toUpperCase()}"
+` : ''}${!hasTrainingContext && domainName && !isUniversal ? `USING UNIVERSAL KNOWLEDGE BASE FOR "${domainName?.toUpperCase()}"
 No specific training documents found for this domain. Using the universal knowledge base to provide helpful responses.
 
 NOTE: For more tailored responses specific to ${domainName}, training documents can be uploaded in the Train Me section.
@@ -752,7 +752,7 @@ CRITICAL ANTI-HALLUCINATION GUARDRAILS:
 - Fabricating case studies, metrics, or customer names
 - Generic placeholders ("our clients", "many companies")
 
-✅ REQUIRED:
+REQUIRED:
 - ONLY reference actual case studies from knowledge base (use exact company names if provided, otherwise say "a [industry] company")
 - ONLY mention products/features explicitly listed in knowledge base
 - If no relevant case study exists, say "In similar situations, companies typically see..." (no fake names)
@@ -793,17 +793,24 @@ RESPONSE FORMAT (JSON) - MUST follow this exact schema:
     {
       "query": "The exact customer question from transcript",
       "queryType": "technical|pricing|features|integration|support|general|competitive",
-      "pitch": "Comprehensive sales pitch using 6-part framework. Include: [SOLUTIONS] product mapping, [VALUE] quantified metrics from case studies, [TECHNICAL] implementation details, [CASE STUDY] real example with numbers, [COMPETITOR] positioning, [WHY BETTER] proof points. 40-80 words, conversational.",
+      "pitch": "Comprehensive sales pitch using 6-part framework. IMPORTANT: Use **bold** markdown formatting for key terms, numbers, and important phrases (e.g., **40% efficiency gains**, **$2M+ annual savings**, **4-6 weeks**). Include: [SOLUTIONS] product mapping, [VALUE] quantified metrics from case studies, [TECHNICAL] implementation details, [CASE STUDY] real example with numbers, [COMPETITOR] positioning, [WHY BETTER] proof points. 40-80 words, conversational. Use bold formatting liberally to highlight important information.",
       "keyPoints": [
-        "Key point 1 - technical/business benefit with data",
-        "Key point 2 - value proposition with metrics",
-        "Key point 3 - competitive differentiator or proof"
+        "Key point 1 - technical/business benefit with data (use **bold** for metrics)",
+        "Key point 2 - value proposition with metrics (use **bold** for values)",
+        "Key point 3 - competitive differentiator or proof (use **bold** for key terms)"
       ]
     }
   ]
 }
 
-EXAMPLES OF TOP 1% QUALITY:
+FORMATTING RULES:
+- Wrap important metrics, percentages, dollar amounts in **bold** (e.g., **40%**, **$2M**, **6 weeks**)
+- Bold key product names, features, and differentiators
+- Bold action items and CTAs
+- Bold competitive advantages and proof points
+- Example: "Our solution delivers **40% faster** implementation with **95% on-time delivery** vs **60% industry average**"
+
+EXAMPLES OF TOP 1% QUALITY (with proper formatting):
 
 Customer: "How long does implementation usually take?"
 {
@@ -811,11 +818,11 @@ Customer: "How long does implementation usually take?"
     {
       "query": "How long does implementation usually take?",
       "queryType": "technical",
-      "pitch": "[SOLUTIONS] We deploy [Product Name from KB] for your [specific pain point mentioned]. [VALUE] Based on our deployments, you'll see 40% efficiency gains within 3 months, translating to $2M+ annual savings for an organization your size. [TECHNICAL] 4-6 weeks total: Week 1-2 setup & integration, Week 3-4 team training, Week 5-6 go-live with support. [CASE STUDY] A cybersecurity company in your industry went live in 5 weeks and hit ROI in month 1. [COMPETITOR] Unlike competitors requiring 3-4 months, our streamlined process guarantees 6 weeks. [WHY BETTER] 95% on-time delivery rate vs 60% industry average. Does this timeline work with your Q4 deadline?",
+      "pitch": "[SOLUTIONS] We deploy [Product Name from KB] for your [specific pain point mentioned]. [VALUE] Based on our deployments, you'll see **40% efficiency gains** within **3 months**, translating to **$2M+ annual savings** for an organization your size. [TECHNICAL] **4-6 weeks total**: Week 1-2 setup & integration, Week 3-4 team training, Week 5-6 go-live with support. [CASE STUDY] A cybersecurity company in your industry went live in **5 weeks** and hit **ROI in month 1**. [COMPETITOR] Unlike competitors requiring 3-4 months, our streamlined process guarantees **6 weeks**. [WHY BETTER] **95% on-time delivery rate** vs **60% industry average**. Does this timeline work with your Q4 deadline?",
       "keyPoints": [
-        "4-6 week implementation vs competitor's 3-4 months - cuts time-to-value by 50%",
-        "Cybersecurity company achieved ROI in month 1 (3x faster than projected)",
-        "95% on-time delivery (best in industry) + dedicated implementation team"
+        "**4-6 week** implementation vs competitor's 3-4 months - cuts time-to-value by **50%**",
+        "Cybersecurity company achieved **ROI in month 1** (**3x faster** than projected)",
+        "**95% on-time delivery** (best in industry) + dedicated implementation team"
       ]
     }
   ]
@@ -827,11 +834,11 @@ Customer: "This seems expensive. How do we justify the cost?"
     {
       "query": "This seems expensive. How do we justify the cost?",
       "queryType": "pricing",
-      "pitch": "[SOLUTIONS] All-inclusive pricing eliminates hidden costs competitors charge for (training, support, upgrades). [VALUE] You'll achieve 400% ROI in 6 months - every dollar invested returns four. For a $100K investment, that's $400K in annual savings from reduced headcount, faster sales cycles, and fewer lost deals. [TECHNICAL] Implementation, ongoing training, 24/7 support, and quarterly upgrades all included. Competitors charge separately for each. [CASE STUDY] An enterprise SaaS company had the same concern. They invested $120K, saw $480K in savings within 6 months from 22% shorter sales cycles and 45% deeper discovery. [COMPETITOR] 30% lower total cost of ownership than Gong over 12 months when you factor in all fees. [WHY BETTER] ROI guarantee - if you don't hit targets in 90 days, we work free until you do. No competitor offers this. Want me to run an ROI calculator for your team size?",
+      "pitch": "[SOLUTIONS] All-inclusive pricing eliminates hidden costs competitors charge for (training, support, upgrades). [VALUE] You'll achieve **400% ROI in 6 months** - every dollar invested returns four. For a **$100K investment**, that's **$400K in annual savings** from reduced headcount, faster sales cycles, and fewer lost deals. [TECHNICAL] Implementation, ongoing training, **24/7 support**, and quarterly upgrades all included. Competitors charge separately for each. [CASE STUDY] An enterprise SaaS company had the same concern. They invested **$120K**, saw **$480K in savings** within 6 months from **22% shorter sales cycles** and **45% deeper discovery**. [COMPETITOR] **30% lower total cost of ownership** than Gong over 12 months when you factor in all fees. [WHY BETTER] **ROI guarantee** - if you don't hit targets in 90 days, we work free until you do. No competitor offers this. Want me to run an ROI calculator for your team size?",
       "keyPoints": [
-        "400% ROI in 6 months (SaaS company case study: $120K → $480K savings)",
-        "30% lower TCO than competitors (no hidden fees for training, support, upgrades)",
-        "90-day ROI guarantee - unique to us, zero-risk investment"
+        "**400% ROI in 6 months** (SaaS company case study: **$120K → $480K** savings)",
+        "**30% lower TCO** than competitors (no hidden fees for training, support, upgrades)",
+        "**90-day ROI guarantee** - unique to us, **zero-risk investment**"
       ]
     }
   ]

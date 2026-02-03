@@ -29,6 +29,8 @@ interface Package {
 interface SessionMinutesStatus {
   hasActiveMinutes: boolean;
   totalMinutesRemaining: number;
+  totalMinutes: number;
+  usedMinutes: number;
   nextExpiryDate: string | null;
   superUserAccess?: boolean;
   activePurchases?: Array<{

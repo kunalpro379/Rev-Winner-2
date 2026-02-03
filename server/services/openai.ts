@@ -227,7 +227,7 @@ async function getTrainingDocumentContext(
       }
     } else {
       allKnowledgeEntries = await storage.getAllUserKnowledgeEntries(userId);
-      console.log(`📚 Universal mode: Loaded ${allKnowledgeEntries.length} total knowledge entries`);
+      console.log(`Universal mode: Loaded ${allKnowledgeEntries.length} total knowledge entries`);
     }
     
     // Define cache key for fallback paths
@@ -241,7 +241,7 @@ async function getTrainingDocumentContext(
       if (searchQuery && allKnowledgeEntries.length > 0) {
         const searchResults = await semanticSearch(searchQuery, allKnowledgeEntries, semanticLimit);
         relevantEntries = searchResults.map(r => r.entry);
-        console.log(`🔍 Semantic search: Found ${relevantEntries.length} relevant entries for query (from ${allKnowledgeEntries.length} total)`);
+        console.log(` Semantic search: Found ${relevantEntries.length} relevant entries for query (from ${allKnowledgeEntries.length} total)`);
       } else if (allKnowledgeEntries.length > semanticLimit) {
         relevantEntries = allKnowledgeEntries.slice(0, semanticLimit);
         console.log(`📋 Using ${relevantEntries.length} most recent knowledge entries`);
@@ -280,7 +280,7 @@ async function getTrainingDocumentContext(
         return "";
       }
       documents = await storage.getAllUserTrainingDocuments(userId);
-      console.log(`📚 Universal mode (raw fallback): Loaded ${documents.length} total documents`);
+      console.log(`Universal mode (raw fallback): Loaded ${documents.length} total documents`);
     }
     
     if (documents.length === 0) {
@@ -377,7 +377,7 @@ async function getTrainingDocumentContext(
         })
         .map(s => s.doc);
       
-      console.log(`🔍 Raw doc search: Query "${searchQuery.slice(0, 50)}" - Top docs:`, 
+      console.log(` Raw doc search: Query "${searchQuery.slice(0, 50)}" - Top docs:`, 
         sortedDocs.slice(0, 3).map(d => `${d.fileName} (matched)`));
     } else {
       // No query - sort by date
@@ -1268,7 +1268,7 @@ The prospect is INQUIRING about ${domainExpertise}. They DON'T have it yet. Ques
 - "How does your ${domainExpertise} handle scalability?"
 - "Costs with ${domainExpertise}?"
 
-✅ GOOD (asks about their CURRENT situation BEFORE ${domainExpertise}):
+GOOD (asks about their CURRENT situation BEFORE ${domainExpertise}):
 - "What challenges with your CURRENT solution are driving you to explore ${domainExpertise}?"
 - "What's your current approach and what's not working?"
 - "What would success look like if you implemented ${domainExpertise}?"
@@ -1370,7 +1370,7 @@ export async function generateSalesResponse(
       client = aiConfig.client;
       model = aiConfig.model;
       engine = aiConfig.engine;
-      console.log(`✅ Using ${engine} (${model}) for user ${userId}`);
+      console.log(`Using ${engine} (${model}) for user ${userId}`);
     } else {
       if (!deepseek) {
         throw new Error("Default AI engine not configured");
@@ -1538,7 +1538,7 @@ export async function generateCombinedAnalysis(
         const knowledgeCacheKey = `knowledge:${userId}:${keywords.problemKeywords.slice(0, 3).join(',')}:${keywords.productKeywords.slice(0, 3).join(',')}`;
         let cached = aiCache.get<{ products: string; caseStudies: string }>(knowledgeCacheKey);
         if (cached) {
-          console.log(`📚 Using cached knowledge context`);
+          console.log(`Using cached knowledge context`);
           return cached;
         }
         
@@ -1554,7 +1554,7 @@ export async function generateCombinedAnalysis(
           caseStudies: knowledgeService.formatCaseStudiesForPrompt(knowledge.relevantCaseStudies),
         };
         aiCache.set(knowledgeCacheKey, ctx, 300);
-        console.log(`📚 Retrieved ${knowledge.relevantProducts.length} products, ${knowledge.relevantCaseStudies.length} case studies`);
+        console.log(`Retrieved ${knowledge.relevantProducts.length} products, ${knowledge.relevantCaseStudies.length} case studies`);
         return ctx;
       })(),
       
@@ -1595,7 +1595,7 @@ export async function generateCombinedAnalysis(
           );
           
           if (universalContext && universalContext.trim().length > 100) {
-            console.log(`📚 UNIVERSAL FALLBACK: Using general training documents (${universalContext.length} chars)`);
+            console.log(`UNIVERSAL FALLBACK: Using general training documents (${universalContext.length} chars)`);
             return { 
               content: `\n=== UNIVERSAL TRAINING KNOWLEDGE (Fallback - domain-specific not available) ===\n${universalContext.slice(0, 2000)}\n=== END UNIVERSAL TRAINING ===\n`, 
               hasTraining: true,
@@ -1696,7 +1696,7 @@ export async function generateCombinedAnalysis(
     };
     
     const ownershipStatus = detectCustomerOwnership(transcriptText, domainExpertise);
-    console.log(`🔍 Customer ownership detection: ${ownershipStatus.hasProduct ? 'EXISTING CUSTOMER' : 'NEW PROSPECT'} (confidence: ${ownershipStatus.confidence}, signals: ${ownershipStatus.signals.join(', ') || 'none'})`);
+    console.log(` Customer ownership detection: ${ownershipStatus.hasProduct ? 'EXISTING CUSTOMER' : 'NEW PROSPECT'} (confidence: ${ownershipStatus.confidence}, signals: ${ownershipStatus.signals.join(', ') || 'none'})`);
     
     // Build multi-product intelligence section if enabled
     const multiProductSection = multiProductIntelligence 
@@ -1783,7 +1783,7 @@ Return VALID JSON:
     try {
       response = await callAIWithTimeout(client, model, primaryTimeout);
       const duration = Date.now() - startTime;
-      console.log(`✅ Primary provider (${engine}) succeeded in ${duration}ms`);
+      console.log(`Primary provider (${engine}) succeeded in ${duration}ms`);
       
       // Track token usage for primary provider
       if (userId && response) {
@@ -1796,12 +1796,12 @@ Return VALID JSON:
       
       // If DeepSeek was primary and user has a different provider, try fallback
       if (engine === 'deepseek' && userId) {
-        console.log(`🔄 Attempting fallback to user's configured provider...`);
+        console.log(`Attempting fallback to user's configured provider...`);
         const fallbackStartTime = Date.now();
         
         try {
           const userAiConfig = await getAIClient(userId);
-          console.log(`🔄 Fallback provider: ${userAiConfig.engine}`);
+          console.log(`Fallback provider: ${userAiConfig.engine}`);
           
           // Try user's provider with reasonable timeout (6s) to stay under 12s total
           const fallbackTimeout = 6000;
@@ -1810,7 +1810,7 @@ Return VALID JSON:
           
           const fallbackDuration = Date.now() - fallbackStartTime;
           const totalDuration = Date.now() - startTime;
-          console.log(`✅ Fallback provider (${userAiConfig.engine}) succeeded in ${fallbackDuration}ms (total: ${totalDuration}ms)`);
+          console.log(`Fallback provider (${userAiConfig.engine}) succeeded in ${fallbackDuration}ms (total: ${totalDuration}ms)`);
           
           // Track token usage for fallback provider
           if (userId && response) {
@@ -1895,7 +1895,7 @@ Return VALID JSON:
       };
     }
     
-    console.log(`📦 AI Response received (${messageContent.length} chars)`);
+    console.log(` AI Response received (${messageContent.length} chars)`);
     
     // Try to parse JSON with error handling
     let result: any;
@@ -1919,7 +1919,7 @@ Return VALID JSON:
         if (validationResult.success) {
           isMultiProduct = true;
           products = validationResult.data.products;
-          console.log(`✅ Multi-product response validated: ${products.length} products`);
+          console.log(`Multi-product response validated: ${products.length} products`);
           
           // For backward compatibility, use first product as default
           const firstProduct = products[0];
@@ -2010,7 +2010,7 @@ Return VALID JSON:
       nextSteps = [...nextSteps, ...fallbackSteps].slice(0, 3);
     }
     
-    console.log(`✅ VALIDATION: ${discoveryQuestions.length} discovery questions, closingPitch complete, ${nextSteps.length} next steps`);
+    console.log(`VALIDATION: ${discoveryQuestions.length} discovery questions, closingPitch complete, ${nextSteps.length} next steps`);
     
     // Build analysis result with validated, comprehensive content
     const analysisResult = {
@@ -2061,7 +2061,7 @@ Return VALID JSON:
       }
     };
 
-    console.log(`✅ Analysis result prepared - Script: ${analysisResult.salesScript.solutions.length} solutions, ${analysisResult.salesScript.valueProposition.length} values, ${analysisResult.salesScript.technicalAnswers.length} technical`);
+    console.log(`Analysis result prepared - Script: ${analysisResult.salesScript.solutions.length} solutions, ${analysisResult.salesScript.valueProposition.length} values, ${analysisResult.salesScript.technicalAnswers.length} technical`);
 
     // Build tab-based analysis using multiple sales methodologies
     const tabBasedAnalysis = buildTabBasedAnalysis(
@@ -2070,7 +2070,7 @@ Return VALID JSON:
       scriptData,
       domainExpertise
     );
-    console.log(`📊 Tab-based analysis built with ${tabBasedAnalysis.methodologiesUsed.length} methodologies`);
+    console.log(` Tab-based analysis built with ${tabBasedAnalysis.methodologiesUsed.length} methodologies`);
 
     // Attach multi-product intelligence and tab-based analysis if available
     let resultWithMultiProduct: any = {
@@ -2262,7 +2262,7 @@ Return JSON:
       client = aiConfig.client;
       model = aiConfig.model;
       engine = aiConfig.engine;
-      console.log(`✅ FAST analysis using ${engine} (${model}) for user ${userId}`);
+      console.log(`FAST analysis using ${engine} (${model}) for user ${userId}`);
     } else {
       if (!deepseek) {
         throw new Error("Default AI engine not configured");
@@ -2399,7 +2399,7 @@ Return JSON with these sections:
       client = aiConfig.client;
       model = aiConfig.model;
       engine = aiConfig.engine;
-      console.log(`✅ Script generation using ${engine} (${model}) for user ${userId}`);
+      console.log(`Script generation using ${engine} (${model}) for user ${userId}`);
     } else {
       if (!deepseek) {
         throw new Error("Default AI engine not configured");
@@ -2482,7 +2482,7 @@ export async function generateCoachingSuggestions(
       const aiConfig = await getAIClient(userId);
       client = aiConfig.client;
       model = aiConfig.model;
-      console.log(`✅ Coaching suggestions using ${aiConfig.engine} (${model}) for user ${userId}`);
+      console.log(`Coaching suggestions using ${aiConfig.engine} (${model}) for user ${userId}`);
     } else {
       if (!deepseek) throw new Error("Default AI engine not configured");
       client = deepseek;
@@ -2954,7 +2954,7 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
     const defaultDate = meetingTime.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
     const defaultTime = meetingTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     
-    console.log(`📅 Meeting metadata: ${defaultDate} at ${defaultTime} (from ${meetingStartTime ? 'session start' : 'current time'})`);
+    console.log(` Meeting metadata: ${defaultDate} at ${defaultTime} (from ${meetingStartTime ? 'session start' : 'current time'})`);
     
     // STRICT: If AI didn't extract attendees, it means they're NOT in the conversation
     let finalAttendees = result.attendees || [];
@@ -3005,7 +3005,7 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
     }
     
     // Log extraction results for debugging
-    console.log(`📊 Meeting Minutes Extraction Results:`);
+    console.log(` Meeting Minutes Extraction Results:`);
     console.log(`   - Attendees: ${finalAttendees.join(', ')}`);
     console.log(`   - Company: ${result.companyName || 'Not mentioned'}`);
     console.log(`   - Opportunity: ${result.opportunityName || 'Not mentioned'}`);
@@ -3334,7 +3334,7 @@ export async function generateShiftGearsTips(
     let semanticQuery = recentConversation;
     if (isPricingQuery) {
       semanticQuery = `pricing price cost fee subscription rate per user per seat ${recentConversation}`;
-      console.log('💰 ShiftGears: PRICING QUERY DETECTED - Searching for pricing data in training materials');
+      console.log(' ShiftGears: PRICING QUERY DETECTED - Searching for pricing data in training materials');
     }
     
     const [trainingContext, knowledgeModule] = await Promise.all([
@@ -3404,7 +3404,7 @@ export async function generateShiftGearsTips(
     const userPrompt = `🎙️ LIVE CONVERSATION (Last 10 turns - respond to THIS):
 ${recentTurns}
 
-🔑 KEY TOPICS DETECTED: ${conversationKeywords}
+KEY TOPICS DETECTED: ${conversationKeywords}
 ${domainExpertise ? `\n🎯 DOMAIN: ${domainExpertise}` : ''}
 
 📋 YOUR TASK: Provide EXACTLY 3 tips that a VIRTUAL SALESPERSON would give RIGHT NOW.
@@ -3440,7 +3440,7 @@ RESPONSE FORMAT (JSON only):
 }`;
 
     // STRUCTURED LOGGING: Verify knowledge retrieval and context
-    console.log('📊 Shift Gears Context:', {
+    console.log(' Shift Gears Context:', {
       domain: domainExpertise,
       transcriptLength: conversationText.length,
       recentConversationLines: conversationLines.slice(-10).length,
@@ -3496,7 +3496,7 @@ RESPONSE FORMAT (JSON only):
     const tips = result.tips || [];
     
     // LOG: Verify AI response is contextual with total timing
-    console.log(`✅ Shift Gears Response (Total: ${Date.now() - startTime}ms):`, {
+    console.log(`Shift Gears Response (Total: ${Date.now() - startTime}ms):`, {
       tipsCount: tips.length,
       tipTypes: tips.map((t: ShiftGearsTip) => t.type),
       tipTitles: tips.map((t: ShiftGearsTip) => t.title)
@@ -3564,7 +3564,7 @@ export async function generateQueryPitches(
     let semanticQuery = recentQuery;
     if (isPricingQuery) {
       semanticQuery = `pricing price cost fee subscription rate ${recentQuery}`;
-      console.log('💰 PRICING QUERY DETECTED - Using enhanced semantic search for pricing data');
+      console.log(' PRICING QUERY DETECTED - Using enhanced semantic search for pricing data');
     }
     
     // Fetch training context with SEMANTIC SEARCH using the actual query for high accuracy
@@ -3582,7 +3582,7 @@ export async function generateQueryPitches(
     });
     
     // STRUCTURED LOGGING: Verify knowledge retrieval and context
-    console.log('📊 Customer Query Pitches Context:', {
+    console.log(' Customer Query Pitches Context:', {
       domain: domainExpertise,
       transcriptLength: conversationText.length,
       trainingContextLength: trainingContext.length,
@@ -3723,7 +3723,7 @@ Example:
     const queries = result.queries || [];
     
     // LOG: Verify AI response is contextual
-    console.log('✅ Customer Query Pitches Response:', {
+    console.log('Customer Query Pitches Response:', {
       queriesCount: queries.length,
       queryTypes: queries.map((q: QueryPitch) => q.queryType),
       queries: queries.map((q: QueryPitch) => q.query)
@@ -3762,7 +3762,7 @@ export async function generatePresentToWin(
         return cached;
       }
     } else {
-      console.log(`🔄 Battle card caching DISABLED for contextual accuracy`);
+      console.log(`Battle card caching DISABLED for contextual accuracy`);
     }
 
     // Optimize: Limit context to last 4000 characters for faster generation
@@ -3777,7 +3777,7 @@ export async function generatePresentToWin(
       // PRIORITY 1: Fetch Train Me documents (reduced for speed)
       // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
       const trainingContext = await getTrainingDocumentContext(userId, 4000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
-      console.log(`📚 Pitch Deck - Training documents loaded: ${trainingContext ? trainingContext.length : 0} chars`);
+      console.log(`Pitch Deck - Training documents loaded: ${trainingContext ? trainingContext.length : 0} chars`);
       
       // Ultra-optimized: last 1000 chars only for speed
       const ultraContext = conversationContext.length > 1000
@@ -3845,7 +3845,7 @@ JSON:
       // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
       const trainingContext = await getTrainingDocumentContext(userId, 6000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
       const hasTrainingDocs = trainingContext && trainingContext.trim().length > 100;
-      console.log(`📚 Case Study - Training documents loaded: ${trainingContext ? trainingContext.length : 0} chars`);
+      console.log(`Case Study - Training documents loaded: ${trainingContext ? trainingContext.length : 0} chars`);
       
       // Use optimized conversation context for speed
       const conversationSummary = conversationContext.length > 1500
@@ -3977,7 +3977,7 @@ JSON format:
       // PRIORITY 1: Fetch Train Me documents (reduced for speed)
       // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
       const trainingContext = await getTrainingDocumentContext(userId, 6000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
-      console.log(`📚 Battle Card - Training documents loaded: ${trainingContext ? trainingContext.length : 0} chars`);
+      console.log(`Battle Card - Training documents loaded: ${trainingContext ? trainingContext.length : 0} chars`);
       
       // Optimized context (up to 1500 chars for speed)
       const fullContext = conversationContext.length > 1500
@@ -3997,8 +3997,8 @@ JSON format:
         const competitors: string[] = [];
         const normalizedText = text.toLowerCase();
         
-        console.log(`🔍 Extraction - Testing text length: ${text.length}, normalized length: ${normalizedText.length}`);
-        console.log(`🔍 Extraction - Normalized sample (first 300 chars): ${normalizedText.substring(0, 300)}`);
+        console.log(` Extraction - Testing text length: ${text.length}, normalized length: ${normalizedText.length}`);
+        console.log(` Extraction - Normalized sample (first 300 chars): ${normalizedText.substring(0, 300)}`);
         
         // Comprehensive competitor dictionary (case-insensitive patterns)
         const competitorPatterns = [
@@ -4046,7 +4046,7 @@ JSON format:
           if (pattern.test(normalizedText)) {
             if (!competitors.includes(name)) {
               competitors.push(name);
-              console.log(`🔍 Detected competitor in conversation: "${name}"`);
+              console.log(` Detected competitor in conversation: "${name}"`);
             }
           }
         }
@@ -4056,7 +4056,7 @@ JSON format:
       
       // Extract competitors mentioned in the conversation
       const conversationCompetitors = extractCompetitorsFromConversation(conversationContext);
-      console.log(`🔍 Competitors extracted from conversation: [${conversationCompetitors.join(', ') || 'None'}]`);
+      console.log(` Competitors extracted from conversation: [${conversationCompetitors.join(', ') || 'None'}]`);
       
       // DETERMINISTIC COMPETITOR MAPPING - maps domains to their actual competitors
       interface CompetitorSet {
@@ -4362,7 +4362,7 @@ JSON format:
       for (const { pattern, canonical } of providerSynonyms) {
         if (pattern.test(preMappedDomain)) {
           preMappedDomain = canonical.toLowerCase();
-          console.log(`🔄 Pre-mapping: "${domainExpertise}" → "${canonical}"`);
+          console.log(`Pre-mapping: "${domainExpertise}" → "${canonical}"`);
           break;
         }
       }
@@ -4379,14 +4379,14 @@ JSON format:
         .replace(/\s+/g, ' ')
         .trim();
       
-      console.log(`🔍 Domain normalization: "${domainExpertise}" → "${normalizedDomain}"`);
+      console.log(` Domain normalization: "${domainExpertise}" → "${normalizedDomain}"`);
       
       // STEP 2: Find matching competitor set (check if any registry key is contained in the domain)
       let competitorSet: CompetitorSet | null = null;
       for (const [key, value] of Object.entries(competitorRegistry)) {
         if (normalizedDomain.includes(key) || key.includes(normalizedDomain)) {
           competitorSet = value;
-          console.log(`✅ Direct match found: "${domainExpertise}" → ${value.category}`);
+          console.log(`Direct match found: "${domainExpertise}" → ${value.category}`);
           break;
         }
       }
@@ -4406,28 +4406,28 @@ JSON format:
           if (/\b(aws|amazon(\s*web)?)\b/i.test(normalizedDomain)) {
             canonicalProduct = "Amazon Web Services (AWS)";
             competitors = ["Microsoft Azure", "Google Cloud Platform (GCP)", "Oracle Cloud"];
-            console.log(`📊 Cloud detected: AWS keywords found`);
+            console.log(` Cloud detected: AWS keywords found`);
           } else if (/\b(google\s*cloud|gcp|google)\b/i.test(normalizedDomain)) {
             canonicalProduct = "Google Cloud Platform (GCP)";
             competitors = ["Microsoft Azure", "Amazon Web Services (AWS)", "Oracle Cloud"];
-            console.log(`📊 Cloud detected: Google Cloud keywords found`);
+            console.log(` Cloud detected: Google Cloud keywords found`);
           } else if (/\bazure\b/i.test(normalizedDomain)) {
             canonicalProduct = "Microsoft Azure";
             competitors = ["Google Cloud Platform (GCP)", "Amazon Web Services (AWS)", "Oracle Cloud"];
-            console.log(`📊 Cloud detected: Azure keywords found`);
+            console.log(` Cloud detected: Azure keywords found`);
           } else if (/\boracle\s*cloud\b/i.test(normalizedDomain)) {
             canonicalProduct = "Oracle Cloud";
             competitors = ["Microsoft Azure", "AWS", "Google Cloud Platform"];
-            console.log(`📊 Cloud detected: Oracle Cloud keywords found`);
+            console.log(` Cloud detected: Oracle Cloud keywords found`);
           } else if (/\bibm\s*cloud\b/i.test(normalizedDomain)) {
             canonicalProduct = "IBM Cloud";
             competitors = ["Microsoft Azure", "AWS", "Google Cloud Platform"];
-            console.log(`📊 Cloud detected: IBM Cloud keywords found`);
+            console.log(` Cloud detected: IBM Cloud keywords found`);
           } else {
             // Generic cloud keywords without specific provider → use conversation context or default to Azure
             canonicalProduct = "Microsoft Azure"; // Last resort default
             competitors = ["Google Cloud Platform (GCP)", "Amazon Web Services (AWS)", "Oracle Cloud"];
-            console.log(`📊 Cloud detected: Generic cloud keywords, defaulting to Azure`);
+            console.log(` Cloud detected: Generic cloud keywords, defaulting to Azure`);
           }
           
           competitorSet = {
@@ -4435,105 +4435,105 @@ JSON format:
             competitors: competitors,
             category: "Cloud Computing Platform"
           };
-          console.log(`✅ Cloud category: "${canonicalProduct}" vs [${competitors.slice(0, 2).join(", ")}]`);
+          console.log(`Cloud category: "${canonicalProduct}" vs [${competitors.slice(0, 2).join(", ")}]`);
         } else if (/(rmm|remote monitoring|endpoint management|patch|msp|managed service)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise, // Keep original for non-cloud
             competitors: ["ConnectWise Automate", "Kaseya VSA", "NinjaRMM", "Datto RMM"],
             category: "RMM/MSP Platform"
           };
-          console.log(`📊 Category detected: RMM/MSP`);
+          console.log(` Category detected: RMM/MSP`);
         } else if (/(psa|professional service|ticketing|help desk|service desk)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["ConnectWise Manage", "Autotask", "HaloPSA"],
             category: "PSA Platform"
           };
-          console.log(`📊 Category detected: PSA`);
+          console.log(` Category detected: PSA`);
         } else if (/(crm|customer relationship|salesforce|hubspot)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["Salesforce", "HubSpot", "Microsoft Dynamics"],
             category: "CRM Platform"
           };
-          console.log(`📊 Category detected: CRM`);
+          console.log(` Category detected: CRM`);
         } else if (/(security|endpoint protection|antivirus|edr|threat)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["CrowdStrike", "SentinelOne", "Microsoft Defender"],
             category: "Endpoint Security"
           };
-          console.log(`📊 Category detected: Security`);
+          console.log(` Category detected: Security`);
         } else if (/(backup|disaster recovery|bcdr|data protection)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["Veeam", "Acronis", "Datto BCDR"],
             category: "Backup & DR"
           };
-          console.log(`📊 Category detected: Backup`);
+          console.log(` Category detected: Backup`);
         } else if (/(itsm|it service|incident|change management|service desk)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["BMC Remedy", "Jira Service Management", "ManageEngine ServiceDesk Plus"],
             category: "IT Service Management"
           };
-          console.log(`📊 Category detected: ITSM`);
+          console.log(` Category detected: ITSM`);
         } else if (/(csm|customer service|case management|customer support)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["Salesforce Service Cloud", "Zendesk", "Microsoft Dynamics 365"],
             category: "Customer Service Management"
           };
-          console.log(`📊 Category detected: CSM`);
+          console.log(` Category detected: CSM`);
         } else if (/(irm|grc|risk management|compliance|governance)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["RSA Archer", "MetricStream", "LogicGate"],
             category: "Integrated Risk Management"
           };
-          console.log(`📊 Category detected: IRM/GRC`);
+          console.log(` Category detected: IRM/GRC`);
         } else if (/(hr|hris|hcm|payroll|workforce|employee|talent|recruiting|onboarding|benefits|compensation|people\s*management|human\s*capital|human\s*resource)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["Workday", "ADP Workforce Now", "Rippling", "Gusto", "BambooHR"],
             category: "HR/Payroll Platform"
           };
-          console.log(`📊 Category detected: HR/Payroll`);
+          console.log(` Category detected: HR/Payroll`);
         } else if (/(erp|enterprise\s*resource|business\s*planning)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["SAP S/4HANA", "Oracle ERP", "Microsoft Dynamics 365", "NetSuite"],
             category: "ERP System"
           };
-          console.log(`📊 Category detected: ERP`);
+          console.log(` Category detected: ERP`);
         } else if (/(project\s*management|task\s*management|agile|scrum|kanban|sprint|workflow\s*management)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["Asana", "Monday.com", "Jira", "Trello", "ClickUp"],
             category: "Project Management"
           };
-          console.log(`📊 Category detected: Project Management`);
+          console.log(` Category detected: Project Management`);
         } else if (/(communication|collaboration|messaging|chat|video\s*conference|meeting)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["Slack", "Microsoft Teams", "Zoom", "Google Meet"],
             category: "Communication/Collaboration"
           };
-          console.log(`📊 Category detected: Communication/Collaboration`);
+          console.log(` Category detected: Communication/Collaboration`);
         } else if (/(marketing|email\s*marketing|automation|campaign|lead\s*gen)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["HubSpot", "Marketo", "Pardot", "Mailchimp", "ActiveCampaign"],
             category: "Marketing Automation"
           };
-          console.log(`📊 Category detected: Marketing Automation`);
+          console.log(` Category detected: Marketing Automation`);
         } else if (/(accounting|finance|bookkeeping|invoicing|billing|expense)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["QuickBooks", "Xero", "FreshBooks", "Sage", "NetSuite"],
             category: "Accounting/Finance"
           };
-          console.log(`📊 Category detected: Accounting/Finance`);
+          console.log(` Category detected: Accounting/Finance`);
         }
       }
       
@@ -4571,7 +4571,7 @@ JSON format:
             // Use domain detection to find contextually relevant competitors
             const domainContextForGuard = detectDomainFromConversation(conversationContext, normalizedDomain);
             if (domainContextForGuard.suggestedCompetitors.length > 0) {
-              console.log(`📊 Anti-fallback guard: Found domain competitors from conversation: [${domainContextForGuard.suggestedCompetitors.join(', ')}]`);
+              console.log(` Anti-fallback guard: Found domain competitors from conversation: [${domainContextForGuard.suggestedCompetitors.join(', ')}]`);
               for (const competitor of domainContextForGuard.suggestedCompetitors) {
                 if (!mergedCompetitors.includes(competitor) && mergedCompetitors.length < 3) {
                   mergedCompetitors.push(competitor);
@@ -4592,7 +4592,7 @@ JSON format:
           competitors: mergedCompetitors.slice(0, 3), // Maximum 3 competitors
           category: "Domain-Specific Solution"
         };
-        console.log(`✅ Guard activated: ${competitorSet.yourProduct} vs [${competitorSet.competitors.join(", ")}]`);
+        console.log(`Guard activated: ${competitorSet.yourProduct} vs [${competitorSet.competitors.join(", ")}]`);
       }
       
       // FINAL ANTI-FALLBACK GUARD: Prevent Rev Winner for cloud-related domains/conversations
@@ -4611,15 +4611,15 @@ JSON format:
             competitors: ["Microsoft Azure", "Amazon Web Services (AWS)", "Google Cloud Platform (GCP)"],
             category: "Cloud Computing Platform"
           };
-          console.log(`✅ Cloud guard activated: "${competitorSet.yourProduct}" vs [${competitorSet.competitors.slice(0, 2).join(", ")}]`);
+          console.log(`Cloud guard activated: "${competitorSet.yourProduct}" vs [${competitorSet.competitors.slice(0, 2).join(", ")}]`);
         } else {
           // INTELLIGENT FALLBACK: Use domain detection from conversation to find contextually relevant competitors
-          console.log(`🔄 INTELLIGENT FALLBACK: Using conversation-aware domain detection for "${domainExpertise}"`);
+          console.log(`INTELLIGENT FALLBACK: Using conversation-aware domain detection for "${domainExpertise}"`);
           
           // Use the domain-detection module to analyze conversation context for better competitor suggestions
           const conversationDomainContext = detectDomainFromConversation(conversationContext, domainExpertise);
-          console.log(`📊 Domain detection result: detected="${conversationDomainContext.detectedDomain}", confidence=${conversationDomainContext.confidenceScore}%`);
-          console.log(`📊 Suggested competitors from domain detection: [${conversationDomainContext.suggestedCompetitors.join(', ') || 'None'}]`);
+          console.log(` Domain detection result: detected="${conversationDomainContext.detectedDomain}", confidence=${conversationDomainContext.confidenceScore}%`);
+          console.log(` Suggested competitors from domain detection: [${conversationDomainContext.suggestedCompetitors.join(', ') || 'None'}]`);
           
           let contextualCompetitors: string[] = [];
           let detectedCategory = "Custom Solution";
@@ -4640,8 +4640,8 @@ JSON format:
                 contextualCompetitors = intelligence.competitors.map(c => c.name).slice(0, 3);
                 detectedCategory = intelligence.industry || "Industry Solution";
                 aiResearchSucceeded = true;
-                console.log(`✅ AI Research found ${intelligence.competitors.length} competitors: [${contextualCompetitors.join(', ')}]`);
-                console.log(`📊 Industry: ${intelligence.industry}, Source: ${intelligence.source}`);
+                console.log(`AI Research found ${intelligence.competitors.length} competitors: [${contextualCompetitors.join(', ')}]`);
+                console.log(` Industry: ${intelligence.industry}, Source: ${intelligence.source}`);
               } else {
                 console.log(`⚠️ AI Research returned no competitors - falling back to generic competitors`);
               }
@@ -4651,11 +4651,11 @@ JSON format:
             
             // If AI research didn't provide competitors, use sensible generic defaults
             if (!aiResearchSucceeded) {
-              console.log(`🔄 Using generic competitor fallback for unknown domain`);
+              console.log(`Using generic competitor fallback for unknown domain`);
               // Provide generic industry competitors so the prompt has something to work with
               contextualCompetitors = ["Industry Leader A", "Industry Leader B", "Industry Leader C"];
               detectedCategory = "Industry Solution";
-              console.log(`📊 Generic fallback: Will ask AI to identify specific competitors for "${domainExpertise}"`);
+              console.log(` Generic fallback: Will ask AI to identify specific competitors for "${domainExpertise}"`);
             }
           }
           
@@ -4666,14 +4666,14 @@ JSON format:
           };
           
           if (contextualCompetitors.length > 0) {
-            console.log(`✅ Dynamic fallback: "${competitorSet.yourProduct}" vs [${competitorSet.competitors.join(", ")}]`);
+            console.log(`Dynamic fallback: "${competitorSet.yourProduct}" vs [${competitorSet.competitors.join(", ")}]`);
           } else {
             console.log(`⚠️ No competitors found - AI will identify appropriate competitors`);
           }
         }
       }
       
-      console.log(`✅ Battle Card: ${competitorSet.yourProduct} vs [${competitorSet.competitors.slice(0, 2).join(", ")}]`);
+      console.log(`Battle Card: ${competitorSet.yourProduct} vs [${competitorSet.competitors.slice(0, 2).join(", ")}]`);
       
       // Build deterministic prompt that ENFORCES conversation-mentioned competitors
       const competitorSection = conversationCompetitors.length > 0
@@ -4688,7 +4688,7 @@ ${competitorSet.competitors.length > 0 ? competitorSet.competitors.map((c, i) =>
 SUGGESTED COMPETITORS FOR ${competitorSet.yourProduct}:
 ${competitorSet.competitors.map((c, i) => `${i + 1}. ${c}`).join('\n')}`
           : `
-🔍 COMPETITOR IDENTIFICATION REQUIRED:
+ COMPETITOR IDENTIFICATION REQUIRED:
 Based on your knowledge of ${competitorSet.yourProduct}, identify the 2 most relevant competitors in the same market.
 Research and use REAL competitor products that compete directly with "${competitorSet.yourProduct}".
 Examples: If this is an HR platform, competitors might include Workday, ADP, Rippling, Gusto, etc.
@@ -4725,7 +4725,7 @@ CRITICAL INSTRUCTIONS:
    - If 2+ conversation competitors: Use the 2 most discussed ones`
      : `📋 Use the suggested competitors list since no competitors were mentioned in conversation`}
    
-   ✅ IMPORTANT: competitor1 and competitor2 MUST be actual product/company names (e.g., "NinjaOne", "Gong"), NOT generic terms
+   IMPORTANT: competitor1 and competitor2 MUST be actual product/company names (e.g., "NinjaOne", "Gong"), NOT generic terms
 
 3. Create an accurate battle card that CLEARLY DEMONSTRATES TECHNICAL SUPERIORITY.
    - Focus on 6-8 features that matter to THIS customer based on what they discussed
@@ -4840,14 +4840,14 @@ Generate a detailed, factual battle card that CLEARLY shows ${competitorSet.your
           }
           
           result = JSON.parse(sanitizedContent);
-          console.log(`✅ Battle Card JSON parsed successfully on attempt ${retryCount + 1}`);
+          console.log(`Battle Card JSON parsed successfully on attempt ${retryCount + 1}`);
           break; // Success - exit retry loop
           
         } catch (parseError: any) {
           console.error(`❌ Battle Card JSON parse failed (Attempt ${retryCount + 1}/${MAX_RETRIES + 1}): ${parseError.message}`);
           
           if (retryCount < MAX_RETRIES) {
-            console.log(`🔄 Retrying with simplified prompt...`);
+            console.log(`Retrying with simplified prompt...`);
             retryCount++;
             
             // Simplify prompt for retry - focus on core content
@@ -4945,7 +4945,7 @@ Generate a JSON response with this EXACT structure (keep it concise to avoid tru
       if (validationWarnings > 0) {
         console.warn(`⚠️  Battle Card validation: ${validationWarnings} section(s) used fallback content`);
       } else {
-        console.log(`✅ Battle Card validation: All sections populated by AI`);
+        console.log(`Battle Card validation: All sections populated by AI`);
       }
       
       // Inject intelligence metadata into result
@@ -5013,7 +5013,7 @@ Generate a JSON response with this EXACT structure (keep it concise to avoid tru
     
     // Handle authentication errors specifically
     if (statusCode === 401 || statusCode === 403 || error?.message?.includes('Invalid Authentication') || error?.message?.includes('Incorrect API key')) {
-      console.error("🔑 Authentication error detected - API key issue");
+      console.error("Authentication error detected - API key issue");
       throw new Error("AI API key authentication failed. Please check your AI engine settings and ensure your API key is valid.");
     }
     
@@ -5095,7 +5095,7 @@ export async function generateMultiProductPresentToWin(
     
     // If only 1 or no products detected, fall back to single-product mode
     if (allProducts.length <= 1) {
-      console.log(`📦 Single product detected (${allProducts.length}), using standard generation`);
+      console.log(` Single product detected (${allProducts.length}), using standard generation`);
       const content = await generatePresentToWin(type, conversationContext, domainExpertise, userId);
       return {
         ...content,
@@ -5103,7 +5103,7 @@ export async function generateMultiProductPresentToWin(
       };
     }
     
-    console.log(`📦 ${allProducts.length} products detected: ${allProducts.map((p: any) => p.productName).join(', ')}`);
+    console.log(` ${allProducts.length} products detected: ${allProducts.map((p: any) => p.productName).join(', ')}`);
     
     // Generate content for each detected product (in parallel for speed)
     const productContents = await Promise.all(
@@ -5148,7 +5148,7 @@ export async function generateMultiProductPresentToWin(
       })
     );
     
-    console.log(`✅ Multi-product ${type} generation complete: ${productContents.length} products`);
+    console.log(`Multi-product ${type} generation complete: ${productContents.length} products`);
     
     return {
       _multiProduct: true,

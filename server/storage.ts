@@ -1,5 +1,8 @@
-import { type Conversation, type InsertConversation, type Message, type InsertMessage, type TeamsMeeting, type InsertTeamsMeeting, type AudioSource, type InsertAudioSource, type User, type UpsertUser, type SessionUsage, type InsertSessionUsage, type Lead, type InsertLead, type DomainExpertise, type InsertDomainExpertise, type UpdateDomainExpertise, type TrainingDocument, type InsertTrainingDocument, type SubscriptionPlan, type InsertSubscriptionPlan, type Addon, type InsertAddon, type ConversationMemory, type InsertConversationMemory, type UserProfile, type InsertUserProfile, type KnowledgeEntry, type InsertKnowledgeEntry, AUDIO_SOURCE_TYPES } from "../shared/schema";
+import { type Conversation, type InsertConversation, type Message, type InsertMessage, type TeamsMeeting, type InsertTeamsMeeting, type AudioSource, type InsertAudioSource, type User, type UpsertUser, type SessionUsage, type InsertSessionUsage, type Lead, type InsertLead, type DomainExpertise, type InsertDomainExpertise, type UpdateDomainExpertise, type TrainingDocument, type InsertTrainingDocument, type SubscriptionPlan, type InsertSubscriptionPlan, type Addon, type InsertAddon, type ConversationMemory, type InsertConversationMemory, type UserProfile, type InsertUserProfile, type KnowledgeEntry, type InsertKnowledgeEntry, AUDIO_SOURCE_TYPES, users, conversations, messages, subscriptionPlans, addons, audioSources, teamsMeetings, sessionUsage } from "../shared/schema";
 import { randomUUID } from "crypto";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
+import { authStorage } from "./storage-auth";
 
 export interface IStorage {
   // User operations - IMPORTANT: these are mandatory for Replit Auth
@@ -866,4 +869,377 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Database-backed storage implementation
+class DbStorage implements IStorage {
+  // User operations - IMPORTANT: these are mandatory for Replit Auth
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return user;
+  }
+
+  async upsertUser(user: UpsertUser): Promise<User> {
+    // Try to find existing user first
+    const existing = user.id ? await this.getUser(user.id) : undefined;
+    if (existing && user.id) {
+      const [updated] = await db.update(users).set(user).where(eq(users.id, user.id)).returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(users).values(user).returning();
+      return created;
+    }
+  }
+
+  // Conversation management
+  async createConversation(insertConversation: InsertConversation): Promise<Conversation> {
+    const conversationData = {
+      ...insertConversation,
+      id: randomUUID(),
+      userId: insertConversation.userId || null,
+      status: "active" as const,
+      discoveryInsights: {},
+      callSummary: null,
+      createdAt: new Date(),
+      endedAt: null,
+      clientName: insertConversation.clientName || null,
+    };
+    
+    const [result] = await db.insert(conversations).values(conversationData).returning();
+    return result;
+  }
+
+  async getConversation(sessionId: string): Promise<Conversation | undefined> {
+    const [conversation] = await db.select().from(conversations).where(eq(conversations.sessionId, sessionId)).limit(1);
+    return conversation;
+  }
+
+  async updateConversation(sessionId: string, updates: Partial<Conversation>): Promise<Conversation | undefined> {
+    const [conversation] = await db.update(conversations).set(updates).where(eq(conversations.sessionId, sessionId)).returning();
+    return conversation;
+  }
+
+  async endConversation(sessionId: string, summary: string): Promise<Conversation | undefined> {
+    const [conversation] = await db.update(conversations)
+      .set({ 
+        status: "completed",
+        callSummary: summary,
+        endedAt: new Date()
+      })
+      .where(eq(conversations.sessionId, sessionId))
+      .returning();
+    return conversation;
+  }
+
+  // Message management
+  async addMessage(insertMessage: InsertMessage): Promise<Message> {
+    const messageData = {
+      ...insertMessage,
+      id: randomUUID(),
+      timestamp: new Date(),
+      speakerLabel: insertMessage.speakerLabel ?? null,
+      audioSourceId: insertMessage.audioSourceId ?? null,
+      customerIdentification: insertMessage.customerIdentification ?? null,
+      discoveryQuestions: insertMessage.discoveryQuestions ?? null,
+      caseStudies: insertMessage.caseStudies ?? null,
+      competitorAnalysis: insertMessage.competitorAnalysis ?? null,
+      solutionRecommendations: insertMessage.solutionRecommendations ?? null,
+      productFeatures: insertMessage.productFeatures ?? null,
+      nextSteps: insertMessage.nextSteps ?? null,
+      bantQualification: insertMessage.bantQualification ?? null,
+      solutions: insertMessage.solutions ?? null,
+      problemStatement: insertMessage.problemStatement ?? null,
+      recommendedSolutions: insertMessage.recommendedSolutions ?? null,
+      suggestedNextPrompt: insertMessage.suggestedNextPrompt ?? null,
+    };
+    
+    const [result] = await db.insert(messages).values(messageData as any).returning();
+    return result;
+  }
+
+  async getMessages(conversationId: string): Promise<Message[]> {
+    return await db.select().from(messages).where(eq(messages.conversationId, conversationId)).orderBy(messages.timestamp);
+  }
+
+  // Teams meeting management
+  async createTeamsMeeting(insertMeeting: InsertTeamsMeeting): Promise<TeamsMeeting> {
+    const meetingData = {
+      ...insertMeeting,
+      id: randomUUID(),
+      createdAt: new Date(),
+    };
+    
+    const [result] = await db.insert(teamsMeetings).values(meetingData).returning();
+    return result;
+  }
+
+  async getTeamsMeeting(conversationId: string): Promise<TeamsMeeting | undefined> {
+    const [meeting] = await db.select().from(teamsMeetings).where(eq(teamsMeetings.conversationId, conversationId)).limit(1);
+    return meeting;
+  }
+
+  async updateTeamsMeeting(id: string, updates: Partial<TeamsMeeting>): Promise<TeamsMeeting | undefined> {
+    const [meeting] = await db.update(teamsMeetings).set(updates).where(eq(teamsMeetings.id, id)).returning();
+    return meeting;
+  }
+
+  // Audio source management
+  async createAudioSource(insertSource: InsertAudioSource): Promise<AudioSource> {
+    const sourceData = {
+      ...insertSource,
+      id: randomUUID(),
+      createdAt: new Date(),
+    };
+    
+    const [result] = await db.insert(audioSources).values(sourceData).returning();
+    return result;
+  }
+
+  async getAudioSources(conversationId: string): Promise<AudioSource[]> {
+    return await db.select().from(audioSources).where(eq(audioSources.conversationId, conversationId));
+  }
+
+  async updateAudioSource(id: string, updates: Partial<AudioSource>): Promise<AudioSource | undefined> {
+    const [source] = await db.update(audioSources).set(updates).where(eq(audioSources.id, id)).returning();
+    return source;
+  }
+
+  async getDefaultAudioSource(conversationId: string): Promise<AudioSource> {
+    // Try to find existing default source
+    const [existing] = await db.select().from(audioSources)
+      .where(eq(audioSources.conversationId, conversationId))
+      .limit(1);
+    
+    if (existing) {
+      return existing;
+    }
+
+    // Create default source if none exists
+    return await this.createAudioSource({
+      conversationId,
+      sourceType: AUDIO_SOURCE_TYPES.DEVICE_MICROPHONE,
+    });
+  }
+
+  // Discovery insights
+  async updateDiscoveryInsights(sessionId: string, insights: any): Promise<void> {
+    await db.update(conversations)
+      .set({ discoveryInsights: insights })
+      .where(eq(conversations.sessionId, sessionId));
+  }
+
+  // Session usage tracking
+  async createSessionUsage(insertUsage: InsertSessionUsage): Promise<SessionUsage> {
+    const usageData = {
+      ...insertUsage,
+      id: randomUUID(),
+      createdAt: new Date(),
+    };
+    
+    const [result] = await db.insert(sessionUsage).values(usageData).returning();
+    return result;
+  }
+
+  async getSessionUsage(sessionId: string, userId: string): Promise<SessionUsage | undefined> {
+    const [usage] = await db.select().from(sessionUsage)
+      .where(eq(sessionUsage.sessionId, sessionId))
+      .limit(1);
+    return usage;
+  }
+
+  async updateSessionUsage(sessionId: string, userId: string, updates: Partial<SessionUsage>): Promise<SessionUsage | undefined> {
+    const [usage] = await db.update(sessionUsage)
+      .set(updates)
+      .where(eq(sessionUsage.sessionId, sessionId))
+      .returning();
+    return usage;
+  }
+
+  async getUserSessionUsage(userId: string): Promise<SessionUsage[]> {
+    return await db.select().from(sessionUsage).where(eq(sessionUsage.userId, userId));
+  }
+
+  // For methods that require complex implementations, delegate to existing storage systems
+  // or throw not implemented errors for now
+
+  async createLead(lead: InsertLead): Promise<Lead> {
+    throw new Error("Lead management not implemented in DbStorage yet");
+  }
+
+  // Train Me feature - Domain Expertise management
+  async createDomainExpertise(domain: InsertDomainExpertise): Promise<DomainExpertise> {
+    throw new Error("Domain expertise management not implemented in DbStorage yet");
+  }
+
+  async getUserDomainExpertises(userId: string): Promise<DomainExpertise[]> {
+    throw new Error("Domain expertise management not implemented in DbStorage yet");
+  }
+
+  async getDomainExpertise(id: string, userId: string): Promise<DomainExpertise | undefined> {
+    throw new Error("Domain expertise management not implemented in DbStorage yet");
+  }
+
+  async getDomainExpertiseByName(name: string, userId: string): Promise<DomainExpertise | undefined> {
+    throw new Error("Domain expertise management not implemented in DbStorage yet");
+  }
+
+  async updateDomainExpertise(id: string, userId: string, updates: UpdateDomainExpertise): Promise<DomainExpertise | undefined> {
+    throw new Error("Domain expertise management not implemented in DbStorage yet");
+  }
+
+  async deleteDomainExpertise(id: string, userId: string): Promise<void> {
+    throw new Error("Domain expertise management not implemented in DbStorage yet");
+  }
+
+  // Train Me feature - Training Documents management
+  async createTrainingDocument(document: InsertTrainingDocument): Promise<TrainingDocument> {
+    throw new Error("Training document management not implemented in DbStorage yet");
+  }
+
+  async getTrainingDocumentsByDomain(domainId: string, userId: string): Promise<TrainingDocument[]> {
+    throw new Error("Training document management not implemented in DbStorage yet");
+  }
+
+  async getAllUserTrainingDocuments(userId: string): Promise<TrainingDocument[]> {
+    throw new Error("Training document management not implemented in DbStorage yet");
+  }
+
+  async countUserTrainingDocuments(userId: string): Promise<number> {
+    throw new Error("Training document management not implemented in DbStorage yet");
+  }
+
+  async getTrainingDocument(id: string, userId: string): Promise<TrainingDocument | undefined> {
+    throw new Error("Training document management not implemented in DbStorage yet");
+  }
+
+  async updateTrainingDocument(id: string, userId: string, updates: Partial<TrainingDocument>): Promise<TrainingDocument | undefined> {
+    throw new Error("Training document management not implemented in DbStorage yet");
+  }
+
+  async deleteTrainingDocument(id: string, userId: string): Promise<void> {
+    throw new Error("Training document management not implemented in DbStorage yet");
+  }
+
+  async searchTrainingDocuments(userId: string, query: string, domainId?: string): Promise<TrainingDocument[]> {
+    throw new Error("Training document management not implemented in DbStorage yet");
+  }
+
+  // Knowledge Base management
+  async createKnowledgeEntry(entry: InsertKnowledgeEntry): Promise<KnowledgeEntry> {
+    throw new Error("Knowledge base management not implemented in DbStorage yet");
+  }
+
+  async getKnowledgeEntriesByDomain(domainId: string, userId: string): Promise<KnowledgeEntry[]> {
+    throw new Error("Knowledge base management not implemented in DbStorage yet");
+  }
+
+  async getAllUserKnowledgeEntries(userId: string): Promise<KnowledgeEntry[]> {
+    throw new Error("Knowledge base management not implemented in DbStorage yet");
+  }
+
+  async getKnowledgeEntry(id: string, userId: string): Promise<KnowledgeEntry | undefined> {
+    throw new Error("Knowledge base management not implemented in DbStorage yet");
+  }
+
+  async updateKnowledgeEntry(id: string, userId: string, updates: Partial<KnowledgeEntry>): Promise<KnowledgeEntry | undefined> {
+    throw new Error("Knowledge base management not implemented in DbStorage yet");
+  }
+
+  async updateKnowledgeEntryEmbedding(id: string, embedding: number[]): Promise<void> {
+    throw new Error("Knowledge base management not implemented in DbStorage yet");
+  }
+
+  async deleteKnowledgeEntry(id: string, userId: string): Promise<void> {
+    throw new Error("Knowledge base management not implemented in DbStorage yet");
+  }
+
+  async deleteKnowledgeEntriesByDomain(domainId: string, userId: string): Promise<void> {
+    throw new Error("Knowledge base management not implemented in DbStorage yet");
+  }
+
+  async searchKnowledgeEntries(userId: string, query: string, category?: string): Promise<KnowledgeEntry[]> {
+    throw new Error("Knowledge base management not implemented in DbStorage yet");
+  }
+
+  // Subscription Plan management
+  async getAllSubscriptionPlans(): Promise<SubscriptionPlan[]> {
+    return await db.select().from(subscriptionPlans);
+  }
+
+  async createSubscriptionPlan(plan: InsertSubscriptionPlan): Promise<SubscriptionPlan> {
+    const [result] = await db.insert(subscriptionPlans).values(plan).returning();
+    return result;
+  }
+
+  async updateSubscriptionPlan(id: string, updates: Partial<SubscriptionPlan>): Promise<SubscriptionPlan | undefined> {
+    const [plan] = await db.update(subscriptionPlans).set(updates).where(eq(subscriptionPlans.id, id)).returning();
+    return plan;
+  }
+
+  async deleteSubscriptionPlan(id: string): Promise<boolean> {
+    const result = await db.delete(subscriptionPlans).where(eq(subscriptionPlans.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async planHasActiveSubscriptions(planId: string): Promise<boolean> {
+    // This would need to check the subscriptions table
+    // For now, return false to allow deletion
+    return false;
+  }
+
+  // Add-on management
+  async getAllAddons(): Promise<Addon[]> {
+    return await db.select().from(addons);
+  }
+
+  async createAddon(addon: InsertAddon): Promise<Addon> {
+    const [result] = await db.insert(addons).values(addon).returning();
+    return result;
+  }
+
+  async updateAddon(id: string, updates: Partial<Addon>): Promise<Addon | undefined> {
+    const [addon] = await db.update(addons).set(updates).where(eq(addons.id, id)).returning();
+    return addon;
+  }
+
+  async deleteAddon(id: string): Promise<boolean> {
+    const result = await db.delete(addons).where(eq(addons.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async addonIsReferencedByPlans(addonId: string): Promise<boolean> {
+    // This would need to check if any subscription plans reference this addon
+    // For now, return false to allow deletion
+    return false;
+  }
+
+  // Conversation Memory operations - delegate to authStorage
+  async createConversationMemory(memory: InsertConversationMemory): Promise<ConversationMemory> {
+    return await authStorage.createConversationMemory(memory);
+  }
+
+  async getConversationMemory(conversationId: string): Promise<ConversationMemory | undefined> {
+    const result = await authStorage.getConversationMemory(conversationId);
+    return result || undefined;
+  }
+
+  async updateConversationMemory(conversationId: string, updates: Partial<ConversationMemory>): Promise<ConversationMemory | undefined> {
+    const result = await authStorage.updateConversationMemory(conversationId, updates);
+    return result || undefined;
+  }
+
+  // User Profile operations - delegate to authStorage
+  async getUserProfile(userId: string): Promise<UserProfile | undefined> {
+    const result = await authStorage.getUserProfile(userId);
+    return result || undefined;
+  }
+
+  async upsertUserProfile(profile: InsertUserProfile & { userId: string }): Promise<UserProfile> {
+    return await authStorage.upsertUserProfile(profile);
+  }
+
+  async updateUserProfile(userId: string, updates: Partial<UserProfile>): Promise<UserProfile | undefined> {
+    const result = await authStorage.updateUserProfile(userId, updates);
+    return result || undefined;
+  }
+}
+
+export const storage = new DbStorage();

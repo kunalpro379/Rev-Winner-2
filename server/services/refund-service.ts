@@ -175,7 +175,7 @@ class RefundService {
         },
       });
 
-      console.log(`[Refund Service] ✅ Refund processed successfully`);
+      console.log(`[Refund Service] Refund processed successfully`);
       console.log(`[Refund Service] Refund ID: ${refundResult.refundId}`);
       console.log(`[Refund Service] Gateway Refund ID: ${refundResult.providerRefundId}`);
       console.log(`[Refund Service] Status: ${refundResult.status}`);
@@ -410,7 +410,7 @@ class RefundService {
         },
       });
 
-      console.log(`[Refund Service] ✅ Addon refund processed successfully`);
+      console.log(`[Refund Service] Addon refund processed successfully`);
 
       return {
         success: true,

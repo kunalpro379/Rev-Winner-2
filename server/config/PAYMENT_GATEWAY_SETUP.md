@@ -45,10 +45,10 @@ Start your server and check the logs. You should see:
 
 ```
 ============================================================
-💳 PAYMENT GATEWAY CONFIGURATION
+PAYMENT GATEWAY CONFIGURATION
 ============================================================
 Current Gateway: Razorpay (razorpay)
-Configured: ✅ Yes
+Configured: Yes
 Environment: development
 Supported Currencies: INR, USD
 Features: orders, refunds, webhooks, subscriptions
@@ -93,14 +93,14 @@ The server will automatically initialize the new payment gateway.
 
 ## Supported Payment Gateways
 
-### ✅ Razorpay (Current Default)
+### Razorpay (Current Default)
 - **Status:** Fully implemented
 - **Docs:** https://razorpay.com/docs/
 - **Dashboard:** https://dashboard.razorpay.com/
 - **Currencies:** INR, USD
 - **Features:** Orders, Refunds, Webhooks, Subscriptions
 
-### ✅ Cashfree (Alternative)
+### Cashfree (Alternative)
 - **Status:** Fully implemented
 - **Docs:** https://docs.cashfree.com/
 - **Dashboard:** https://merchant.cashfree.com/
@@ -172,10 +172,10 @@ If you see this warning:
 ### Payment Fails in Production
 
 **Checklist:**
-1. ✅ Are you using LIVE/PRODUCTION credentials?
-2. ✅ Is `RAZORPAY_MODE` set to `LIVE` (or `NODE_ENV` set to `production`)?
-3. ✅ Have you activated your Razorpay account and completed KYC?
-4. ✅ Is your webhook URL configured in the Razorpay dashboard?
+1. Are you using LIVE/PRODUCTION credentials?
+2. Is `RAZORPAY_MODE` set to `LIVE` (or `NODE_ENV` set to `production`)?
+3. Have you activated your Razorpay account and completed KYC?
+4. Is your webhook URL configured in the Razorpay dashboard?
 
 ## Architecture
 

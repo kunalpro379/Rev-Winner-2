@@ -242,7 +242,7 @@ export function useVoiceFingerprinting({
 
         // Switch only if we have 2+ consecutive matches and cooldown passed
         if (consecutiveMatchesRef.current.count >= 2 && canSwitch) {
-          console.log(`🔄 Switching: ${lastSpeakerRef.current} → ${bestMatch.speakerId} (${(bestMatch.similarity * 100).toFixed(1)}% match)`);
+          console.log(`Switching: ${lastSpeakerRef.current} → ${bestMatch.speakerId} (${(bestMatch.similarity * 100).toFixed(1)}% match)`);
           
           lastSpeakerRef.current = bestMatch.speakerId;
           lastSwitchTimeRef.current = now;
@@ -293,7 +293,7 @@ export function useVoiceFingerprinting({
     consecutiveMatchesRef.current = { speakerId: "", count: 0 };
     setCurrentSpeaker("speaker1");
     setConfidence(0);
-    console.log("🔄 Speaker detection reset");
+    console.log("Speaker detection reset");
   }, []);
 
   useEffect(() => {

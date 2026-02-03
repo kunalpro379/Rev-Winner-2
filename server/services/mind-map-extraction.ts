@@ -357,7 +357,7 @@ JSON only.`;
           
           if (completeNodes.length > 0) {
             repairedJson = `{"nodes":[${completeNodes.join(',')}],"edges":[]}`;
-            console.log(`✅ Map/Flow: Repaired JSON with ${completeNodes.length} complete nodes`);
+            console.log(`Map/Flow: Repaired JSON with ${completeNodes.length} complete nodes`);
           }
         }
       }
@@ -408,7 +408,7 @@ JSON only.`;
       type: validEdgeTypes.includes(edge.type) ? edge.type : 'default'
     }));
 
-    console.log(`✅ Map/Flow: Extracted ${nodes.length} nodes, ${edges.length} edges in ${Date.now() - startTime}ms`);
+    console.log(`Map/Flow: Extracted ${nodes.length} nodes, ${edges.length} edges in ${Date.now() - startTime}ms`);
 
     if (nodes.length === 0) {
       console.warn('⚠️ Map/Flow: AI returned 0 nodes. Raw response:', messageContent?.substring(0, 500));

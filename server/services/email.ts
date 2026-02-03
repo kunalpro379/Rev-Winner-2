@@ -260,7 +260,7 @@ export async function sendLeadNotificationEmail(
     subject = '🏢 New Business Teams Inquiry - Rev Winner';
     html = formatBusinessTeamsEmail(leadData);
   } else {
-    subject = '📧 New Contact Form Submission - Rev Winner';
+    subject = 'New Contact Form Submission - Rev Winner';
     html = formatContactFormEmail(leadData);
   }
 
@@ -374,7 +374,7 @@ function formatContactFormEmail(data: {
       <body>
         <div class="container">
           <div class="header">
-            <h1 style="margin: 0; font-size: 28px;">📧 New Contact Form Submission</h1>
+            <h1 style="margin: 0; font-size: 28px;">New Contact Form Submission</h1>
           </div>
           <div class="content">
             <div class="field">
@@ -599,7 +599,7 @@ export async function sendLicenseAccessNotificationEmail(
           </div>
 
           <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 4px;">
-            <p style="margin: 0; color: #1e3a8a; font-weight: bold;">✅ You're All Set!</p>
+            <p style="margin: 0; color: #1e3a8a; font-weight: bold;">You're All Set!</p>
             <p style="margin: 10px 0 0 0; color: #1e40af; font-size: 14px;">You can log in now using your existing password.</p>
           </div>
 
@@ -703,7 +703,7 @@ export async function sendLicenseManagerInvitationEmail(
           </div>
 
           <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;">
-            <p style="margin: 0; color: #92400e; font-weight: bold;">🔑 As License Manager, you can:</p>
+            <p style="margin: 0; color: #92400e; font-weight: bold;">As License Manager, you can:</p>
             <ul style="margin: 10px 0 0 0; color: #78350f; font-size: 14px; padding-left: 20px;">
               <li>Assign licenses to team members</li>
               <li>Revoke licenses when needed</li>
@@ -830,7 +830,7 @@ export async function sendNewRegistrationNotification(
               
               <div class="field">
                 <div class="label">Account Status</div>
-                <div class="value">✅ Email verification pending</div>
+                <div class="value">Email verification pending</div>
               </div>
               
               <div class="field">
@@ -840,7 +840,7 @@ export async function sendNewRegistrationNotification(
             </div>
             
             <div class="footer">
-              <p><strong>📊 User Activity:</strong> Monitor their trial usage and reach out when they show engagement</p>
+              <p><strong> User Activity:</strong> Monitor their trial usage and reach out when they show engagement</p>
               <p style="margin-top: 10px; font-size: 12px; color: #9ca3af;">This is an automated notification from Rev Winner</p>
             </div>
           </div>

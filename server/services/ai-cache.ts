@@ -16,7 +16,7 @@ class AIResponseCache {
       ttl,
     });
     
-    console.log(`📦 Cache SET: ${key.substring(0, 50)}...`);
+    console.log(` Cache SET: ${key.substring(0, 50)}...`);
   }
 
   get<T>(key: string): T | null {
@@ -35,7 +35,7 @@ class AIResponseCache {
       return null;
     }
 
-    console.log(`✅ Cache HIT (${age}ms old): ${key.substring(0, 50)}...`);
+    console.log(`Cache HIT (${age}ms old): ${key.substring(0, 50)}...`);
     return entry.data as T;
   }
 

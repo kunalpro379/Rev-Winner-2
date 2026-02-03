@@ -195,7 +195,7 @@ export function createPaymentHandler(
 ) {
   return async function (response: any) {
     try {
-      console.log('🔄 Payment handler called with response:', {
+      console.log('Payment handler called with response:', {
         payment_id: response.razorpay_payment_id,
         order_id: response.razorpay_order_id,
         signature: response.razorpay_signature ? 'present' : 'missing'
@@ -216,7 +216,7 @@ export function createPaymentHandler(
       });
 
       const verifyData = await verifyResponse.json();
-      console.log('✅ Payment verification response:', { 
+      console.log('Payment verification response:', { 
         status: verifyResponse.status, 
         success: verifyResponse.ok 
       });
@@ -252,7 +252,7 @@ export function createPaymentHandler(
               }
             });
             
-            console.log('🔄 Razorpay modal cleanup completed, refreshing page...');
+            console.log('Razorpay modal cleanup completed, refreshing page...');
             
             // Force page refresh to show updated data and ensure clean state
             window.location.reload();
@@ -287,7 +287,7 @@ export function openRazorpayCheckout(config: RazorpayOptions) {
   
   const isTestMode = config.key.includes('test') || config.key.startsWith('rzp_test');
   
-  console.log('🚀 Opening Razorpay checkout with enhanced config:', {
+  console.log('Opening Razorpay checkout with enhanced config:', {
     mode: isTestMode ? 'TEST' : 'PRODUCTION',
     amount: enhancedConfig.amount,
     currency: enhancedConfig.currency,
@@ -305,7 +305,7 @@ export function openRazorpayCheckout(config: RazorpayOptions) {
   
   // Enhanced error handling for payment failures
   razorpay.on('payment.failed', function (response: any) {
-    console.error('💳 Payment failed:', response.error);
+    console.error('Payment failed:', response.error);
     
     // Show user-friendly error message
     const errorCode = response.error?.code;
@@ -331,7 +331,7 @@ export function openRazorpayCheckout(config: RazorpayOptions) {
   
   // Handle successful modal open
   razorpay.on('payment.authorized', function (response: any) {
-    console.log('✅ Payment authorized:', response);
+    console.log('Payment authorized:', response);
   });
   
   razorpay.open();

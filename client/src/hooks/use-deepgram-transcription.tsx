@@ -208,11 +208,11 @@ export function useDeepgramTranscription({
           } 
         });
         micStreamRef.current = micStream;
-        console.log('✅ Microphone access granted, tracks:', micStream.getAudioTracks().length);
+        console.log('Microphone access granted, tracks:', micStream.getAudioTracks().length);
         
         const micSource = audioContext.createMediaStreamSource(micStream);
         sources.push(micSource);
-        console.log('✅ Microphone source created');
+        console.log('Microphone source created');
       }
 
       if (includeTab) {
@@ -243,7 +243,7 @@ export function useDeepgramTranscription({
         tabStreamRef.current = tabStream;
         const tabSource = audioContext.createMediaStreamSource(tabStream);
         sources.push(tabSource);
-        console.log('✅ Tab/meeting audio captured');
+        console.log('Tab/meeting audio captured');
       }
 
       if (sources.length === 0) {

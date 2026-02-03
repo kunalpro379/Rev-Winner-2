@@ -71,6 +71,8 @@ export function SessionMinutesModal({ open, onOpenChange }: SessionMinutesModalP
   const { data: statusData } = useQuery<{
     hasActiveMinutes: boolean;
     totalMinutesRemaining: number;
+    totalMinutes: number;
+    usedMinutes: number;
     nextExpiryDate: string | null;
   }>({
     queryKey: ["/api/session-minutes/status"],

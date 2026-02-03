@@ -35,7 +35,7 @@ export class RazorpayAdapter implements IPaymentGateway {
           key_id: keyId,
           key_secret: keySecret,
         });
-        console.log(`✅ Razorpay initialized successfully (Key ID: ${keyId.substring(0, 10)}...)`);
+        console.log(`Razorpay initialized successfully (Key ID: ${keyId.substring(0, 10)}...)`);
       } catch (error: any) {
         console.error("❌ Failed to initialize Razorpay:", error.message);
         this.razorpay = null;

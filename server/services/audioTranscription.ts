@@ -84,7 +84,7 @@ export async function transcribeAudioFile(filePath: string, fileType: string): P
   const duration = result.metadata?.duration || 0;
   const model = result.metadata?.model_info?.[Object.keys(result.metadata?.model_info || {})[0]]?.name || "nova-2";
 
-  console.log(`✅ Transcription complete: ${transcript.length} chars, ${duration}s duration, ${(confidence * 100).toFixed(1)}% confidence`);
+  console.log(`Transcription complete: ${transcript.length} chars, ${duration}s duration, ${(confidence * 100).toFixed(1)}% confidence`);
 
   return {
     content: transcript,
@@ -151,7 +151,7 @@ export async function transcribeAudioFromBuffer(
   const duration = result.metadata?.duration || 0;
   const model = result.metadata?.model_info?.[Object.keys(result.metadata?.model_info || {})[0]]?.name || "nova-2";
 
-  console.log(`✅ Transcription complete: ${transcript.length} chars, ${duration}s duration, ${(confidence * 100).toFixed(1)}% confidence`);
+  console.log(`Transcription complete: ${transcript.length} chars, ${duration}s duration, ${(confidence * 100).toFixed(1)}% confidence`);
 
   return {
     content: transcript,

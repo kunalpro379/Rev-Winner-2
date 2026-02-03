@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-console.log('🚀 ServiceNow Sales Assistant - Teams App Deployment Helper\n');
+console.log('ServiceNow Sales Assistant - Teams App Deployment Helper\n');
 
 // Get the current Replit app URL
 let replitUrl = process.env.REPLIT_URL || 'workspace.replit.app';
@@ -38,8 +38,8 @@ fs.writeFileSync(distManifestPath, JSON.stringify(manifest, null, 2));
 fs.copyFileSync(path.join(__dirname, 'color-icon.png'), path.join(distPath, 'color-icon.png'));
 fs.copyFileSync(path.join(__dirname, 'outline-icon.png'), path.join(distPath, 'outline-icon.png'));
 
-console.log('✅ Teams app package built successfully!');
-console.log('\n📦 Installation Files Ready in "dist" folder!');
+console.log('Teams app package built successfully!');
+console.log('\n Installation Files Ready in "dist" folder!');
 console.log('\nNext steps:');
 console.log('1. Download these 3 files from the "dist" folder:');
 console.log('   - dist/manifest.json');

@@ -49,7 +49,7 @@ function getCachedIntelligence(companyName: string): CompanyIntelligence | null 
   const cached = intelligenceCache.get(normalized);
   
   if (cached && cached.expiresAt > Date.now()) {
-    console.log(`📦 Cache hit for competitive intelligence: ${companyName}`);
+    console.log(` Cache hit for competitive intelligence: ${companyName}`);
     return { ...cached.data, source: "cache" };
   }
   
@@ -84,7 +84,7 @@ export async function researchCompanyIntelligence(
   }
 
   try {
-    console.log(`🔍 Researching competitive intelligence for: ${companyName}`);
+    console.log(` Researching competitive intelligence for: ${companyName}`);
     const researchStartTime = Date.now();
     
     const prompt = `You are a business intelligence analyst. Research and provide accurate information about the company "${companyName}".
@@ -173,7 +173,7 @@ IMPORTANT RULES:
     console.log(`⏱️ Research completed in ${requestDurationMs}ms`);
 
     cacheIntelligence(intelligence);
-    console.log(`✅ Successfully researched ${companyName}: Found ${intelligence.competitors.length} competitors`);
+    console.log(`Successfully researched ${companyName}: Found ${intelligence.competitors.length} competitors`);
     
     return intelligence;
   } catch (error) {

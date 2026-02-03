@@ -104,14 +104,14 @@ export async function seedMarketingDummyData(): Promise<{ success: boolean; back
       });
       
       backupsCreated++;
-      console.log(`  ✅ Created backup for ${backup.companyName} - ${backup.clientName}`);
+      console.log(`  Created backup for ${backup.companyName} - ${backup.clientName}`);
     } catch (error) {
       console.error(`  ❌ Error creating backup for ${backup.companyName}:`, error);
     }
   }
   
   console.log("✨ Marketing dummy data seeding completed!");
-  console.log(`📊 Created ${backupsCreated} conversation backups across ${Object.keys(domainUserMap).length} domains`);
+  console.log(` Created ${backupsCreated} conversation backups across ${Object.keys(domainUserMap).length} domains`);
   
   return {
     success: true,

@@ -656,7 +656,7 @@ export function setupAuthRoutes(app: Router) {
       
       // For default engine, skip API key validation and use a placeholder
       if (aiEngine === 'default') {
-        console.log(`🔑 User ${req.jwtUser!.userId} selected Default AI Engine (Rev Winner's API key)`);
+        console.log(`User ${req.jwtUser!.userId} selected Default AI Engine (Rev Winner's API key)`);
         
         // Store a placeholder encrypted value to satisfy database constraints
         const encryptedKey = encryptApiKey('default');
@@ -692,7 +692,7 @@ export function setupAuthRoutes(app: Router) {
         });
       }
       
-      console.log(`✅ ${aiEngine} API key validated successfully`);
+      console.log(`${aiEngine} API key validated successfully`);
       
       const encryptedKey = encryptApiKey(apiKey);
       

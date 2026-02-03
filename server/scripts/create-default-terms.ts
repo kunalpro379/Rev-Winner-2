@@ -143,7 +143,7 @@ Rev Winner may update these terms periodically. Continued use indicates acceptan
 ## 14. Contact Information
 
 For support or policy inquiries:
-📧 support@revwinner.com
+support@revwinner.com
 
 ---
 
@@ -173,7 +173,7 @@ async function createDefaultTerms() {
       lastModifiedBy: "system", // System-generated default
     }).returning();
     
-    console.log("✅ Default terms and conditions created successfully!");
+    console.log("Default terms and conditions created successfully!");
     console.log("Terms ID:", newTerms.id);
     console.log("Version:", newTerms.version);
     console.log("Title:", newTerms.title);
