@@ -203,15 +203,45 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
     }
   });
 
-  const formatPitchText = (text: string) => {
-    if (!text) return { formatted: "", hasSections: false };
-    const cleaned = text
-      .replace(/\[(SOLUTION|VALUE|TECHNICAL|CASE STUDY|COMPETITOR|WHY BETTER)\]\s*/gi, "\n$1: ")
-      .replace(/\s+\n/g, "\n")
-      .trim();
+  const formatTextWithMarkdown = (text: string): JSX.Element | string => {
+    if (!text) return text;
+    
+    // Convert markdown-style formatting to React elements
+    const parts: (string | JSX.Element)[] = [];
+    let currentIndex = 0;
+    
+    // Pattern to match **bold** text
+    const boldPattern = /\*\*(.*?)\*\*/g;
+    let match;
+    let keyCounter = 0;
+    
+    while ((match = boldPattern.exec(text)) !== null) {
+      // Add text before bold
+      if (match.index > currentIndex) {
+        parts.push(text.substring(currentIndex, match.index));
+      }
+      // Add bold text
+      parts.push(<strong key={`bold-${keyCounter++}`} className="font-bold text-current">{match[1]}</strong>);
+      currentIndex = boldPattern.lastIndex;
+    }
+    
+    // Add remaining text
+    if (currentIndex < text.length) {
+      parts.push(text.substring(currentIndex));
+    }
+    
+    return parts.length > 1 ? <>{parts}</> : text;
+  };
 
-    const hasSections = /SOLUTION:|VALUE:|TECHNICAL:|CASE STUDY:|COMPETITOR:|WHY BETTER:/i.test(cleaned);
-    return { formatted: cleaned, hasSections };
+  const formatPitchText = (text: string) => {
+    if (!text) return { formatted: null, hasSections: false };
+    
+    const formatted = formatTextWithMarkdown(text);
+    
+    // Detect if text has structured sections
+    const hasSections = /\[(SOLUTION|VALUE|TECHNICAL|CASE STUDY|COMPETITOR|WHY BETTER)\]|SOLUTION:|VALUE:|TECHNICAL:|CASE STUDY:|COMPETITOR:|WHY BETTER:/i.test(text);
+    
+    return { formatted: formatted !== text ? formatted : null, hasSections };
   };
 
   // Auto-update logic for tips: trigger when transcript changes significantly
@@ -306,7 +336,7 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
       
       if (hasMeaningfulSignal && transcriptText.trim().length > 30) {
         hasFetchedFirstTipRef.current = true;
-        console.log('🚀 Shift Gears: Initial fetch triggered - detected meaningful content');
+        console.log('Shift Gears: Initial fetch triggered - detected meaningful content');
         fetchTipsMutation.mutate();
       }
     }
@@ -319,7 +349,7 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
       
       if ((hasQuestion || hasEnoughContent) && transcriptText.trim().length > 30) {
         hasFetchedFirstPitchRef.current = true;
-        console.log('🚀 Query Pitches: Initial fetch triggered - detected question or content');
+        console.log('Query Pitches: Initial fetch triggered - detected question or content');
         fetchPitchesMutation.mutate();
       }
     }
@@ -624,12 +654,12 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
                                   {(() => {
                                     const { formatted, hasSections } = formatPitchText(pitch.pitch);
                                     return (
-                                      <p
-                                        className={`text-sm leading-relaxed ${hasSections ? "whitespace-pre-line" : ""}`}
+                                      <div
+                                        className={`text-sm leading-relaxed ${hasSections ? "space-y-2" : ""}`}
                                         data-testid={`pitch-response-${index}`}
                                       >
-                                        {formatted || pitch.pitch}
-                                      </p>
+                                        {formatted ? formatted : pitch.pitch}
+                                      </div>
                                     );
                                   })()}
                                 </div>
@@ -640,9 +670,9 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
                                     {pitch.keyPoints.map((point, pIndex) => (
                                       <div key={pIndex} className="flex items-start gap-2">
                                         <div className="w-1.5 h-1.5 rounded-full bg-current mt-1.5 flex-shrink-0"></div>
-                                        <p className="text-xs leading-relaxed" data-testid={`pitch-point-${index}-${pIndex}`}>
-                                          {point}
-                                        </p>
+                                        <div className="text-xs leading-relaxed" data-testid={`pitch-point-${index}-${pIndex}`}>
+                                          {formatTextWithMarkdown(point)}
+                                        </div>
                                       </div>
                                     ))}
                                   </div>

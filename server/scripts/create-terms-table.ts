@@ -71,7 +71,7 @@ async function createTermsTable() {
     `);
     
     console.log("Final verification - table exists:", verifyExists.rows[0]?.exists);
-    console.log("✅ terms_and_conditions table created successfully!");
+    console.log("terms_and_conditions table created successfully!");
     
   } catch (error) {
     console.error("❌ Error creating terms_and_conditions table:", error);

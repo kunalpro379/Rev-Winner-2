@@ -50,7 +50,7 @@ export async function getPaymentGatewayConfig(): Promise<{
 export async function openPaymentCheckout(options: UnifiedPaymentOptions) {
   const config = await getPaymentGatewayConfig();
   
-  console.log(`💳 Using ${config.gateway.toUpperCase()} payment gateway`);
+  console.log(`Using ${config.gateway.toUpperCase()} payment gateway`);
   
   if (config.gateway === 'razorpay') {
     return openRazorpayPayment(options, config.keyId);

@@ -85,7 +85,13 @@ export default function Subscribe() {
   });
 
   // Fetch Session Minutes status for required addon validation
-  const { data: sessionMinutesStatus } = useQuery<{ hasActiveMinutes: boolean; totalMinutesRemaining: number; superUserAccess?: boolean }>({
+  const { data: sessionMinutesStatus } = useQuery<{ 
+    hasActiveMinutes: boolean; 
+    totalMinutesRemaining: number; 
+    totalMinutes: number;
+    usedMinutes: number;
+    superUserAccess?: boolean 
+  }>({
     queryKey: ["/api/session-minutes/status"],
   });
 

@@ -61,7 +61,7 @@ Minimal changes to existing app behavior
 
 ---
 
-💳 2. SUBSCRIPTION & PACKAGES (INDIVIDUAL USERS)
+2. SUBSCRIPTION & PACKAGES (INDIVIDUAL USERS)
 
 2.1 Platform Access (Required)
 
@@ -157,7 +157,7 @@ Add minutes to remaining pool or reset (choose the simpler, well-structured mode
 
 ---
 
-📚 4. OPTIONAL ADD-ON: TRAIN ME
+4. OPTIONAL ADD-ON: TRAIN ME
 
 Train Me lets users / enterprises upload internal content for personalized responses.
 
@@ -658,7 +658,7 @@ Logging to admin_actions_log
 
 ---
 
-💰 8. BILLING & RAZORPAY
+ 8. BILLING & RAZORPAY
 
 Add/ensure SKUs:
 
@@ -828,7 +828,7 @@ Use existing design system/styling where possible.
 
 ---
 
-✅ Final Reminder
+Final Reminder
 
 Preserve ALL existing Rev Winner functionality.
 

@@ -53,7 +53,7 @@ The app automatically detects when you're in a Teams meeting and:
 - Enables meeting context features
 - Provides enhanced discovery insights
 
-## 🚀 **Quick Start**
+## **Quick Start**
 
 Once installed, the Sales Assistant provides:
 - **AI-powered conversation responses**

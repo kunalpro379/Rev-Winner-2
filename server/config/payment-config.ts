@@ -15,7 +15,7 @@ const IS_PRODUCTION = ENVIRONMENT === 'PROD' || ENVIRONMENT === 'PRODUCTION';
 const PAYMENT_GATEWAY = process.env.PAYMENT_GATEWAY || 'razorpay';
 
 console.log(`🔧 Payment Configuration: ${ENVIRONMENT} mode`);
-console.log(`💳 Active Payment Gateway: ${PAYMENT_GATEWAY.toUpperCase()}`);
+console.log(`Active Payment Gateway: ${PAYMENT_GATEWAY.toUpperCase()}`);
 
 // Razorpay Configuration
 export const razorpayConfig = {
@@ -54,14 +54,14 @@ if (PAYMENT_GATEWAY === 'razorpay') {
     console.warn('⚠️  Razorpay credentials not configured properly');
   } else {
     console.log(`🔐 Razorpay Mode: ${razorpayConfig.mode}`);
-    console.log(`✅ Razorpay configured successfully`);
+    console.log(`Razorpay configured successfully`);
   }
 } else if (PAYMENT_GATEWAY === 'cashfree') {
   if (!cashfreeConfig.appId || !cashfreeConfig.secretKey) {
     console.warn('⚠️  Cashfree credentials not configured properly');
   } else {
     console.log(`🔐 Cashfree Environment: ${cashfreeConfig.environment}`);
-    console.log(`✅ Cashfree configured successfully`);
+    console.log(`Cashfree configured successfully`);
   }
 }
 

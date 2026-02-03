@@ -75,7 +75,7 @@ export function serveStatic(app: Express) {
     ? path.resolve(import.meta.dirname, "..", "dist", "public")
     : path.resolve(import.meta.dirname, "public");
 
-  console.log(`🔍 Static file serving debug:`);
+  console.log(` Static file serving debug:`);
   console.log(`  NODE_ENV: ${process.env.NODE_ENV}`);
   console.log(`  isProduction: ${isProduction}`);
   console.log(`  Looking for: ${distPath}`);

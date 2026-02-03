@@ -886,7 +886,7 @@ function CallFlowScriptTab({ data }: { data: CallFlowScript }) {
             <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200">{pages[currentPage].title}</h3>
           </div>
           
-          <div className="min-h-[300px]">
+          <div className="min-h-[200px]">
             {renderPageContent()}
           </div>
         </CardContent>
@@ -1289,7 +1289,7 @@ function AnalysisTabs({ tabData, productName }: { tabData: TabBasedAnalysis; pro
         </TabsTrigger>
       </TabsList>
 
-      <ScrollArea className="h-[500px] mt-4">
+      <ScrollArea className="max-h-[70vh] mt-4">
         <TabsContent value="discovery" className="mt-0 pr-4">
           <DiscoveryQuestionsTab data={safeTabData.discovery} />
         </TabsContent>

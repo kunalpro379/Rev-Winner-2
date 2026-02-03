@@ -5,7 +5,7 @@ import { z } from "zod";
 import { storage } from "./storage";
 import { authStorage } from "./storage-auth";
 import { generateSalesResponse, generateCallSummary, generateCoachingSuggestions } from "./services/openai";
-import { insertConversationSchema, insertMessageSchema, insertTeamsMeetingSchema, insertAudioSourceSchema, insertSessionUsageSchema, AUDIO_SOURCE_TYPES, subscriptions, pendingOrders, addonPurchases, sessionUsage } from "../shared/schema";
+import { insertConversationSchema, insertMessageSchema, insertTeamsMeetingSchema, insertAudioSourceSchema, insertSessionUsageSchema, AUDIO_SOURCE_TYPES, subscriptions, pendingOrders, addonPurchases, sessionUsage, conversations } from "../shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { setupAuth, isAuthenticated } from "./replitAuth";
@@ -2019,44 +2019,7 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
     try {
       const userId = req.jwtUser!.userId;
       console.log(`[DEBUG] Fetching subscription for userId: ${userId}`);
-      const now = new Date();
-
-      const hasPaymentReference = (purchase: any) => {
-        const metadata = (purchase?.metadata as any) || {};
-        const amount = (purchase?.purchaseAmount || '').toString();
-        const isFree = amount === '0' || amount === '0.00';
-        return Boolean(purchase?.gatewayTransactionId || metadata?.paymentId || isFree);
-      };
-
-      const platformPurchases = await db
-        .select()
-        .from(addonPurchases)
-        .where(
-          and(
-            eq(addonPurchases.userId, userId),
-            eq(addonPurchases.addonType, 'platform_access'),
-            eq(addonPurchases.status, 'active')
-          )
-        );
-
-      const validPlatform = platformPurchases
-        .filter(p => !p.endDate || p.endDate > now)
-        .filter(hasPaymentReference);
-
-      if (validPlatform.length > 0) {
-        const activePlatform = validPlatform[0];
-        return res.json({
-          planType: "professional",
-          status: "active",
-          currentPeriodStart: activePlatform.startDate,
-          currentPeriodEnd: activePlatform.endDate,
-          purchaseId: activePlatform.id,
-          packageSku: activePlatform.packageSku,
-          purchaseAmount: activePlatform.purchaseAmount,
-          currency: activePlatform.currency,
-        });
-      }
-
+      
       const subscription = await authStorage.getSubscriptionByUserId(userId);
       console.log(`[DEBUG] Subscription found:`, subscription ? {
         id: subscription.id,
@@ -2064,7 +2027,7 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
         status: subscription.status,
         planId: subscription.planId,
       } : 'NULL');
-
+      
       if (!subscription) {
         console.log(`[DEBUG] No subscription found for user ${userId}, returning free_trial`);
         return res.json({
@@ -2073,7 +2036,7 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
           message: "No active subscription"
         });
       }
-
+      
       // Get plan details if planId exists
       let planDetails = null;
       if (subscription.planId) {
@@ -2083,32 +2046,167 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
           price: planDetails.price,
         } : 'NULL');
       }
+      
+      res.json({
+        id: subscription.id,
+        planType: subscription.planType,
+        status: subscription.status,
+        currentPeriodStart: subscription.currentPeriodStart,
+        currentPeriodEnd: subscription.currentPeriodEnd,
+        sessionsUsed: subscription.sessionsUsed,
+        sessionsLimit: subscription.sessionsLimit,
+        minutesUsed: subscription.minutesUsed,
+        minutesLimit: subscription.minutesLimit,
+        sessionHistory: subscription.sessionHistory || [],
+        canceledAt: subscription.canceledAt,
+        createdAt: subscription.createdAt,
+        plan: planDetails ? {
+          name: planDetails.name,
+          price: planDetails.price,
+          currency: planDetails.currency,
+          billingInterval: planDetails.billingInterval,
+        } : null,
+      });
+    } catch (error: any) {
+      console.error(`[DEBUG] Error fetching subscription:`, error);
+      res.status(500).json({ message: "Failed to fetch subscription", error: error.message });
+    }
+  });
+  
+  // Debug endpoint to check subscription and payment status
+  app.get("/api/debug/subscription-status", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      
+      // Get user info
+      const user = await authStorage.getUserById(userId);
+      
+      // Get all subscriptions for this user (not just the latest)
+      const allSubscriptions = await db.select().from(subscriptions)
+        .where(eq(subscriptions.userId, userId))
+        .orderBy(desc(subscriptions.createdAt));
+      
+      // Get all payments for this user
+      const payments = await authStorage.getPaymentsByUserId(userId);
+      
+      // Get all pending orders
+      const orders = await db.select().from(pendingOrders)
+        .where(eq(pendingOrders.userId, userId))
+        .orderBy(desc(pendingOrders.createdAt));
+      
+      res.json({
+        userId,
+        userEmail: user?.email,
+        userName: `${user?.firstName} ${user?.lastName}`,
+        subscriptionsCount: allSubscriptions.length,
+        subscriptions: allSubscriptions.map(sub => ({
+          id: sub.id,
+          planType: sub.planType,
+          status: sub.status,
+          planId: sub.planId,
+          createdAt: sub.createdAt,
+          currentPeriodEnd: sub.currentPeriodEnd,
+        })),
+        paymentsCount: payments.length,
+        payments: payments.map((p: any) => ({
+          id: p.id,
+          amount: p.amount,
+          status: p.status,
+          subscriptionId: p.subscriptionId,
+          createdAt: p.createdAt,
+          razorpayOrderId: p.razorpayOrderId,
+        })),
+        ordersCount: orders.length,
+        orders: orders.map(order => ({
+          id: order.id,
+          status: order.status,
+          amount: order.amount,
+          gatewayOrderId: order.gatewayOrderId,
+          createdAt: order.createdAt,
+          completedAt: order.completedAt,
+        })),
+      });
+    } catch (error: any) {
+      console.error("[DEBUG] Error fetching debug info:", error);
+      res.status(500).json({ message: "Failed to fetch debug info", error: error.message });
+    }
+  });
+
+  // Get user session history
+  app.get("/api/profile/session-history", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const limit = parseInt(req.query.limit as string) || 50;
+      
+      console.log(`[DEBUG] Fetching session history for userId: ${userId}`);
+      
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+      
+      // Fetch conversations for this user
+      const userConversations = await db
+        .select({
+          id: conversations.id,
+          sessionId: conversations.sessionId,
+          clientName: conversations.clientName,
+          status: conversations.status,
+          createdAt: conversations.createdAt,
+          endedAt: conversations.endedAt,
+        })
+        .from(conversations)
+        .where(eq(conversations.userId, userId))
+        .orderBy(sql`${conversations.createdAt} DESC`)
+        .limit(limit);
+
+      // Calculate session details with null safety
+      const sessionHistory = userConversations.map(conv => {
+        const startTime = conv.createdAt || new Date();
+        const endTime = conv.endedAt || new Date();
+        const durationMs = Math.max(0, endTime.getTime() - startTime.getTime());
+        const durationMinutes = Math.round(durationMs / (1000 * 60));
+        
+        return {
+          id: conv.id,
+          sessionId: conv.sessionId || 'unknown',
+          clientName: conv.clientName || "Unknown",
+          status: conv.status || 'active',
+          startTime: startTime.toISOString(),
+          endTime: conv.endedAt?.toISOString() || null,
+          durationMinutes,
+          isActive: conv.status === "active",
+        };
+      });
+
+      // Calculate total usage
+      const totalSessions = sessionHistory.length;
+      const completedSessions = sessionHistory.filter(s => s.status === "ended").length;
+      const totalMinutes = sessionHistory.reduce((sum, s) => sum + (s.durationMinutes || 0), 0);
+
+      console.log(`[DEBUG] Session history loaded: ${totalSessions} total sessions, ${completedSessions} completed`);
 
       res.json({
-        subscription: {
-          id: subscription.id,
-          planType: subscription.planType,
-          status: subscription.status,
-          currentPeriodStart: subscription.currentPeriodStart,
-          currentPeriodEnd: subscription.currentPeriodEnd,
-          sessionsUsed: subscription.sessionsUsed,
-          sessionsLimit: subscription.sessionsLimit,
-          minutesUsed: subscription.minutesUsed,
-          minutesLimit: subscription.minutesLimit,
-          sessionHistory: subscription.sessionHistory || [],
-          canceledAt: subscription.canceledAt,
-          createdAt: subscription.createdAt,
-          plan: planDetails ? {
-            name: planDetails.name,
-            price: planDetails.price,
-            currency: planDetails.currency,
-            billingInterval: planDetails.billingInterval,
-          } : null,
+        sessions: sessionHistory,
+        summary: {
+          totalSessions,
+          completedSessions,
+          activeSessions: totalSessions - completedSessions,
+          totalMinutesUsed: totalMinutes,
         }
       });
     } catch (error: any) {
-      console.error(`[DEBUG] Error fetching current subscription:`, error);
-      res.status(500).json({ message: "Failed to fetch subscription", error: error.message });
+      console.error(`[ERROR] Failed to fetch session history for user:`, error);
+      res.status(500).json({ 
+        message: "Failed to fetch session history", 
+        error: error.message || 'Unknown error',
+        sessions: [],
+        summary: {
+          totalSessions: 0,
+          completedSessions: 0,
+          activeSessions: 0,
+          totalMinutesUsed: 0,
+        }
+      });
     }
   });
 

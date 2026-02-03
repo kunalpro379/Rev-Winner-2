@@ -1,5 +1,6 @@
-import { authStorage } from "../storage-auth";
-import type { ConversationMemory, UserProfile } from "../../shared/schema";
+import { authStorage } from "../storage-auth";import { db } from '../db';
+import { conversations } from '../../shared/schema';
+import { eq } from 'drizzle-orm';import type { ConversationMemory, UserProfile } from "../../shared/schema";
 
 export interface SalesFrameworkContext {
   // System brief with all methodologies
@@ -82,45 +83,63 @@ export async function updateConversationLearnings(
   transcript: string,
   analysis: any
 ): Promise<void> {
-  const existing = await authStorage.getConversationMemory(conversationId);
-  
-  // Extract SPIN insights
-  const spinProblems = extractProblems(transcript);
-  const spinImplications = extractImplications(transcript);
-  
-  // Extract MEDDIC elements
-  const meddicPain = extractPainPoints(analysis);
-  const meddicMetrics = extractMetrics(transcript);
-  
-  // Extract BANT qualification
-  const bantData = extractBANT(transcript, analysis);
-  
-  // Determine buyer stage
-  const buyerStage = determineBuyerStage(transcript, analysis);
-  
-  // Calculate engagement score (0-100)
-  const engagementScore = calculateEngagement(transcript);
-  
-  const updates = {
-    conversationId,
-    userId,
-    spinProblems: spinProblems.length > 0 ? spinProblems : existing?.spinProblems || [],
-    spinImplications: spinImplications.length > 0 ? spinImplications : existing?.spinImplications || [],
-    meddicPain: meddicPain.length > 0 ? meddicPain : existing?.meddicPain || [],
-    meddicMetrics: meddicMetrics || existing?.meddicMetrics || {},
-    bantBudget: bantData.budget || existing?.bantBudget || null,
-    bantAuthority: bantData.authority || existing?.bantAuthority || null,
-    bantNeed: bantData.need || existing?.bantNeed || null,
-    bantTimeline: bantData.timeline || existing?.bantTimeline || null,
-    buyerStage: buyerStage || existing?.buyerStage || null,
-    engagementScore: engagementScore || existing?.engagementScore || 0,
-    keyInsights: analysis?.discoveryInsights?.painPoints || existing?.keyInsights || [],
-  };
-  
-  if (existing) {
-    await authStorage.updateConversationMemory(conversationId, updates);
-  } else {
-    await authStorage.createConversationMemory(updates);
+  try {
+    // CRITICAL FIX: Verify conversation exists before creating memory
+    // This prevents FK constraint violations
+    const [conversationExists] = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(eq(conversations.id, conversationId))
+      .limit(1);
+      
+    if (!conversationExists) {
+      console.warn(`⚠️ Skipping conversation learnings: conversation ${conversationId} not found in database`);
+      return;
+    }
+    
+    const existing = await authStorage.getConversationMemory(conversationId);
+    
+    // Extract SPIN insights
+    const spinProblems = extractProblems(transcript);
+    const spinImplications = extractImplications(transcript);
+    
+    // Extract MEDDIC elements
+    const meddicPain = extractPainPoints(analysis);
+    const meddicMetrics = extractMetrics(transcript);
+    
+    // Extract BANT qualification
+    const bantData = extractBANT(transcript, analysis);
+    
+    // Determine buyer stage
+    const buyerStage = determineBuyerStage(transcript, analysis);
+    
+    // Calculate engagement score (0-100)
+    const engagementScore = calculateEngagement(transcript);
+    
+    const updates = {
+      conversationId,
+      userId,
+      spinProblems: spinProblems.length > 0 ? spinProblems : existing?.spinProblems || [],
+      spinImplications: spinImplications.length > 0 ? spinImplications : existing?.spinImplications || [],
+      meddicPain: meddicPain.length > 0 ? meddicPain : existing?.meddicPain || [],
+      meddicMetrics: meddicMetrics || existing?.meddicMetrics || {},
+      bantBudget: bantData.budget || existing?.bantBudget || null,
+      bantAuthority: bantData.authority || existing?.bantAuthority || null,
+      bantNeed: bantData.need || existing?.bantNeed || null,
+      bantTimeline: bantData.timeline || existing?.bantTimeline || null,
+      buyerStage: buyerStage || existing?.buyerStage || null,
+      engagementScore: engagementScore || existing?.engagementScore || 0,
+      keyInsights: analysis?.discoveryInsights?.painPoints || existing?.keyInsights || [],
+    };
+    
+    if (existing) {
+      await authStorage.updateConversationMemory(conversationId, updates);
+    } else {
+      await authStorage.createConversationMemory(updates);
+    }
+  } catch (error) {
+    // Graceful error handling - don't break the main flow
+    console.error('Error updating conversation learnings:', error);
   }
 }
 

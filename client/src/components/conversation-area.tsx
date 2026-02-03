@@ -1,19 +1,20 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, TrendingUp } from "lucide-react";
+import { RefreshCw, TrendingUp, Loader2 } from "lucide-react";
 
 interface ConversationAreaProps {
   children?: React.ReactNode;
   onRegenerate?: () => void;
   isRegenerating?: boolean;
   hasAnalysis?: boolean;
+  isAnalyzing?: boolean;
 }
 
-export function ConversationArea({ children, onRegenerate, isRegenerating = false, hasAnalysis = false }: ConversationAreaProps) {
+export function ConversationArea({ children, onRegenerate, isRegenerating = false, hasAnalysis = false, isAnalyzing = false }: ConversationAreaProps) {
   return (
-    <Card className="card-shadow-lg border-border/50 overflow-hidden w-full">
-      <CardHeader className="border-b border-border/50 pb-4 bg-gradient-to-r from-purple-500/10 via-purple-500/5 to-transparent">
+    <Card className="card-shadow-lg border-border/50 overflow-hidden w-full h-full flex flex-col">
+      <CardHeader className="border-b border-border/50 pb-4 bg-gradient-to-r from-purple-500/10 via-purple-500/5 to-transparent flex-shrink-0">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <TrendingUp className="h-5 w-5 text-purple-600 mt-0.5" />
@@ -23,9 +24,15 @@ export function ConversationArea({ children, onRegenerate, isRegenerating = fals
                 <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 dark:text-amber-400">
                   Beta
                 </Badge>
-                {hasAnalysis && (
+                {hasAnalysis && !isAnalyzing && (
                   <Badge variant="default" className="text-xs bg-purple-600">
                     Active
+                  </Badge>
+                )}
+                {isAnalyzing && (
+                  <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    Analyzing
                   </Badge>
                 )}
               </div>
@@ -40,7 +47,7 @@ export function ConversationArea({ children, onRegenerate, isRegenerating = fals
               variant="outline"
               size="sm"
               onClick={onRegenerate}
-              disabled={isRegenerating}
+              disabled={isRegenerating || isAnalyzing}
               data-testid="button-regenerate-analysis"
               className="gap-2"
             >
@@ -51,8 +58,22 @@ export function ConversationArea({ children, onRegenerate, isRegenerating = fals
         </div>
       </CardHeader>
 
-      <CardContent className="p-5" data-testid="conversation-area">
-        {children}
+      <CardContent className="p-5 flex-1 flex flex-col min-h-0" data-testid="conversation-area">
+        {isAnalyzing ? (
+          <div className="flex-1 flex flex-col items-center justify-center min-h-[400px]">
+            <div className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 rounded-full mb-4">
+              <Loader2 className="h-8 w-8 text-blue-600 dark:text-blue-400 animate-spin" />
+            </div>
+            <p className="text-base font-semibold text-foreground mb-2">Analyzing Conversation</p>
+            <p className="text-sm text-muted-foreground max-w-md text-center leading-relaxed">
+              AI is processing your conversation to extract insights, discovery questions, and recommendations...
+            </p>
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col min-h-0">
+            {children}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

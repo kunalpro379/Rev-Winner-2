@@ -37,7 +37,7 @@ async function main() {
       )
       .returning();
 
-    console.log(`✅ Updated ${updated.length} subscriptions to have unlimited limits!\n`);
+    console.log(`Updated ${updated.length} subscriptions to have unlimited limits!\n`);
 
     // Show before/after
     updated.slice(0, 3).forEach((sub) => {

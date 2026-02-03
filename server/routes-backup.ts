@@ -10,7 +10,7 @@ export function registerBackupRoutes(app: Express) {
         return res.status(403).json({ success: false, message: "Admin access required" });
       }
 
-      console.log(`📦 Starting full conversation backup requested by ${user.email}`);
+      console.log(` Starting full conversation backup requested by ${user.email}`);
       const stats = await meetingMinutesBackupService.backupAllConversations("manual");
       
       res.json({
@@ -153,5 +153,5 @@ export function registerBackupRoutes(app: Express) {
     }
   });
 
-  console.log('📦 Backup routes registered');
+  console.log(' Backup routes registered');
 }

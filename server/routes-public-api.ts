@@ -239,5 +239,5 @@ export function setupPublicApiRoutes(app: Express) {
     }
   });
   
-  console.log("🌐 Public API routes registered at /api/v1/*");
+  console.log(" Public API routes registered at /api/v1/*");
 }

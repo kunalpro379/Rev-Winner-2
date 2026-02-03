@@ -40,7 +40,7 @@ Present to Win Section – Using auto-generated Pitch Deck, Case Study, and Batt
 
 Meeting Minutes & Summaries – Accessing and exporting auto-generated minutes post-call.
 
-📚 4. Advanced Features
+4. Advanced Features
 
 For power users and enterprise customers.
 
@@ -54,7 +54,7 @@ Data Privacy & Security – Encryption policies, session data handling, and stor
 
 Integrations & APIs – Connecting Rev Winner with CRM, email, and calendar apps (if applicable).
 
-💳 5. Billing & Subscriptions
+5. Billing & Subscriptions
 
 Self-service and transparency for users.
 

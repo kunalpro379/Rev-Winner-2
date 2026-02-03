@@ -128,7 +128,7 @@ class JobQueue {
     const reportProgress = (progress: number, message?: string) => {
       pendingJob.progress = Math.min(100, Math.max(0, progress));
       if (message) {
-        console.log(`📊 Job ${pendingJob.id}: ${progress}% - ${message}`);
+        console.log(` Job ${pendingJob.id}: ${progress}% - ${message}`);
       }
       this.notifySubscribers(pendingJob);
     };

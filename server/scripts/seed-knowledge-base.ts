@@ -272,19 +272,19 @@ async function seedKnowledgeBase() {
     for (const product of sampleProducts) {
       await db.insert(products).values(product).onConflictDoNothing();
     }
-    console.log(`✅ Inserted ${sampleProducts.length} products`);
+    console.log(`Inserted ${sampleProducts.length} products`);
 
     console.log("Inserting case studies...");
     for (const caseStudy of sampleCaseStudies) {
       await db.insert(caseStudies).values(caseStudy).onConflictDoNothing();
     }
-    console.log(`✅ Inserted ${sampleCaseStudies.length} case studies`);
+    console.log(`Inserted ${sampleCaseStudies.length} case studies`);
 
     console.log("Inserting implementation playbooks...");
     for (const playbook of samplePlaybooks) {
       await db.insert(implementationPlaybooks).values(playbook).onConflictDoNothing();
     }
-    console.log(`✅ Inserted ${samplePlaybooks.length} playbooks`);
+    console.log(`Inserted ${samplePlaybooks.length} playbooks`);
 
     console.log("🎉 Knowledge base seeded successfully!");
   } catch (error) {

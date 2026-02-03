@@ -310,7 +310,7 @@ Clear README with setup steps
 
 ---
 
-💰 Optional Monetization Hooks
+ Optional Monetization Hooks
 
 Free: limited post optimizations/week
 

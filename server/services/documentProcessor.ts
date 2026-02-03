@@ -342,7 +342,7 @@ Be specific with numbers, percentages, and facts visible in the image.`
     // Format the extracted content for storage
     const content = `[IMAGE ANALYSIS]\n\n${analysisContent}`;
     
-    console.log(`✅ Image processed successfully: ${filePath.substring(filePath.lastIndexOf('/') + 1)}`);
+    console.log(`Image processed successfully: ${filePath.substring(filePath.lastIndexOf('/') + 1)}`);
     
     return {
       content,
@@ -390,7 +390,7 @@ async function processAudio(filePath: string, fileType: string): Promise<Process
     
     const content = `[AUDIO TRANSCRIPTION]\n\n${result.content}`;
     
-    console.log(`✅ Audio processed successfully: ${result.duration}s, ${result.content.length} chars`);
+    console.log(`Audio processed successfully: ${result.duration}s, ${result.content.length} chars`);
     
     return {
       content,

@@ -17,7 +17,7 @@ async function main() {
     console.log('⚡ Subscription Audit (Raw SQL)\n');
 
     // 1. Count users by subscription status
-    console.log('📊 User Subscription Status:');
+    console.log(' User Subscription Status:');
     const userStats = await pool.query(`
       SELECT 
         au.id,

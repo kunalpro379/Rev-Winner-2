@@ -59,7 +59,7 @@ export function setupTranscriptionRoutes(server: Server): Router {
       console.log('🎙️ Deepgram configured with nova-2-meeting model for multi-speaker diarization');
 
       dgConnection.on(LiveTranscriptionEvents.Open, () => {
-        console.log('✅ Deepgram connection opened with nova-2-meeting model and diarization');
+        console.log('Deepgram connection opened with nova-2-meeting model and diarization');
         console.log('ℹ️ Note: Diarization needs 20-30 seconds of audio to build speaker profiles');
         
         dgConnection.on(LiveTranscriptionEvents.Transcript, (data) => {

@@ -1900,7 +1900,7 @@ const refreshToken = generateRefreshToken({
         }
       }
       
-      console.log(`✅ Successfully deleted ${type} transaction: ${id}`);
+      console.log(`Successfully deleted ${type} transaction: ${id}`);
       
       
       // Create audit log

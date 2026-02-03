@@ -15,7 +15,7 @@ export async function initializeDefaultGateway() {
     const existingProvider = await billingStorage.getGatewayProviderByName(DEFAULT_PAYMENT_GATEWAY);
     
     if (existingProvider) {
-      console.log(`✅ Payment gateway provider already initialized: ${existingProvider.providerName}`);
+      console.log(`Payment gateway provider already initialized: ${existingProvider.providerName}`);
       
       if (!existingProvider.isDefault) {
         console.log(`⚠️  Note: ${existingProvider.providerName} exists but is not set as default. You may need to update it in the database.`);
@@ -35,7 +35,7 @@ export async function initializeDefaultGateway() {
       },
     });
 
-    console.log(`✅ Payment gateway provider initialized: ${provider.providerName} (${gatewayConfig.name})`);
+    console.log(`Payment gateway provider initialized: ${provider.providerName} (${gatewayConfig.name})`);
     return provider;
   } catch (error) {
     console.error('Failed to initialize payment gateway provider:', error);

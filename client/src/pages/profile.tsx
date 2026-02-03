@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { HamburgerNav } from "@/components/hamburger-nav";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
-import { User, Mail, Phone, Building2, Calendar, CreditCard, Download, ShieldCheck, Clock, GraduationCap, Loader2, Video, ChevronDown, ChevronUp, Search, FileAudio, FileText, Package, Hash } from "lucide-react";
+import { User, Mail, Phone, Building2, Calendar, CreditCard, Download, ShieldCheck, Clock, GraduationCap, Loader2, Video, ChevronDown, ChevronUp, Search, FileAudio } from "lucide-react";
 import { useSEO } from "@/hooks/use-seo";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -140,6 +140,8 @@ export default function Profile() {
   const { data: sessionMinutesStatus, isLoading: isLoadingMinutes } = useQuery<{
     hasActiveMinutes: boolean;
     totalMinutesRemaining: number;
+    totalMinutes: number;
+    usedMinutes: number;
     nextExpiryDate: string | null;
   }>({
     queryKey: ["/api/session-minutes/status"],
@@ -150,7 +152,7 @@ export default function Profile() {
     queryKey: ["/api/call-recordings"],
   });
   
-  // Purchase Train Me subscription using enhanced Razorpay
+  // Purchase Train Me subscription using Razorpay
   const purchaseTrainMe = async () => {
     try {
       setIsPurchasing(true);
@@ -182,42 +184,57 @@ export default function Profile() {
 
       const { razorpayOrderId, razorpayKeyId, orderId, amount, currency } = await orderResponse.json();
 
-      // Import enhanced Razorpay utilities
-      const { openRazorpayCheckout, createPaymentHandler } = await import("@/utils/razorpay-config");
-
-      // Create enhanced payment handler with proper redirection
-      const paymentHandler = createPaymentHandler(
-        "/api/train-me/verify-payment",
-        orderId,
-        accessToken,
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["/api/train-me/status"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/profile/invoices"] });
-          toast({
-            title: "Train Me Activated!",
-            description: "You now have 30 days of access to Train Me features.",
-          });
-        },
-        (error) => {
-          toast({
-            title: "Payment Failed",
-            description: error,
-            variant: "destructive",
-          });
-        }
-      );
-
-      // Step 2: Open enhanced Razorpay checkout with all payment methods
-      openRazorpayCheckout({
+      // Step 2: Initialize Razorpay checkout
+      const options = {
         key: razorpayKeyId,
         amount: Math.round(parseFloat(amount) * 100),
-        currency: currency || 'USD',
+        currency: currency || 'INR',
         name: 'Rev Winner',
-        description: 'Train Me Subscription - 30 Days Access',
+        description: 'Train Me Subscription',
         order_id: razorpayOrderId,
-        handler: paymentHandler,
+        handler: async function (response: any) {
+          try {
+            const verifyResponse = await fetch("/api/train-me/verify-payment", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${accessToken}`,
+              },
+              body: JSON.stringify({
+                orderId,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+
+            const verifyData = await verifyResponse.json();
+
+            if (verifyResponse.ok) {
+              queryClient.invalidateQueries({ queryKey: ["/api/train-me/status"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/profile/invoices"] });
+              toast({
+                title: "Train Me Activated!",
+                description: "You now have 30 days of access to Train Me features.",
+              });
+            } else {
+              toast({
+                title: "Verification Failed",
+                description: verifyData.message || "Payment verification failed.",
+                variant: "destructive",
+              });
+            }
+          } catch (error: any) {
+            toast({
+              title: "Verification Error",
+              description: error.message || "Failed to verify payment.",
+              variant: "destructive",
+            });
+          }
+          setIsPurchasing(false);
+        },
         modal: {
-          ondismiss: () => {
+          ondismiss: function () {
             toast({
               title: "Payment Cancelled",
               description: "You cancelled the payment process.",
@@ -225,17 +242,13 @@ export default function Profile() {
             setIsPurchasing(false);
           }
         },
-        prefill: {
-          name: profileData ? `${profileData.firstName} ${profileData.lastName}` : 'Customer',
-          email: profileData?.email || 'customer@revwinner.com',
-          contact: profileData?.mobile || undefined
-        },
-        notes: {
-          addon_type: 'train_me',
-          order_type: 'train_me_subscription',
-          user_id: profileData?.id
+        theme: {
+          color: '#6366f1'
         }
-      });
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
 
     } catch (error: any) {
       toast({
@@ -300,8 +313,10 @@ export default function Profile() {
     return <Badge variant={statusInfo.variant as any}>{statusInfo.label}</Badge>;
   };
 
-  const handleDownloadInvoice = async (invoice: Invoice) => {
-    if (!invoice.receiptUrl) {
+  const handleDownloadInvoice = (invoice: Invoice) => {
+    if (invoice.receiptUrl) {
+      window.open(invoice.receiptUrl, "_blank");
+    } else {
       // Generate a simple invoice view
       const invoiceWindow = window.open("", "_blank");
       if (invoiceWindow) {
@@ -318,65 +333,20 @@ export default function Profile() {
             </head>
             <body>
               <div class="header">
-                <h1>Rev Winner Invoice</h1>
+                <h1>Rev Winner - Invoice</h1>
                 <p>Invoice ID: ${invoice.id}</p>
               </div>
               <div class="details">
-                <div class="row"><span>Date:</span><span>${new Date(invoice.createdAt).toLocaleDateString()}</span></div>
-                <div class="row"><span>Product:</span><span>${invoice.productName}</span></div>
-                <div class="row"><span>Amount:</span><span>$${invoice.amount}</span></div>
-                <div class="row"><span>Status:</span><span>${invoice.status}</span></div>
-                <div class="row"><span>Payment Method:</span><span>${invoice.paymentMethod}</span></div>
+                <div class="row"><strong>Date:</strong> ${formatDate(invoice.createdAt)}</div>
+                <div class="row"><strong>Amount:</strong> ${formatCurrency(invoice.amount, invoice.currency)}</div>
+                <div class="row"><strong>Status:</strong> ${invoice.status}</div>
+                <div class="row"><strong>Payment ID:</strong> ${invoice.razorpayPaymentId || "N/A"}</div>
+                <div class="row"><strong>Order ID:</strong> ${invoice.razorpayOrderId || "N/A"}</div>
               </div>
             </body>
           </html>
         `);
-        invoiceWindow.document.close();
       }
-      return;
-    }
-
-    try {
-      // Redirect to the new invoice page instead of trying to download directly
-      if (invoice.orderId) {
-        window.open(`/invoice?orderId=${invoice.orderId}`, '_blank');
-        return;
-      }
-      
-      // Fallback for old invoices: try receiptUrl first, then generate simple view
-      if (invoice.receiptUrl) {
-        // Make authenticated request to get invoice data
-        const response = await apiRequest("GET", invoice.receiptUrl);
-        
-        if (response.ok) {
-          // Check if response is JSON (error) or HTML (invoice)
-          const contentType = response.headers.get('content-type');
-          if (contentType && contentType.includes('application/json')) {
-            const error = await response.json();
-            throw new Error(error.message || 'Failed to download invoice');
-          }
-          
-          // Get the HTML content
-          const htmlContent = await response.text();
-          
-          // Create a new window and write the invoice HTML
-          const invoiceWindow = window.open("", "_blank");
-          if (invoiceWindow) {
-            invoiceWindow.document.write(htmlContent);
-            invoiceWindow.document.close();
-            return;
-          }
-        }
-      }
-      
-      // Generate a simple invoice view as fallback
-    } catch (error: any) {
-      console.error("Invoice download error:", error);
-      toast({
-        title: "Download Failed",
-        description: error.message || "Failed to download invoice. Please try again.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -561,7 +531,8 @@ export default function Profile() {
                   <div className="p-4 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 rounded-lg border border-border/30">
                     <p className="text-sm text-muted-foreground mb-1">Minutes Remaining</p>
                     <p className="text-3xl font-bold text-purple-600 dark:text-purple-400" data-testid="text-minutes-remaining">
-                      {sessionMinutesStatus.totalMinutesRemaining}
+                          <span>{subscriptionData?.minutesUsed || sessionMinutesStatus.usedMinutes || 0}/</span>                          <span>{sessionMinutesStatus.totalMinutesRemaining}</span>
+
                     </p>
                   </div>
                   
@@ -572,6 +543,41 @@ export default function Profile() {
                     </p>
                   </div>
                 </div>
+
+                {/* Usage Summary - Always show if we have total minutes data */}
+                {(sessionMinutesStatus.totalMinutes !== Infinity || (subscriptionData?.minutesUsed && parseInt(subscriptionData.minutesUsed) > 0)) && (
+                  <div className="p-4 bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-950/30 dark:to-gray-950/30 rounded-lg border border-border/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm text-muted-foreground">Usage Summary</p>
+                      <p className="text-xs text-muted-foreground">
+                        {subscriptionData?.minutesUsed || sessionMinutesStatus.usedMinutes || 0} / {sessionMinutesStatus.totalMinutes !== Infinity ? sessionMinutesStatus.totalMinutes : 'Unlimited'} minutes used
+                      </p>
+                    </div>
+                    {sessionMinutesStatus.totalMinutes !== Infinity && (
+                      <>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                          <div 
+                            className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full transition-all duration-300"
+                            style={{ 
+                              width: `${Math.min(100, ((subscriptionData?.minutesUsed ? parseInt(subscriptionData.minutesUsed) : sessionMinutesStatus.usedMinutes) / sessionMinutesStatus.totalMinutes) * 100)}%` 
+                            }}
+                          ></div>
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                          <span>{subscriptionData?.minutesUsed || sessionMinutesStatus.usedMinutes || 0} used</span>
+                          <span>{sessionMinutesStatus.totalMinutesRemaining} remaining</span>
+                        </div>
+                      </>
+                    )}
+                    {sessionMinutesStatus.totalMinutes === Infinity && (
+                      <div className="text-center py-2">
+                        <p className="text-sm text-green-600 dark:text-green-400 font-semibold">
+                          ✨ Unlimited Minutes - {subscriptionData?.minutesUsed || 0} minutes used
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
                 
                 {!sessionMinutesStatus.hasActiveMinutes && (
                   <div className="p-4 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg">
@@ -770,55 +776,8 @@ export default function Profile() {
                   </div>
                 </div>
 
-                {/* Session History Table */}
-                {subscriptionData.sessionHistory && subscriptionData.sessionHistory.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <div className="text-sm font-semibold text-foreground mb-3">Recent Sessions</div>
-                    <div className="border border-border rounded-lg overflow-hidden">
-                      <table className="w-full">
-                        <thead className="bg-muted/50">
-                          <tr>
-                            <th className="text-left p-3 text-xs font-semibold text-muted-foreground">#</th>
-                            <th className="text-left p-3 text-xs font-semibold text-muted-foreground">Start Time</th>
-                            <th className="text-left p-3 text-xs font-semibold text-muted-foreground">End Time</th>
-                            <th className="text-left p-3 text-xs font-semibold text-muted-foreground">Duration</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {subscriptionData.sessionHistory
-                            .slice()
-                            .reverse()
-                            .map((session, index) => (
-                              <tr
-                                key={session.sessionId}
-                                className="border-t border-border hover:bg-muted/30 transition-colors"
-                                data-testid={`session-${index}`}
-                              >
-                                <td className="p-3 text-sm font-mono text-muted-foreground">
-                                  {subscriptionData.sessionHistory!.length - index}
-                                </td>
-                                <td className="p-3 text-sm text-foreground" data-testid={`session-start-${index}`}>
-                                  {formatDateTime(session.startTime)}
-                                </td>
-                                <td className="p-3 text-sm text-foreground" data-testid={`session-end-${index}`}>
-                                  {formatDateTime(session.endTime)}
-                                </td>
-                                <td className="p-3 text-sm font-semibold text-foreground" data-testid={`session-duration-${index}`}>
-                                  {formatDuration(session.durationMinutes)}
-                                </td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p className="text-sm">No session history yet</p>
-                    <p className="text-xs mt-1">Start using the Rev Winner app to see your sessions here</p>
-                  </div>
-                )}
+                {/* Enhanced Session History Table */}
+                <EnhancedSessionHistoryTable sessionHistory={subscriptionData.sessionHistory} />
               </div>
             ) : (
               <p className="text-muted-foreground">Failed to load session history</p>
@@ -871,137 +830,399 @@ export default function Profile() {
           </CardHeader>
           <CardContent className="p-6">
             {isLoadingInvoices ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="border border-border rounded-lg p-4 animate-pulse">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="h-6 bg-muted rounded w-32"></div>
-                      <div className="h-6 bg-muted rounded w-20"></div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="h-4 bg-muted rounded w-48"></div>
-                      <div className="h-4 bg-muted rounded w-36"></div>
-                    </div>
-                  </div>
-                ))}
+              <div className="space-y-3">
+                <div className="h-16 bg-muted animate-pulse rounded"></div>
+                <div className="h-16 bg-muted animate-pulse rounded"></div>
               </div>
             ) : invoicesData && invoicesData.invoices.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {invoicesData.invoices.map((invoice, index) => (
                   <div
                     key={invoice.id}
-                    className="border border-border rounded-lg p-4 hover:bg-muted/30 transition-all duration-200 hover:shadow-md"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors"
                     data-testid={`invoice-${index}`}
                   >
-                    {/* Invoice Header */}
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-gradient-to-br from-purple-500 to-fuchsia-500 rounded-lg">
-                          <FileText className="h-4 w-4 text-white" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-bold text-lg text-foreground">
-                              {formatCurrency(invoice.amount, invoice.currency)}
-                            </h3>
-                            {getStatusBadge(invoice.status)}
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            Invoice #{invoice.razorpayPaymentId?.substring(0, 12) || invoice.id.substring(0, 12)}...
-                          </p>
-                        </div>
+                    <div className="flex-1 space-y-1 mb-3 sm:mb-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-foreground">
+                          {formatCurrency(invoice.amount, invoice.currency)}
+                        </p>
+                        {getStatusBadge(invoice.status)}
                       </div>
-                      <Button
-                        onClick={() => handleDownloadInvoice(invoice)}
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 hover:bg-purple-50 hover:border-purple-300 dark:hover:bg-purple-950"
-                        data-testid={`button-download-invoice-${index}`}
-                      >
-                        <Download className="h-4 w-4" />
-                        Download
-                      </Button>
+                      <p className="text-sm text-muted-foreground">
+                        {formatDate(invoice.createdAt)}
+                      </p>
+                      {invoice.razorpayPaymentId && (
+                        <p className="text-xs text-muted-foreground font-mono">
+                          ID: {invoice.razorpayPaymentId}
+                        </p>
+                      )}
                     </div>
-
-                    {/* Invoice Details */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-purple-500" />
-                        <div>
-                          <p className="text-muted-foreground">Purchase Date</p>
-                          <p className="font-semibold">{formatDate(invoice.createdAt)}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4 text-blue-500" />
-                        <div>
-                          <p className="text-muted-foreground">Product</p>
-                          <p className="font-semibold">
-                            {invoice.metadata?.description || 'Rev Winner Service'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4 text-green-500" />
-                        <div>
-                          <p className="text-muted-foreground">Payment Method</p>
-                          <p className="font-semibold">
-                            {invoice.razorpayPaymentId ? 'Razorpay' : 'Cashfree'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Additional Details */}
-                    {(invoice.metadata?.minutesAdded || invoice.razorpayPaymentId) && (
-                      <div className="mt-4 pt-4 border-t border-border/50">
-                        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                          {invoice.metadata?.minutesAdded && (
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              <span>{invoice.metadata.minutesAdded} minutes added</span>
-                            </div>
-                          )}
-                          {invoice.razorpayPaymentId && (
-                            <div className="flex items-center gap-1">
-                              <Hash className="h-3 w-3" />
-                              <span>Payment ID: {invoice.razorpayPaymentId}</span>
-                            </div>
-                          )}
-                          {invoice.metadata?.invoiceNumber && (
-                            <div className="flex items-center gap-1">
-                              <FileText className="h-3 w-3" />
-                              <span>{invoice.metadata.invoiceNumber}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                    <Button
+                      onClick={() => handleDownloadInvoice(invoice)}
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      data-testid={`button-download-invoice-${index}`}
+                    >
+                      <Download className="h-4 w-4" />
+                      Download
+                    </Button>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="text-center py-12">
-                <div className="p-4 bg-gradient-to-br from-purple-100 to-blue-100 dark:from-purple-900/20 dark:to-blue-900/20 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
-                  <CreditCard className="h-10 w-10 text-purple-500" />
-                </div>
-                <h3 className="font-semibold text-lg mb-2">No invoices yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  Your payment history and invoices will appear here
+                <CreditCard className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
+                <p className="text-muted-foreground">No invoices found</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Your payment history will appear here
                 </p>
-                <Button
-                  onClick={() => setLocation('/packages')}
-                  className="bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700"
-                >
-                  Browse Packages
-                </Button>
               </div>
             )}
           </CardContent>
         </Card>
       </main>
     </div>
+  );
+}
+
+// Enhanced Session History Table Component
+function EnhancedSessionHistoryTable({ sessionHistory }: { sessionHistory?: any[] }) {
+  const [selectedSession, setSelectedSession] = useState<string | null>(null);
+  const [showConversation, setShowConversation] = useState(false);
+
+  // Fetch conversation data for selected session
+  const { data: conversationData, isLoading: isLoadingConversation, error: conversationError } = useQuery<{
+    conversation: any;
+    messages: Array<{
+      id: string;
+      content: string;
+      sender: string;
+      speakerLabel: string | null;
+      timestamp: string;
+      discoveryQuestions: any;
+      caseStudies: any;
+      competitorAnalysis: any;
+      solutionRecommendations: any;
+      productFeatures: any;
+      nextSteps: any;
+      bantQualification: any;
+      solutions: any;
+      problemStatement: string | null;
+      recommendedSolutions: any;
+      suggestedNextPrompt: string | null;
+    }>;
+  }>({
+    queryKey: ["/api/conversations", selectedSession],
+    enabled: !!selectedSession,
+    retry: false, // Don't retry on 404
+  });
+
+  // Calculate statistics from conversation data
+  const statistics = conversationData ? {
+    totalMessages: conversationData.messages.length,
+    aiMessages: conversationData.messages.filter(m => m.sender === 'assistant').length,
+    userMessages: conversationData.messages.filter(m => m.sender === 'user').length,
+    messagesWithAiData: conversationData.messages.filter(m => 
+      m.discoveryQuestions || m.caseStudies || m.competitorAnalysis || 
+      m.solutionRecommendations || m.productFeatures || m.nextSteps ||
+      m.bantQualification || m.solutions || m.problemStatement ||
+      m.recommendedSolutions || m.suggestedNextPrompt
+    ).length,
+  } : {
+    totalMessages: 0,
+    aiMessages: 0,
+    userMessages: 0,
+    messagesWithAiData: 0,
+  };
+
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const formatDuration = (minutes: number) => {
+    if (minutes < 60) {
+      return `${minutes} min`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  };
+
+  const handleViewConversation = (sessionId: string) => {
+    setSelectedSession(sessionId);
+    setShowConversation(true);
+  };
+
+  // Check if a session has conversation data (not a usage tracking entry)
+  const hasConversationData = (sessionId: string) => {
+    // Usage tracking sessions typically start with "usage_" 
+    // Real conversation sessions typically start with "session_"
+    return sessionId.startsWith('session_') && !sessionId.startsWith('usage_');
+  };
+
+  if (!sessionHistory || sessionHistory.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
+        <p className="text-sm">No session history yet</p>
+        <p className="text-xs mt-1">Start using the Rev Winner app to see your sessions here</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="overflow-x-auto">
+        <div className="text-sm font-semibold text-foreground mb-3">Recent Sessions</div>
+        <div className="border border-border rounded-lg overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-muted/50">
+              <tr>
+                <th className="text-left p-3 text-xs font-semibold text-muted-foreground">#</th>
+                <th className="text-left p-3 text-xs font-semibold text-muted-foreground">Start Time</th>
+                <th className="text-left p-3 text-xs font-semibold text-muted-foreground">End Time</th>
+                <th className="text-left p-3 text-xs font-semibold text-muted-foreground">Duration</th>
+                <th className="text-left p-3 text-xs font-semibold text-muted-foreground">Session Type</th>
+                <th className="text-left p-3 text-xs font-semibold text-muted-foreground">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sessionHistory
+                .slice()
+                .reverse()
+                .map((session, index) => (
+                  <tr
+                    key={`${session.sessionId}-${index}-${session.startTime}`}
+                    className="border-t border-border hover:bg-muted/30 transition-colors"
+                    data-testid={`session-${index}`}
+                  >
+                    <td className="p-3 text-sm font-mono text-muted-foreground">
+                      {sessionHistory.length - index}
+                    </td>
+                    <td className="p-3 text-sm text-foreground" data-testid={`session-start-${index}`}>
+                      {formatDateTime(session.startTime)}
+                    </td>
+                    <td className="p-3 text-sm text-foreground" data-testid={`session-end-${index}`}>
+                      {formatDateTime(session.endTime)}
+                    </td>
+                    <td className="p-3 text-sm font-semibold text-foreground" data-testid={`session-duration-${index}`}>
+                      {formatDuration(session.durationMinutes)}
+                    </td>
+                    <td className="p-3 text-sm text-foreground" data-testid={`session-type-${index}`}>
+                      <div className="flex items-center gap-2">
+                        {hasConversationData(session.sessionId) ? (
+                          <>
+                            <Badge variant="default" className="text-xs">
+                              AI Session
+                            </Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              Conversation Data
+                            </Badge>
+                          </>
+                        ) : (
+                          <>
+                            <Badge variant="outline" className="text-xs">
+                              Usage Tracking
+                            </Badge>
+                            <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">
+                              No AI Data
+                            </Badge>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      {hasConversationData(session.sessionId) ? (
+                        <Button
+                          onClick={() => handleViewConversation(session.sessionId)}
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          data-testid={`button-view-conversation-${index}`}
+                        >
+                          <FileAudio className="h-4 w-4" />
+                          View AI Data
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled
+                          className="gap-2 text-muted-foreground"
+                          data-testid={`button-no-data-${index}`}
+                        >
+                          <Clock className="h-4 w-4" />
+                          Usage Only
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Conversation Modal */}
+      {showConversation && selectedSession && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background border border-border rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <h3 className="text-lg font-semibold">
+                Conversation Data - Session {selectedSession.split('_').pop()?.substring(0, 8)}
+              </h3>
+              <Button
+                onClick={() => setShowConversation(false)}
+                variant="ghost"
+                size="sm"
+              >
+                ✕
+              </Button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              {isLoadingConversation ? (
+                <div className="space-y-3">
+                  <div className="h-4 bg-muted animate-pulse rounded"></div>
+                  <div className="h-4 bg-muted animate-pulse rounded"></div>
+                  <div className="h-4 bg-muted animate-pulse rounded"></div>
+                </div>
+              ) : conversationError ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileAudio className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">No conversation data found</p>
+                  <p className="text-xs mt-1">This session may be a usage tracking entry without AI conversation data</p>
+                </div>
+              ) : conversationData && conversationData.messages.length > 0 ? (
+                <div className="space-y-4">
+                  {/* Statistics */}
+                  <div className="grid grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-foreground">{statistics.totalMessages}</p>
+                      <p className="text-xs text-muted-foreground">Total Messages</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-foreground">{statistics.aiMessages}</p>
+                      <p className="text-xs text-muted-foreground">AI Responses</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-foreground">{statistics.userMessages}</p>
+                      <p className="text-xs text-muted-foreground">User Messages</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-foreground">{statistics.messagesWithAiData}</p>
+                      <p className="text-xs text-muted-foreground">With AI Data</p>
+                    </div>
+                  </div>
+
+                  {/* Messages */}
+                  <div className="space-y-3">
+                    {conversationData.messages.map((message, index) => (
+                      <div
+                        key={message.id}
+                        className={`p-3 rounded-lg ${
+                          message.sender === 'assistant' 
+                            ? 'bg-blue-50 dark:bg-blue-950/30 border-l-4 border-blue-500' 
+                            : 'bg-gray-50 dark:bg-gray-950/30 border-l-4 border-gray-500'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={message.sender === 'assistant' ? 'default' : 'secondary'}>
+                              {message.sender === 'assistant' ? 'AI Assistant' : 'User'}
+                            </Badge>
+                            {message.speakerLabel && (
+                              <Badge variant="outline">{message.speakerLabel}</Badge>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {formatDateTime(message.timestamp)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-foreground mb-2">{message.content}</p>
+                        
+                        {/* AI Data */}
+                        {message.sender === 'assistant' && (
+                          <div className="space-y-2 mt-3 pt-3 border-t border-border/30">
+                            {message.discoveryQuestions && (
+                              <div>
+                                <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mb-1">🔍 Discovery Questions:</p>
+                                <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-2 rounded">
+                                  {Array.isArray(message.discoveryQuestions) 
+                                    ? message.discoveryQuestions.map((q, i) => <div key={i}>• {q}</div>)
+                                    : JSON.stringify(message.discoveryQuestions)
+                                  }
+                                </div>
+                              </div>
+                            )}
+                            {message.solutionRecommendations && (
+                              <div>
+                                <p className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">💡 Solution Recommendations:</p>
+                                <div className="text-xs text-muted-foreground bg-green-50 dark:bg-green-950/20 p-2 rounded">
+                                  {Array.isArray(message.solutionRecommendations) 
+                                    ? message.solutionRecommendations.map((s, i) => <div key={i}>• {s}</div>)
+                                    : JSON.stringify(message.solutionRecommendations)
+                                  }
+                                </div>
+                              </div>
+                            )}
+                            {message.nextSteps && (
+                              <div>
+                                <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 mb-1">📋 Next Steps:</p>
+                                <div className="text-xs text-muted-foreground bg-purple-50 dark:bg-purple-950/20 p-2 rounded">
+                                  {Array.isArray(message.nextSteps) 
+                                    ? message.nextSteps.map((step, i) => <div key={i}>• {step}</div>)
+                                    : JSON.stringify(message.nextSteps)
+                                  }
+                                </div>
+                              </div>
+                            )}
+                            {message.bantQualification && (
+                              <div>
+                                <p className="text-xs font-semibold text-orange-600 dark:text-orange-400 mb-1">🎯 BANT Qualification:</p>
+                                <div className="text-xs text-muted-foreground bg-orange-50 dark:bg-orange-950/20 p-2 rounded">
+                                  {typeof message.bantQualification === 'object' 
+                                    ? Object.entries(message.bantQualification).map(([key, value]) => (
+                                        <div key={key}><strong>{key}:</strong> {String(value)}</div>
+                                      ))
+                                    : JSON.stringify(message.bantQualification)
+                                  }
+                                </div>
+                              </div>
+                            )}
+                            {message.suggestedNextPrompt && (
+                              <div>
+                                <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 mb-1">💬 Suggested Next Prompt:</p>
+                                <div className="text-xs text-muted-foreground bg-indigo-50 dark:bg-indigo-950/20 p-2 rounded italic">
+                                  "{message.suggestedNextPrompt}"
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileAudio className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-sm">No conversation messages found</p>
+                  <p className="text-xs mt-1">This session may not have AI conversation data</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

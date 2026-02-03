@@ -503,13 +503,13 @@ export default function SalesGame() {
     
     const text = `🏆 ${achievementMessage}
 
-📊 Score: ${score}/${questions.length} | Badge Earned: ${title}
+ Score: ${score}/${questions.length} | Badge Earned: ${title}
 
 This certification validates my knowledge in:
-✅ Sales methodology & best practices
-✅ Customer engagement strategies  
-✅ Objection handling techniques
-✅ Value-based selling approaches
+Sales methodology & best practices
+Customer engagement strategies  
+Objection handling techniques
+Value-based selling approaches
 
 🎯 Ready to put these skills into action and drive results!
 

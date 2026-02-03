@@ -153,7 +153,7 @@ export function registerMarketingRoutes(app: Express) {
       const isSuperAdmin = user.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
       const { domainOverride, accessAll } = req.body;
       
-      console.log(`📊 Marketing discover query from user ${user.email}: ${validatedBody.queryType} (${validatedBody.dataMode} mode)${isSuperAdmin ? ` [Super Admin: domainOverride=${domainOverride}, accessAll=${accessAll}]` : ""}`);
+      console.log(` Marketing discover query from user ${user.email}: ${validatedBody.queryType} (${validatedBody.dataMode} mode)${isSuperAdmin ? ` [Super Admin: domainOverride=${domainOverride}, accessAll=${accessAll}]` : ""}`);
       
       let effectiveUserEmail = user.email;
       if (isSuperAdmin) {
@@ -348,7 +348,7 @@ export function registerMarketingRoutes(app: Express) {
         }
       }
       
-      console.log(`📚 Research generation for user ${user.email}: "${validatedBody.topic}"${isSuperAdmin ? ` [Super Admin]` : ""}`);
+      console.log(`Research generation for user ${user.email}: "${validatedBody.topic}"${isSuperAdmin ? ` [Super Admin]` : ""}`);
       
       const result = await marketingInsightsService.generateResearch({
         userId: user.id,
@@ -409,7 +409,7 @@ export function registerMarketingRoutes(app: Express) {
         }
       }
       
-      console.log(`📊 Infographic generation for user ${user.email}: "${validatedBody.topic}"${isSuperAdmin ? ` [Super Admin]` : ""}`);
+      console.log(` Infographic generation for user ${user.email}: "${validatedBody.topic}"${isSuperAdmin ? ` [Super Admin]` : ""}`);
       
       const result = await marketingInsightsService.generateInfographic({
         userId: user.id,
@@ -743,7 +743,7 @@ export function registerMarketingRoutes(app: Express) {
         lastName: user.lastName,
       });
       
-      console.log(`📊 Marketing login successful for ${user.email}`);
+      console.log(` Marketing login successful for ${user.email}`);
       
       res.json({ 
         success: true, 
@@ -1032,7 +1032,7 @@ export function registerMarketingRoutes(app: Express) {
     }
   });
   
-  console.log("📊 Marketing routes registered");
+  console.log(" Marketing routes registered");
 }
 
 function capitalizeCompanyName(name: string): string {

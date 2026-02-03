@@ -44,7 +44,7 @@ export function createCashfreeConfig(options: CashfreeOptions) {
     redirect: true,
   };
 
-  console.log('🚀 Opening Cashfree checkout with config:', {
+  console.log('Opening Cashfree checkout with config:', {
     mode: isTestMode ? 'TEST' : 'PRODUCTION',
     amount: baseConfig.orderAmount,
     currency: baseConfig.orderCurrency,

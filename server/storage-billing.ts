@@ -1014,7 +1014,7 @@ export class BillingStorage implements IBillingStorage {
       return { success: false, message: "Promo code usage limit reached" };
     }
 
-    // ✅ NEW: Validate category match
+    // NEW: Validate category match
     if (promo.category) {
       // Map addon types to promo categories
       const categoryMap: Record<string, string> = {
@@ -1034,7 +1034,7 @@ export class BillingStorage implements IBillingStorage {
       }
     }
 
-    // ✅ NEW: Validate allowed plan types (for platform subscriptions)
+    // NEW: Validate allowed plan types (for platform subscriptions)
     if (promo.allowedPlanTypes && Array.isArray(promo.allowedPlanTypes) && (promo.allowedPlanTypes as any[]).length > 0) {
       const itemMetadata = item.metadata as any || {};
       const itemPlanType = itemMetadata.planType;

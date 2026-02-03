@@ -244,7 +244,7 @@ class GeolocationService {
     // Try primary service
     let result = await this.fetchFromIpApiCo(ip);
     if (result) {
-      console.log(`[GeoLocation] ✅ ipapi.co success for ${ip}: ${result.city}, ${result.state}, ${result.country}`);
+      console.log(`[GeoLocation] ipapi.co success for ${ip}: ${result.city}, ${result.state}, ${result.country}`);
       this.saveToCache(ip, result);
       return result;
     }
@@ -252,7 +252,7 @@ class GeolocationService {
     // Try fallback 1
     result = await this.fetchFromIpApi(ip);
     if (result) {
-      console.log(`[GeoLocation] ✅ ip-api.com success for ${ip}: ${result.city}, ${result.state}, ${result.country}`);
+      console.log(`[GeoLocation] ip-api.com success for ${ip}: ${result.city}, ${result.state}, ${result.country}`);
       this.saveToCache(ip, result);
       return result;
     }
@@ -260,7 +260,7 @@ class GeolocationService {
     // Try fallback 2
     result = await this.fetchFromIpInfo(ip);
     if (result) {
-      console.log(`[GeoLocation] ✅ ipinfo.io success for ${ip}: ${result.city}, ${result.state}, ${result.country}`);
+      console.log(`[GeoLocation] ipinfo.io success for ${ip}: ${result.city}, ${result.state}, ${result.country}`);
       this.saveToCache(ip, result);
       return result;
     }

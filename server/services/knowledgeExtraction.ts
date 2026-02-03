@@ -72,7 +72,7 @@ For EACH distinct piece of knowledge, create an entry with:
 
 EXTRACTION RULES - EXTRACT EVERYTHING:
 
-📦 PRODUCTS & FEATURES:
+ PRODUCTS & FEATURES:
 - Every feature with full description, not just names
 - How each feature works technically
 - Benefits and use cases for each feature
@@ -80,7 +80,7 @@ EXTRACTION RULES - EXTRACT EVERYTHING:
 - Limitations and requirements
 - Screenshots/UI descriptions if mentioned
 
-💰 PRICING:
+ PRICING:
 - ALL pricing tiers with exact amounts
 - What's included in each tier
 - Add-ons and their costs
@@ -88,7 +88,7 @@ EXTRACTION RULES - EXTRACT EVERYTHING:
 - Payment terms and billing cycles
 - Free trial details
 
-📊 CASE STUDIES & RESULTS:
+ CASE STUDIES & RESULTS:
 - Company names and industries
 - Specific metrics and improvements (exact numbers)
 - Timeline of implementation
@@ -222,7 +222,7 @@ async function extractFromChunkWithClaude(
     ? COMPREHENSIVE_EXTRACTION_PROMPT + chunk
     : CHUNK_EXTRACTION_PROMPT + chunk;
   
-  console.log(`🔄 [Claude] Chunk ${chunkIndex + 1}/${totalChunks}: Sending to Claude (${chunk.length} chars)...`);
+  console.log(`[Claude] Chunk ${chunkIndex + 1}/${totalChunks}: Sending to Claude (${chunk.length} chars)...`);
   
   try {
     const response = await anthropic.messages.create({
@@ -242,10 +242,10 @@ ${prompt}`
     });
     
     const responseText = response.content[0].type === 'text' ? response.content[0].text : '[]';
-    console.log(`✅ [Claude] Chunk ${chunkIndex + 1}/${totalChunks}: Received ${responseText.length} chars`);
+    console.log(`[Claude] Chunk ${chunkIndex + 1}/${totalChunks}: Received ${responseText.length} chars`);
     
     const entries = parseAIResponse(responseText);
-    console.log(`📊 [Claude] Chunk ${chunkIndex + 1}/${totalChunks}: Extracted ${entries.length} entries`);
+    console.log(` [Claude] Chunk ${chunkIndex + 1}/${totalChunks}: Extracted ${entries.length} entries`);
     
     return entries;
   } catch (error: any) {
@@ -266,7 +266,7 @@ async function extractFromChunk(
       ? COMPREHENSIVE_EXTRACTION_PROMPT + chunk
       : CHUNK_EXTRACTION_PROMPT + chunk;
     
-    console.log(`🔄 Chunk ${chunkIndex + 1}/${totalChunks}: Sending to DeepSeek (${chunk.length} chars)...`);
+    console.log(`Chunk ${chunkIndex + 1}/${totalChunks}: Sending to DeepSeek (${chunk.length} chars)...`);
     
     try {
       const response = await deepseek.chat.completions.create({
@@ -286,10 +286,10 @@ Create multiple entries to cover all information. Do not summarize - preserve al
       });
       
       const responseText = response.choices[0]?.message?.content || '[]';
-      console.log(`✅ Chunk ${chunkIndex + 1}/${totalChunks}: Received ${responseText.length} chars from DeepSeek`);
+      console.log(`Chunk ${chunkIndex + 1}/${totalChunks}: Received ${responseText.length} chars from DeepSeek`);
       
       const entries = parseAIResponse(responseText);
-      console.log(`📊 Chunk ${chunkIndex + 1}/${totalChunks}: Extracted ${entries.length} entries`);
+      console.log(` Chunk ${chunkIndex + 1}/${totalChunks}: Extracted ${entries.length} entries`);
       
       if (entries.length > 0) {
         return entries;
@@ -299,7 +299,7 @@ Create multiple entries to cover all information. Do not summarize - preserve al
       console.log(`⚠️ DeepSeek returned no entries, trying Claude...`);
     } catch (error: any) {
       console.error(`❌ DeepSeek failed for chunk ${chunkIndex + 1}: ${error.message}`);
-      console.log(`🔄 Falling back to Claude...`);
+      console.log(`Falling back to Claude...`);
     }
   }
   
@@ -322,7 +322,7 @@ export async function extractKnowledgeFromDocument(
   }
 
   const content = document.content.trim();
-  console.log(`📚 Processing document: ${document.fileName} (${content.length} chars)`);
+  console.log(`Processing document: ${document.fileName} (${content.length} chars)`);
 
   try {
     const chunks = splitIntoChunks(content, CHUNK_SIZE);
@@ -341,7 +341,7 @@ export async function extractKnowledgeFromDocument(
       }
     }
 
-    console.log(`📊 Total raw entries extracted: ${allParsedEntries.length}`);
+    console.log(` Total raw entries extracted: ${allParsedEntries.length}`);
 
     const validEntries: ExtractedKnowledge[] = [];
     const seenTitles = new Set<string>(); // Avoid duplicate titles within same document
@@ -378,7 +378,7 @@ export async function extractKnowledgeFromDocument(
       seenTitles.add(titleNormalized);
     }
 
-    console.log(`✅ Extracted ${validEntries.length} comprehensive knowledge entries from ${document.fileName}`);
+    console.log(`Extracted ${validEntries.length} comprehensive knowledge entries from ${document.fileName}`);
     return validEntries;
 
   } catch (error: any) {
@@ -446,7 +446,7 @@ export async function processDocumentForKnowledge(
     }
   }
 
-  console.log(`📚 Knowledge extraction complete: ${newEntriesAdded} added, ${duplicatesSkipped} duplicates skipped`);
+  console.log(`Knowledge extraction complete: ${newEntriesAdded} added, ${duplicatesSkipped} duplicates skipped`);
 
   return {
     entries: extracted,
@@ -485,7 +485,7 @@ export async function rebuildKnowledgeBase(
       });
   
   if (unprocessedDocs.length === 0 && !forceFullRebuild) {
-    console.log(`✅ All ${completedDocs.length} documents already processed. No new extraction needed.`);
+    console.log(`All ${completedDocs.length} documents already processed. No new extraction needed.`);
     return {
       entries: [],
       duplicatesSkipped: 0,
@@ -499,7 +499,7 @@ export async function rebuildKnowledgeBase(
     await storage.deleteKnowledgeEntriesByDomain(domainExpertiseId, userId);
   }
   
-  console.log(`📚 Processing ${unprocessedDocs.length} unprocessed documents (${completedDocs.length - unprocessedDocs.length} already done)`);
+  console.log(`Processing ${unprocessedDocs.length} unprocessed documents (${completedDocs.length - unprocessedDocs.length} already done)`);
 
   let totalAdded = 0;
   let totalDuplicates = 0;
@@ -586,12 +586,12 @@ export async function rebuildKnowledgeBase(
         knowledgeExtractedAt: new Date(),
         contentHash: docContentHash
       });
-      console.log(`✅ Marked ${doc.fileName} as processed (${docEntriesAdded} entries added)`);
+      console.log(`Marked ${doc.fileName} as processed (${docEntriesAdded} entries added)`);
     }
   }
 
   const totalEntries = forceFullRebuild ? totalAdded : existingEntries.length + totalAdded;
-  console.log(`🔄 Knowledge base updated: ${totalAdded} new entries added (${totalEntries} total), ${totalDuplicates} duplicates skipped`);
+  console.log(`Knowledge base updated: ${totalAdded} new entries added (${totalEntries} total), ${totalDuplicates} duplicates skipped`);
 
   return {
     entries: allEntries,
@@ -615,8 +615,8 @@ export function buildStructuredKnowledgeContext(entries: KnowledgeEntry[]): stri
 ╚══════════════════════════════════════════════════════════════════╝\n\n`;
 
   const categoryLabels: Record<string, string> = {
-    product: '📦 PRODUCTS & SERVICES',
-    pricing: '💰 PRICING INFORMATION',
+    product: ' PRODUCTS & SERVICES',
+    pricing: ' PRICING INFORMATION',
     process: '📋 PROCESSES & WORKFLOWS',
     faq: '❓ FREQUENTLY ASKED QUESTIONS',
     case_study: '📈 CASE STUDIES & SUCCESS STORIES',
@@ -643,7 +643,7 @@ export function buildStructuredKnowledgeContext(entries: KnowledgeEntry[]): stri
       // Include ALL details for comprehensive response generation
       if (entry.details && Object.keys(entry.details).length > 0) {
         const details = entry.details as Record<string, any>;
-        context += `\n  📊 DETAILS:\n`;
+        context += `\n   DETAILS:\n`;
         
         for (const [key, value] of Object.entries(details)) {
           if (value === null || value === undefined) continue;
@@ -677,7 +677,7 @@ export function buildStructuredKnowledgeContext(entries: KnowledgeEntry[]): stri
   }
 
   context += `\n${'═'.repeat(60)}\n`;
-  context += `📚 KNOWLEDGE BASE SUMMARY:\n`;
+  context += `KNOWLEDGE BASE SUMMARY:\n`;
   context += `   Total Entries: ${entries.length}\n`;
   context += `   Categories: ${Object.keys(byCategory).length}\n`;
   
@@ -835,10 +835,10 @@ export async function generateMissingEmbeddings(
     }
     
     if (generated % 10 === 0) {
-      console.log(`🔄 Generated embeddings: ${generated}/${entries.length}`);
+      console.log(`Generated embeddings: ${generated}/${entries.length}`);
     }
   }
 
-  console.log(`✅ Embedding generation complete: ${generated} generated, ${failed} failed`);
+  console.log(`Embedding generation complete: ${generated} generated, ${failed} failed`);
   return { generated, failed };
 }

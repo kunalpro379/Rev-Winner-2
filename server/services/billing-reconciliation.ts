@@ -43,7 +43,7 @@ export async function reconcileSubscriptionPayments(): Promise<ReconciliationDis
   const discrepancies: ReconciliationDiscrepancy[] = [];
   
   try {
-    console.log('🔍 Reconciling individual subscription payments...');
+    console.log(' Reconciling individual subscription payments...');
     
     // Get all successful payments with subscriptionId
     const successfulPayments = await db
@@ -174,7 +174,7 @@ export async function reconcileLicensePayments(): Promise<ReconciliationDiscrepa
   const discrepancies: ReconciliationDiscrepancy[] = [];
   
   try {
-    console.log('🔍 Reconciling enterprise license payments...');
+    console.log(' Reconciling enterprise license payments...');
     
     // Get all active license packages
     const activePackages = await db
@@ -247,7 +247,7 @@ export async function reconcileAddonPayments(): Promise<ReconciliationDiscrepanc
   const discrepancies: ReconciliationDiscrepancy[] = [];
   
   try {
-    console.log('🔍 Reconciling add-on purchases...');
+    console.log(' Reconciling add-on purchases...');
     
     // Get all active add-on purchases
     const activeAddons = await db
@@ -338,7 +338,7 @@ export async function reconcileAddonPayments(): Promise<ReconciliationDiscrepanc
  * Returns all detected discrepancies
  */
 export async function runBillingReconciliation(): Promise<ReconciliationDiscrepancy[]> {
-  console.log('💰 Starting comprehensive billing reconciliation...');
+  console.log(' Starting comprehensive billing reconciliation...');
   const startTime = Date.now();
   
   const subscriptionDiscrepancies = await reconcileSubscriptionPayments();
@@ -359,7 +359,7 @@ export async function runBillingReconciliation(): Promise<ReconciliationDiscrepa
   const duration = ((Date.now() - startTime) / 1000).toFixed(2);
   
   if (allDiscrepancies.length === 0) {
-    console.log(`✅ Billing reconciliation completed in ${duration}s - No discrepancies found`);
+    console.log(`Billing reconciliation completed in ${duration}s - No discrepancies found`);
   } else {
     console.log(`⚠️ Billing reconciliation completed in ${duration}s`);
     console.log(`  ${critical.length} critical issues`);

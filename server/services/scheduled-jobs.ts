@@ -27,7 +27,7 @@ const billingStorage = new BillingStorage();
  */
 async function expireSubscriptions() {
   try {
-    console.log('🔄 Running subscription expiration job...');
+    console.log('Running subscription expiration job...');
     
     const result = await db
       .update(subscriptions)
@@ -41,9 +41,9 @@ async function expireSubscriptions() {
     
     const expiredCount = result.rowCount || 0;
     if (expiredCount > 0) {
-      console.log(`✅ Expired ${expiredCount} subscription(s)`);
+      console.log(`Expired ${expiredCount} subscription(s)`);
     } else {
-      console.log('✅ No subscriptions to expire');
+      console.log('No subscriptions to expire');
     }
     
     return expiredCount;
@@ -58,7 +58,7 @@ async function expireSubscriptions() {
  */
 async function expireLicensePackages() {
   try {
-    console.log('🔄 Running license package expiration job...');
+    console.log('Running license package expiration job...');
     
     const result = await db
       .update(licensePackages)
@@ -72,9 +72,9 @@ async function expireLicensePackages() {
     
     const expiredCount = result.rowCount || 0;
     if (expiredCount > 0) {
-      console.log(`✅ Expired ${expiredCount} license package(s)`);
+      console.log(`Expired ${expiredCount} license package(s)`);
     } else {
-      console.log('✅ No license packages to expire');
+      console.log('No license packages to expire');
     }
     
     return expiredCount;
@@ -89,7 +89,7 @@ async function expireLicensePackages() {
  */
 async function sendExpiryWarnings() {
   try {
-    console.log('📧 Running expiry warning notifications job...');
+    console.log('Running expiry warning notifications job...');
     let emailsSent = 0;
     
     // Get subscriptions expiring in exactly 7 days or 3 days
@@ -181,9 +181,9 @@ async function sendExpiryWarnings() {
     }
     
     if (emailsSent > 0) {
-      console.log(`✅ Sent ${emailsSent} expiry warning email(s)`);
+      console.log(`Sent ${emailsSent} expiry warning email(s)`);
     } else {
-      console.log('✅ No expiry warnings to send');
+      console.log('No expiry warnings to send');
     }
     
     return emailsSent;
@@ -198,14 +198,14 @@ async function sendExpiryWarnings() {
  */
 async function expireAddons() {
   try {
-    console.log('🔄 Running add-on expiration job...');
+    console.log('Running add-on expiration job...');
     
     const expiredCount = await billingStorage.expireAddonPurchases();
     
     if (expiredCount > 0) {
-      console.log(`✅ Expired ${expiredCount} add-on(s)`);
+      console.log(`Expired ${expiredCount} add-on(s)`);
     } else {
-      console.log('✅ No add-ons to expire');
+      console.log('No add-ons to expire');
     }
     
     return expiredCount;
@@ -220,14 +220,14 @@ async function expireAddons() {
  */
 async function cleanupPendingOrders() {
   try {
-    console.log('🔄 Running pending order cleanup job...');
+    console.log('Running pending order cleanup job...');
     
     const expiredCount = await billingStorage.expirePendingOrders();
     
     if (expiredCount > 0) {
-      console.log(`✅ Cleaned up ${expiredCount} expired pending order(s)`);
+      console.log(`Cleaned up ${expiredCount} expired pending order(s)`);
     } else {
-      console.log('✅ No pending orders to clean up');
+      console.log('No pending orders to clean up');
     }
     
     return expiredCount;
@@ -242,14 +242,14 @@ async function cleanupPendingOrders() {
  */
 async function deleteExpiredCallRecordings() {
   try {
-    console.log('🔄 Running call recordings cleanup job...');
+    console.log('Running call recordings cleanup job...');
     
     const deletedCount = await recordingsStorage.deleteExpiredRecordings();
     
     if (deletedCount > 0) {
-      console.log(`✅ Deleted ${deletedCount} expired call recording(s)`);
+      console.log(`Deleted ${deletedCount} expired call recording(s)`);
     } else {
-      console.log('✅ No expired call recordings to delete');
+      console.log('No expired call recordings to delete');
     }
     
     return deletedCount;
@@ -264,14 +264,14 @@ async function deleteExpiredCallRecordings() {
  */
 async function deleteExpiredMeetingMinutes() {
   try {
-    console.log('🔄 Running meeting minutes cleanup job...');
+    console.log('Running meeting minutes cleanup job...');
     
     const deletedCount = await recordingsStorage.deleteExpiredMeetingMinutes();
     
     if (deletedCount > 0) {
-      console.log(`✅ Deleted ${deletedCount} expired meeting minutes record(s)`);
+      console.log(`Deleted ${deletedCount} expired meeting minutes record(s)`);
     } else {
-      console.log('✅ No expired meeting minutes to delete');
+      console.log('No expired meeting minutes to delete');
     }
     
     return deletedCount;
@@ -287,7 +287,7 @@ async function deleteExpiredMeetingMinutes() {
  */
 async function reconcileUsageTracking() {
   try {
-    console.log('🔄 Running usage reconciliation job...');
+    console.log('Running usage reconciliation job...');
     
     // Get all active subscriptions with session history
     const activeSubscriptions = await db
@@ -331,9 +331,9 @@ async function reconcileUsageTracking() {
     }
     
     if (discrepancyCount > 0) {
-      console.log(`✅ Reconciled ${reconciledCount} subscription(s) with usage discrepancies`);
+      console.log(`Reconciled ${reconciledCount} subscription(s) with usage discrepancies`);
     } else {
-      console.log('✅ All usage tracking is consistent');
+      console.log('All usage tracking is consistent');
     }
     
     return reconciledCount;
@@ -349,11 +349,11 @@ async function reconcileUsageTracking() {
  */
 async function backupConversationMinutes() {
   try {
-    console.log('📦 Running conversation minutes backup job...');
+    console.log(' Running conversation minutes backup job...');
     
     const stats = await meetingMinutesBackupService.backupAllConversations('scheduled');
     
-    console.log(`✅ Backup completed: ${stats.successfulBackups} new, ${stats.skippedBackups} skipped, ${stats.failedBackups} failed`);
+    console.log(`Backup completed: ${stats.successfulBackups} new, ${stats.skippedBackups} skipped, ${stats.failedBackups} failed`);
     
     return stats;
   } catch (error) {
@@ -367,7 +367,7 @@ async function backupConversationMinutes() {
  * Runs all expiration and cleanup tasks
  */
 async function runDailyMaintenance() {
-  console.log('🌅 Starting daily maintenance job...');
+  console.log(' Starting daily maintenance job...');
   const startTime = Date.now();
   
   // Send expiry warnings BEFORE expiring anything
@@ -388,14 +388,14 @@ async function runDailyMaintenance() {
   await backupConversationMinutes();
   
   const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-  console.log(`✅ Daily maintenance completed in ${duration}s`);
+  console.log(`Daily maintenance completed in ${duration}s`);
 }
 
 /**
  * Initialize all scheduled jobs
  */
 export function initializeScheduledJobs() {
-  console.log('📅 Initializing scheduled jobs...');
+  console.log(' Initializing scheduled jobs...');
   
   // Daily maintenance at 2:00 AM
   cron.schedule('0 2 * * *', runDailyMaintenance, {
@@ -411,11 +411,11 @@ export function initializeScheduledJobs() {
   
   // Run initial maintenance check on startup (after 30 seconds)
   setTimeout(() => {
-    console.log('🚀 Running initial maintenance check...');
+    console.log('Running initial maintenance check...');
     runDailyMaintenance();
   }, 30000);
   
-  console.log('✅ Scheduled jobs initialized successfully');
+  console.log('Scheduled jobs initialized successfully');
 }
 
 // Export individual functions for testing/manual invocation

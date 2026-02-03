@@ -194,6 +194,6 @@ ________________________________________
 •	Expand only when seller clicks
 •	Prevent cognitive overload
 ________________________________________
-🔑 ONE-LINE PRODUCT VISION (Optional)
+ONE-LINE PRODUCT VISION (Optional)
 This system turns live customer conversations into a living visual map of their IT environment—so sellers can see what the customer can’t explain.
 Do not limit response generation to above stated situation but for every potential situation for industries like, Insurance, IT, Technology, Healthcare and more.

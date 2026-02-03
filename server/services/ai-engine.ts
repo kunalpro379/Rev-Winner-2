@@ -170,7 +170,7 @@ function createGeminiWrapper(apiKey: string): AIClient {
             const response = await result.response;
             let responseText = response.text();
 
-            console.log('🔍 Gemini raw response:', responseText.substring(0, 200));
+            console.log(' Gemini raw response:', responseText.substring(0, 200));
 
             // Clean up markdown code blocks if present
             if (params.response_format?.type === 'json_object') {
@@ -179,7 +179,7 @@ function createGeminiWrapper(apiKey: string): AIClient {
               // Validate it's actually JSON
               try {
                 JSON.parse(responseText);
-                console.log('✅ Gemini JSON validation passed');
+                console.log('Gemini JSON validation passed');
               } catch (parseError) {
                 console.error('❌ Gemini JSON parse error:', parseError);
                 console.error('Raw text:', responseText);
@@ -193,7 +193,7 @@ function createGeminiWrapper(apiKey: string): AIClient {
                   // Try parsing the extracted JSON
                   try {
                     JSON.parse(responseText);
-                    console.log('✅ Extracted JSON is valid');
+                    console.log('Extracted JSON is valid');
                   } catch {
                     console.error('❌ Extracted JSON still invalid');
                     responseText = '{}';
@@ -294,10 +294,10 @@ export async function getAIClient(userId: string): Promise<{ client: AIClient; m
     if (!apiKey) {
       throw new Error("Rev Winner's default AI engine is not configured. Please contact support.");
     }
-    console.log('🔑 Using Rev Winner Default AI Engine (DeepSeek)');
+    console.log('Using Rev Winner Default AI Engine (DeepSeek)');
   } else {
     // Debug logging for API key issues (only log length and first/last chars for security)
-    console.log(`🔑 AI Engine: ${engine}, API Key Length: ${apiKey.length}, Preview: ${apiKey.substring(0, 3)}...${apiKey.substring(apiKey.length - 3)}`);
+    console.log(`AI Engine: ${engine}, API Key Length: ${apiKey.length}, Preview: ${apiKey.substring(0, 3)}...${apiKey.substring(apiKey.length - 3)}`);
   }
   
   const config = ENGINE_CONFIGS[engine as keyof typeof ENGINE_CONFIGS];
@@ -420,7 +420,7 @@ export async function validateAPIKey(
 
     await Promise.race([testPromise, timeoutPromise]);
     
-    console.log(`✅ ${engine} API key is valid`);
+    console.log(`${engine} API key is valid`);
     return { valid: true };
   } catch (error: any) {
     console.error(`❌ ${engine} API key validation failed:`, error);

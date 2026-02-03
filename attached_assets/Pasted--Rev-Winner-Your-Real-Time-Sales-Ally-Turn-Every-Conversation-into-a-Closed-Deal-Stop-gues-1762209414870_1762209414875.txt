@@ -10,7 +10,7 @@ With Rev Winner, you get real-time sales intelligence — live transcription, in
 
 ---
 
-🚀 Why Sales Pros Love Rev Winner
+Why Sales Pros Love Rev Winner
 
 Hear. Think. Win. — The AI listens, analyzes, and tells you what to say next.
 
@@ -35,9 +35,9 @@ No Waiting. No Setup. — Works right inside your browser.
 Rev Winner isn’t another note-taking app.
 It’s your AI sales coach that thinks faster than your competition — and helps your team operate like pros.
 
-✅ Reduce your dependency on Sales Engineers by 40 to 50 %.
-✅ Empower every rep to handle technical and business questions on the fly.
-✅ Make your sales team self-sufficient and confident in real-time conversations.
+Reduce your dependency on Sales Engineers by 40 to 50 %.
+Empower every rep to handle technical and business questions on the fly.
+Make your sales team self-sufficient and confident in real-time conversations.
 
 Sales teams using Rev Winner report:
 
@@ -76,7 +76,7 @@ Your data belongs to you, not us.
 Rev Winner does not store any session data — ever.
 All API keys are AES-256 encrypted, and your transcripts remain private on your device.
 No recordings. No leaks. No tracking.
-✅ We respect your privacy — always.
+We respect your privacy — always.
 
 
 ---

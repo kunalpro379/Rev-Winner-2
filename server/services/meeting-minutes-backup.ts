@@ -218,7 +218,7 @@ export class MeetingMinutesBackupService {
         }
       }
 
-      console.log(`📦 Backup completed: ${stats.successfulBackups} new, ${stats.skippedBackups} skipped, ${stats.failedBackups} failed`);
+      console.log(` Backup completed: ${stats.successfulBackups} new, ${stats.skippedBackups} skipped, ${stats.failedBackups} failed`);
       return stats;
     } catch (error: any) {
       console.error("Error in bulk backup:", error);

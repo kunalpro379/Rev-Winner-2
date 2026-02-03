@@ -350,5 +350,5 @@ export function setupSalesIntelligenceRoutes(app: Express) {
     res.json({ intentTypes: Object.values(SALES_INTENT_TYPES) });
   });
 
-  console.log("📊 Sales Intelligence routes registered");
+  console.log(" Sales Intelligence routes registered");
 }

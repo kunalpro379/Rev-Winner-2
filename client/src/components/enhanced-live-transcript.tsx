@@ -111,6 +111,8 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
   const { data: sessionMinutesData } = useQuery<{
     hasActiveMinutes: boolean;
     totalMinutesRemaining: number;
+    totalMinutes: number;
+    usedMinutes: number;
     nextExpiryDate: string | null;
     activePurchases: Array<{
       id: string;

@@ -191,11 +191,11 @@ export function logPaymentGatewayConfig() {
   const isProduction = environment === 'PROD' || environment === 'PRODUCTION';
   
   console.log("=".repeat(60));
-  console.log("💳 PAYMENT GATEWAY CONFIGURATION");
+  console.log("PAYMENT GATEWAY CONFIGURATION");
   console.log("=".repeat(60));
   console.log(`Current Gateway: ${config.name} (${DEFAULT_PAYMENT_GATEWAY})`);
   console.log(`Source: ${process.env.PAYMENT_GATEWAY ? 'Environment Variable' : 'Default Config'}`);
-  console.log(`Configured: ${isConfigured ? '✅ Yes' : '❌ No'}`);
+  console.log(`Configured: ${isConfigured ? 'Yes' : '❌ No'}`);
   console.log(`Environment: ${environment} (${isProduction ? 'LIVE' : 'TEST'})`);
   console.log(`Supported Currencies: ${config.supportedCurrencies.join(', ')}`);
   console.log(`Features: ${config.features.join(', ')}`);

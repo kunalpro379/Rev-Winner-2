@@ -519,14 +519,14 @@ export function setupEnterpriseRoutes(app: Express) {
           resetToken,
           organization.companyName
         );
-        console.log(`📧 Resent password setup email to ${targetUser.email}`);
+        console.log(`Resent password setup email to ${targetUser.email}`);
       } else {
         await sendLicenseAccessNotificationEmail(
           targetUser.email,
           targetUser.firstName,
           organization.companyName
         );
-        console.log(`📧 Resent license access notification to ${targetUser.email}`);
+        console.log(`Resent license access notification to ${targetUser.email}`);
       }
       
       // Create audit log
