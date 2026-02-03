@@ -361,13 +361,21 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
         ).catch(err => console.error('Error updating conversation learnings:', err));
       }
       
-      // Add assistant message WITHOUT auto-generated insights
-      // Insights are now generated on-demand only via the /analyze endpoint
+      // Add assistant message with full AI response data saved to database
       const assistantMessage = await storage.addMessage({
         conversationId: conversation.id,
         content: aiResponse.response,
         sender: "assistant",
-        speakerLabel: "AI Assistant"
+        speakerLabel: "AI Assistant",
+        discoveryQuestions: aiResponse.discoveryQuestions,
+        discoveryInsights: aiResponse.discoveryInsights,
+        nextSteps: aiResponse.nextSteps,
+        caseStudies: aiResponse.caseStudies,
+        bantQualification: aiResponse.bantQualification,
+        problemStatement: aiResponse.problemStatement,
+        recommendedSolutions: aiResponse.recommendedSolutions,
+        suggestedNextPrompt: aiResponse.nextQuestions?.[0] || null,
+        solutions: aiResponse.salesScript ? { script: aiResponse.salesScript } : undefined
       });
       
       res.json({
@@ -2283,6 +2291,78 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
           activeSessions: 0,
           totalMinutesUsed: 0,
         }
+      });
+    }
+  });
+
+  // Fetch session details with AI responses
+  app.get("/api/session/:sessionId", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const { sessionId } = req.params;
+      
+      console.log(`[DEBUG] Fetching session details for sessionId: ${sessionId}, userId: ${userId}`);
+      
+      // Fetch conversation for this session
+      const conversation = await storage.getConversation(sessionId);
+      
+      if (!conversation) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      
+      // Verify the conversation belongs to the user
+      if (conversation.userId !== userId) {
+        return res.status(403).json({ message: "Unauthorized to view this session" });
+      }
+      
+      // Fetch all messages for this conversation
+      const messages = await storage.getMessages(conversation.id);
+      
+      // Format messages with AI response data
+      const formattedMessages = messages.map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        sender: msg.sender,
+        speakerLabel: msg.speakerLabel,
+        timestamp: msg.timestamp,
+        // AI response data (only for assistant messages)
+        ...(msg.sender === 'assistant' && {
+          discoveryQuestions: msg.discoveryQuestions,
+          discoveryInsights: msg.discoveryInsights,
+          nextSteps: msg.nextSteps,
+          caseStudies: msg.caseStudies,
+          competitorAnalysis: msg.competitorAnalysis,
+          solutionRecommendations: msg.solutionRecommendations,
+          productFeatures: msg.productFeatures,
+          bantQualification: msg.bantQualification,
+          solutions: msg.solutions,
+          problemStatement: msg.problemStatement,
+          recommendedSolutions: msg.recommendedSolutions,
+          suggestedNextPrompt: msg.suggestedNextPrompt,
+          customerIdentification: msg.customerIdentification
+        })
+      }));
+      
+      res.json({
+        session: {
+          id: conversation.id,
+          sessionId: conversation.sessionId,
+          clientName: conversation.clientName,
+          status: conversation.status,
+          createdAt: conversation.createdAt,
+          endedAt: conversation.endedAt,
+          callSummary: conversation.callSummary,
+          discoveryInsights: conversation.discoveryInsights,
+        },
+        messages: formattedMessages,
+        messageCount: messages.length,
+        aiResponseCount: messages.filter(m => m.sender === 'assistant').length,
+      });
+    } catch (error: any) {
+      console.error(`[ERROR] Failed to fetch session details:`, error);
+      res.status(500).json({ 
+        message: "Failed to fetch session details", 
+        error: error.message || 'Unknown error'
       });
     }
   });

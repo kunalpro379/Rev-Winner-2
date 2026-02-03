@@ -13,16 +13,15 @@ import { BusinessTeamsDialog } from "@/components/business-teams-dialog";
 import { queryClient } from "@/lib/queryClient";
 
 interface SubscriptionPlan {
-  id: string;
+  sku: string;
   name: string;
-  price: string;
-  listedPrice?: string;
+  price: number;
+  listedPrice?: number | null;
   currency: string;
-  billingInterval: string;
+  billingType: 'one_time' | 'monthly' | '6_months' | '12_months' | '36_months';
+  validityDays: number;
+  description: string;
   features: string[];
-  isActive: boolean;
-  availableUntil?: string;
-  requiredAddons?: string[];
 }
 
 interface PromoCodeValidation {
@@ -75,8 +74,8 @@ export default function Subscribe() {
   const [isPurchasingMinutes, setIsPurchasingMinutes] = useState(false);
   const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
 
-  const { data: plansData, isLoading: plansLoading } = useQuery<{ plans: SubscriptionPlan[] }>({
-    queryKey: ['/api/cashfree/plans'],
+  const { data: packagesResponse, isLoading: plansLoading } = useQuery<{ platformAccess: SubscriptionPlan[]; addons: any[] }>({
+    queryKey: ['/api/billing/packages'],
   });
   
   // Fetch Session Minutes packages
@@ -603,11 +602,11 @@ export default function Subscribe() {
     );
   }
 
-  const plans = plansData?.plans || [];
+  const plans = packagesResponse?.platformAccess || [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-fuchsia-600 via-purple-700 to-blue-900 dark:from-fuchsia-900 dark:via-purple-900 dark:to-slate-950 py-12 px-4">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-white mb-4">
             Upgrade to Rev Winner Pro
@@ -621,7 +620,7 @@ export default function Subscribe() {
         </div>
 
         {/* Promo Code Section */}
-        <Card className="max-w-2xl mx-auto mb-8 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-2 border-purple-300 dark:border-purple-700" data-testid="card-promo-code">
+        <Card className="max-w-3xl mx-auto mb-8 bg-white/95 dark:bg-slate-900/95 backdrop-blur border-2 border-purple-300 dark:border-purple-700" data-testid="card-promo-code">
           <CardHeader>
             <CardTitle className="text-lg flex items-center text-slate-900 dark:text-white">
               <Tag className="h-5 w-5 mr-2 text-purple-600" />
@@ -706,10 +705,10 @@ export default function Subscribe() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
             {plans.map((plan, index) => (
               <Card
-                key={plan.id}
+                key={plan.sku}
                 className={`bg-white/95 dark:bg-slate-900/95 backdrop-blur border-2 transition-all hover:scale-105 ${
                   index === 0 ? 'border-purple-400' : 'border-purple-300 dark:border-purple-700'
                 }`}
@@ -728,24 +727,6 @@ export default function Subscribe() {
                     )}
                   </div>
                   
-                  {/* Limited Time & Required Addons Badges */}
-                  {(plan.availableUntil || (plan.requiredAddons && plan.requiredAddons.length > 0)) && (
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {plan.availableUntil && (
-                        <Badge variant="destructive" className="bg-orange-500 hover:bg-orange-600">
-                          <AlertCircle className="h-3 w-3 mr-1" />
-                          Available until {new Date(plan.availableUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </Badge>
-                      )}
-                      {plan.requiredAddons && plan.requiredAddons.includes('session-minutes') && (
-                        <Badge className="bg-blue-500 hover:bg-blue-600">
-                          <Package className="h-3 w-3 mr-1" />
-                          Session Minutes Required
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-                  
                   <CardDescription>
                     {plan.listedPrice && (
                       <div className="mb-1">
@@ -753,7 +734,7 @@ export default function Subscribe() {
                           {getCurrencySymbol(plan.currency)}{plan.listedPrice}
                         </span>
                         <Badge variant="destructive" className="ml-2 bg-red-500">
-                          Save {getCurrencySymbol(plan.currency)}{(parseFloat(plan.listedPrice) - parseFloat(plan.price)).toFixed(0)}
+                          Save {getCurrencySymbol(plan.currency)}{(plan.listedPrice - plan.price).toFixed(0)}
                         </Badge>
                       </div>
                     )}
@@ -766,14 +747,14 @@ export default function Subscribe() {
                             </span>
                           </div>
                           <span className="text-3xl font-bold text-green-600 dark:text-green-400">
-                            {getCurrencySymbol(plan.currency)}{calculateDiscountedPrice(plan.price).finalPrice}
+                            {getCurrencySymbol(plan.currency)}{calculateDiscountedPrice(plan.price.toString()).finalPrice}
                           </span>
                           <span className="text-slate-600 dark:text-slate-400">
-                            /{plan.billingInterval}
+                            /{plan.billingType.replace('_', ' ')}
                           </span>
                           <div className="mt-1">
                             <Badge className="bg-green-600">
-                              Promo: -{getCurrencySymbol(plan.currency)}{calculateDiscountedPrice(plan.price).discount}
+                              Promo: -{getCurrencySymbol(plan.currency)}{calculateDiscountedPrice(plan.price.toString()).discount}
                             </Badge>
                           </div>
                         </>
@@ -783,7 +764,7 @@ export default function Subscribe() {
                             {getCurrencySymbol(plan.currency)}{plan.price}
                           </span>
                           <span className="text-slate-600 dark:text-slate-400">
-                            /{plan.billingInterval}
+                            /{plan.billingType.replace('_', ' ')}
                           </span>
                         </>
                       )}
@@ -806,31 +787,13 @@ export default function Subscribe() {
                   </ul>
                 </CardContent>
                 <CardFooter className="flex-col gap-2">
-                  {/* Warning for required addons */}
-                  {plan.requiredAddons && plan.requiredAddons.includes('session-minutes') && 
-                   !sessionMinutesStatus?.superUserAccess &&
-                   (!sessionMinutesStatus?.hasActiveMinutes || sessionMinutesStatus?.totalMinutesRemaining <= 0) && (
-                    <div className="w-full p-3 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-md" data-testid={`warning-addon-required-${index}`}>
-                      <p className="text-sm text-orange-800 dark:text-orange-200 font-medium flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                        <span>Session Minutes addon required. <a href="#session-minutes-packages" className="underline font-semibold hover:text-orange-900 dark:hover:text-orange-100">Purchase below</a> before subscribing.</span>
-                      </p>
-                    </div>
-                  )}
-                  
                   <Button
                     data-testid={`button-subscribe-${index}`}
-                    onClick={() => handleSubscribe(plan.id, plan.name, plan.price, plan.currency)}
-                    disabled={
-                      isLoading || 
-                      !cashfreeLoaded || 
-                      (plan.requiredAddons && plan.requiredAddons.includes('session-minutes') && 
-                       !sessionMinutesStatus?.superUserAccess &&
-                       (!sessionMinutesStatus?.hasActiveMinutes || sessionMinutesStatus?.totalMinutesRemaining <= 0))
-                    }
+                    onClick={() => handleSubscribe(plan.sku, plan.name, plan.price.toString(), plan.currency)}
+                    disabled={isLoading || !cashfreeLoaded}
                     className="w-full bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-700 hover:to-purple-700 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isLoading && selectedPlan === plan.id ? (
+                    {isLoading && selectedPlan === plan.sku ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Processing...

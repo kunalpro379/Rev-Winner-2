@@ -902,9 +902,9 @@ function EnhancedSessionHistoryTable({ sessionHistory }: { sessionHistory?: any[
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
   const [showConversation, setShowConversation] = useState(false);
 
-  // Fetch conversation data for selected session
-  const { data: conversationData, isLoading: isLoadingConversation, error: conversationError } = useQuery<{
-    conversation: any;
+  // Fetch conversation data for selected session from the new endpoint
+  const { data: sessionData, isLoading: isLoadingConversation, error: conversationError } = useQuery<{
+    session: any;
     messages: Array<{
       id: string;
       content: string;
@@ -912,6 +912,7 @@ function EnhancedSessionHistoryTable({ sessionHistory }: { sessionHistory?: any[
       speakerLabel: string | null;
       timestamp: string;
       discoveryQuestions: any;
+      discoveryInsights: any;
       caseStudies: any;
       competitorAnalysis: any;
       solutionRecommendations: any;
@@ -922,12 +923,22 @@ function EnhancedSessionHistoryTable({ sessionHistory }: { sessionHistory?: any[
       problemStatement: string | null;
       recommendedSolutions: any;
       suggestedNextPrompt: string | null;
+      customerIdentification: any;
     }>;
+    messageCount: number;
+    aiResponseCount: number;
   }>({
-    queryKey: ["/api/conversations", selectedSession],
+    queryKey: [`/api/session/${selectedSession}`],
+    queryFn: async () => {
+      if (!selectedSession) return null;
+      const response = await apiRequest(`GET`, `/api/session/${selectedSession}`);
+      return response;
+    },
     enabled: !!selectedSession,
     retry: false, // Don't retry on 404
   });
+  
+  const conversationData = sessionData;
 
   // Calculate statistics from conversation data
   const statistics = conversationData ? {
@@ -1162,6 +1173,14 @@ function EnhancedSessionHistoryTable({ sessionHistory }: { sessionHistory?: any[
                         {/* AI Data */}
                         {message.sender === 'assistant' && (
                           <div className="space-y-2 mt-3 pt-3 border-t border-border/30">
+                            {message.problemStatement && (
+                              <div>
+                                <p className="text-xs font-semibold text-red-600 dark:text-red-400 mb-1">⚠️ Problem Statement:</p>
+                                <div className="text-xs text-muted-foreground bg-red-50 dark:bg-red-950/20 p-2 rounded">
+                                  {message.problemStatement}
+                                </div>
+                              </div>
+                            )}
                             {message.discoveryQuestions && (
                               <div>
                                 <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mb-1">🔍 Discovery Questions:</p>
@@ -1173,13 +1192,48 @@ function EnhancedSessionHistoryTable({ sessionHistory }: { sessionHistory?: any[
                                 </div>
                               </div>
                             )}
+                            {message.discoveryInsights && (
+                              <div>
+                                <p className="text-xs font-semibold text-cyan-600 dark:text-cyan-400 mb-1">💭 Discovery Insights:</p>
+                                <div className="text-xs text-muted-foreground bg-cyan-50 dark:bg-cyan-950/20 p-2 rounded">
+                                  {typeof message.discoveryInsights === 'object' && message.discoveryInsights !== null
+                                    ? Object.entries(message.discoveryInsights).map(([key, value]) => (
+                                        <div key={key}><strong>{key}:</strong> {Array.isArray(value) ? value.join(', ') : String(value)}</div>
+                                      ))
+                                    : JSON.stringify(message.discoveryInsights)
+                                  }
+                                </div>
+                              </div>
+                            )}
+                            {message.recommendedSolutions && (
+                              <div>
+                                <p className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">💡 Recommended Solutions:</p>
+                                <div className="text-xs text-muted-foreground bg-green-50 dark:bg-green-950/20 p-2 rounded">
+                                  {Array.isArray(message.recommendedSolutions) 
+                                    ? message.recommendedSolutions.map((s, i) => <div key={i}>• {s}</div>)
+                                    : JSON.stringify(message.recommendedSolutions)
+                                  }
+                                </div>
+                              </div>
+                            )}
                             {message.solutionRecommendations && (
                               <div>
-                                <p className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">💡 Solution Recommendations:</p>
+                                <p className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">🎯 Solution Recommendations:</p>
                                 <div className="text-xs text-muted-foreground bg-green-50 dark:bg-green-950/20 p-2 rounded">
                                   {Array.isArray(message.solutionRecommendations) 
                                     ? message.solutionRecommendations.map((s, i) => <div key={i}>• {s}</div>)
                                     : JSON.stringify(message.solutionRecommendations)
+                                  }
+                                </div>
+                              </div>
+                            )}
+                            {message.caseStudies && (
+                              <div>
+                                <p className="text-xs font-semibold text-yellow-600 dark:text-yellow-400 mb-1">📚 Case Studies:</p>
+                                <div className="text-xs text-muted-foreground bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded">
+                                  {Array.isArray(message.caseStudies) 
+                                    ? message.caseStudies.map((c, i) => <div key={i}>• {c}</div>)
+                                    : JSON.stringify(message.caseStudies)
                                   }
                                 </div>
                               </div>
@@ -1201,7 +1255,7 @@ function EnhancedSessionHistoryTable({ sessionHistory }: { sessionHistory?: any[
                                 <div className="text-xs text-muted-foreground bg-orange-50 dark:bg-orange-950/20 p-2 rounded">
                                   {typeof message.bantQualification === 'object' 
                                     ? Object.entries(message.bantQualification).map(([key, value]) => (
-                                        <div key={key}><strong>{key}:</strong> {String(value)}</div>
+                                        <div key={key}><strong>{key}:</strong> {typeof value === 'object' ? JSON.stringify(value) : String(value)}</div>
                                       ))
                                     : JSON.stringify(message.bantQualification)
                                   }
