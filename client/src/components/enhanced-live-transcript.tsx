@@ -97,6 +97,7 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
     status: string;
     hasPlatformAccess?: boolean;
     hasSessionMinutes?: boolean;
+    trialExpired?: boolean;
     sessionsUsed: number;
     sessionsLimit: number | null;
     sessionsRemaining: number | null;
@@ -290,20 +291,29 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
       // Check subscription limits before starting
       if (limitsData && !limitsData.canUseService) {
         let limitMessage = "";
-        if (limitsData.hasPlatformAccess === false) {
-          limitMessage = "Platform access is required. Visit Packages to purchase Platform Access.";
+        let toastTitle = "Subscription Required";
+        
+        // Check if this is a trial expiration
+        if (limitsData.status === 'trial_expired' || limitsData.trialExpired) {
+          toastTitle = "Free Trial Expired";
+          limitMessage = "Your free trial has ended. Please purchase Platform Access and Session Minutes to continue using Rev Winner. Secured by Cashfree Payments.";
+        } else if (limitsData.hasPlatformAccess === false) {
+          limitMessage = "Platform access is required. Visit Packages to purchase Platform Access secured by Cashfree Payments.";
         } else if (limitsData.hasSessionMinutes === false) {
-          limitMessage = "Session minutes are required to use the platform. Purchase a minutes package to continue.";
+          limitMessage = "Session minutes are required to use the platform. Purchase a minutes package to continue. Secured by Cashfree Payments.";
         } else if (limitsData.sessionsLimit && limitsData.sessionsUsed >= limitsData.sessionsLimit) {
-          limitMessage = `You've used all ${limitsData.sessionsLimit} free sessions. Visit Packages to purchase Platform Access!`;
+          toastTitle = "Free Trial Expired";
+          limitMessage = `You've used all ${limitsData.sessionsLimit} free sessions. Purchase Platform Access and Session Minutes to continue. Secured by Cashfree Payments.`;
         } else if (limitsData.minutesLimit && limitsData.minutesUsed >= limitsData.minutesLimit) {
-          limitMessage = `You've used all ${limitsData.minutesLimit} free minutes. Visit Packages to purchase Platform Access!`;
+          toastTitle = "Free Trial Expired";
+          limitMessage = `You've used all ${limitsData.minutesLimit} free minutes. Purchase Platform Access and Session Minutes to continue. Secured by Cashfree Payments.`;
         } else {
-          limitMessage = "Your free trial has expired. Visit Packages to purchase Platform Access!";
+          toastTitle = "Free Trial Expired";
+          limitMessage = "Your free trial has expired. Visit Packages to purchase Platform Access and Session Minutes. Secured by Cashfree Payments.";
         }
         
         toast({
-          title: "Free Trial Expired",
+          title: toastTitle,
           description: limitMessage,
           variant: "destructive",
         });
@@ -330,16 +340,22 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
           
           let minutesMessage = "";
           if (!sessionMinutesData || sessionMinutesData.totalMinutesRemaining === 0) {
-            minutesMessage = "You've completed your 3 free sessions or 180 free minutes. Purchase Session Minutes to continue!";
+            minutesMessage = "Your free trial has expired. Please purchase Platform Access and Session Minutes to continue using Rev Winner. Secured by Cashfree Payments.";
           } else {
-            minutesMessage = "Your session minutes have expired or been exhausted. Purchase more Session Minutes to continue!";
+            minutesMessage = "Your session minutes have expired or been exhausted. Purchase more Session Minutes to continue. Secured by Cashfree Payments.";
           }
           
           toast({
-            title: "Session Minutes Required",
+            title: "Free Trial Expired",
             description: minutesMessage,
             variant: "destructive"
           });
+          
+          // Redirect to packages page
+          setTimeout(() => {
+            setLocation('/packages');
+          }, 2500);
+          
           return;
         }
       }

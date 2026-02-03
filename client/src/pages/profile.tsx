@@ -531,8 +531,10 @@ export default function Profile() {
                   <div className="p-4 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 rounded-lg border border-border/30">
                     <p className="text-sm text-muted-foreground mb-1">Minutes Remaining</p>
                     <p className="text-3xl font-bold text-purple-600 dark:text-purple-400" data-testid="text-minutes-remaining">
-                          <span>{subscriptionData?.minutesUsed || sessionMinutesStatus.usedMinutes || 0}/</span>                          <span>{sessionMinutesStatus.totalMinutesRemaining}</span>
-
+                      {sessionMinutesStatus.totalMinutesRemaining}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {subscriptionData?.minutesUsed || sessionMinutesStatus.usedMinutes || 0} used / {sessionMinutesStatus.totalMinutes !== Infinity ? sessionMinutesStatus.totalMinutes : 'Unlimited'} total
                     </p>
                   </div>
                   
@@ -582,21 +584,29 @@ export default function Profile() {
                 {!sessionMinutesStatus.hasActiveMinutes && (
                   <div className="p-4 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg">
                     <p className="text-sm font-medium text-orange-900 dark:text-orange-100">
-                      No session minutes available
+                      {sessionMinutesStatus.totalMinutes === 0 && subscriptionData?.planType === 'free_trial' 
+                        ? 'Free Trial Expired - Purchase Required' 
+                        : sessionMinutesStatus.totalMinutes === 0 
+                        ? 'No Session Minutes Available' 
+                        : 'No Active Session Minutes'}
                     </p>
                     <p className="text-xs text-orange-700 dark:text-orange-300 mt-1">
-                      Purchase session minutes packages to continue using the platform
+                      {sessionMinutesStatus.totalMinutes === 0 && subscriptionData?.planType === 'free_trial'
+                        ? 'Purchase Platform Access & Session Minutes to continue. Secured by Cashfree Payments.'
+                        : 'Purchase Session Minutes packages to continue using the platform. Secured by Cashfree Payments.'}
                     </p>
                   </div>
                 )}
                 
                 <Button
-                  onClick={() => setLocation("/manage-subscription")}
+                  onClick={() => setLocation(sessionMinutesStatus.totalMinutes === 0 && subscriptionData?.planType === 'free_trial' ? "/packages" : "/manage-subscription")}
                   className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
                   data-testid="button-manage-minutes"
                 >
                   <CreditCard className="mr-2 h-4 w-4" />
-                  Purchase Session Minutes
+                  {sessionMinutesStatus.totalMinutes === 0 && subscriptionData?.planType === 'free_trial' 
+                    ? 'View Packages' 
+                    : 'Purchase Session Minutes'}
                 </Button>
               </div>
             ) : (

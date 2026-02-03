@@ -112,6 +112,9 @@ export default function Settings() {
     canUseService: boolean;
     planType: string;
     status: string;
+    hasPlatformAccess?: boolean;
+    hasSessionMinutes?: boolean;
+    trialExpired?: boolean;
     sessionsUsed: number;
     sessionsLimit: number | null;
     sessionsRemaining: number | null;

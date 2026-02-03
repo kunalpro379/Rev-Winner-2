@@ -2422,6 +2422,13 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
       const minutesRemaining = minutesLimit ? Math.max(0, minutesLimit - minutesUsed) : null;
 
       const isTrialUser = subscription.status === 'trial' || (sessionsLimit !== null && minutesLimit !== null);
+      
+      // Check if trial has expired (all sessions OR all minutes used)
+      const trialExpired = isTrialUser && (
+        (sessionsLimit !== null && sessionsRemaining !== null && sessionsRemaining <= 0) ||
+        (minutesLimit !== null && minutesRemaining !== null && minutesRemaining <= 0)
+      );
+      
       const trialCanUse = (subscription.status === 'trial' || subscription.status === 'active') &&
         (sessionsLimit === null || (sessionsLimit !== null && sessionsRemaining !== null && sessionsRemaining > 0)) &&
         (minutesLimit === null || (minutesLimit !== null && minutesRemaining !== null && minutesRemaining > 0));
@@ -2429,6 +2436,7 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
       console.log(`[DEBUG] Service access (trial flow):`, {
         status: subscription.status,
         isTrialUser,
+        trialExpired,
         canUseService: trialCanUse,
         sessionsCheck: `${sessionsLimit === null} || ${sessionsRemaining !== null && sessionsRemaining > 0}`,
         minutesCheck: `${minutesLimit === null} || ${minutesRemaining !== null && minutesRemaining > 0}`
@@ -2437,9 +2445,10 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
       return res.json({
         canUseService: trialCanUse,
         planType: subscription.planType,
-        status: subscription.status,
+        status: trialExpired ? 'trial_expired' : subscription.status,
         hasPlatformAccess: false,
         hasSessionMinutes: false,
+        trialExpired,
         sessionsUsed,
         sessionsLimit,
         sessionsRemaining,
