@@ -294,9 +294,11 @@ export default function SalesAssistant() {
       });
     },
     onError: (error) => {
+      const status = (error as any)?.status;
+      const message = error instanceof Error ? error.message : "Failed to send message";
       toast({
-        title: "Error",
-        description: "Failed to send message",
+        title: status === 403 ? "Subscription Required" : "Error",
+        description: status === 403 ? "You need an active subscription to continue." : message,
         variant: "destructive"
       });
     },
@@ -317,7 +319,11 @@ export default function SalesAssistant() {
     };
     setTranscriptEntries(prev => [...prev, userTranscriptEntry]);
     
-    await sendMessageMutation.mutateAsync({ content, speakerLabel });
+    try {
+      await sendMessageMutation.mutateAsync({ content, speakerLabel });
+    } catch (error) {
+      // Mutation onError handles user feedback; swallow to avoid unhandled rejection overlay.
+    }
   };
 
   const handleAnalyze = async (transcriptText: string) => {
