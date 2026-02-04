@@ -43,6 +43,8 @@ interface EnhancedLiveTranscriptProps {
   onTranscribingChange?: (isTranscribing: boolean) => void;
   onNewSession?: () => void;
   resetVersion?: number;
+    sessionId?: number;
+    onStop?: () => Promise<void>;
 }
 
 const SPEAKER_COLORS = [
@@ -72,7 +74,7 @@ const isDesktopBrowser = () => {
   return !isMobileDevice() && typeof navigator.mediaDevices?.getDisplayMedia === 'function';
 };
 
-export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing = false, shouldStop = false, onStopped, onStartTimer, onStopTimer, onTranscriptUpdate, onTranscribingChange, onNewSession, resetVersion = 0 }: EnhancedLiveTranscriptProps) {
+export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing = false, shouldStop = false, onStopped, onStartTimer, onStopTimer, onTranscriptUpdate, onTranscribingChange, onNewSession, resetVersion = 0, sessionId, onStop }: EnhancedLiveTranscriptProps) {
   const [interimTranscript, setInterimTranscript] = useState("");
   const [fullTranscript, setFullTranscript] = useState("");
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
@@ -370,7 +372,10 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
     }
   };
 
-  const handleStop = () => {
+  const handleStop = async () => {
+    if (onStop && sessionId) {
+      await onStop();
+    }
     stopTranscription();
     setIsPaused(false);
   };

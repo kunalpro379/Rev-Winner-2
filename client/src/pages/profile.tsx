@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { HamburgerNav } from "@/components/hamburger-nav";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
-import { User, Mail, Phone, Building2, Calendar, CreditCard, Download, ShieldCheck, Clock, GraduationCap, Loader2, Video, ChevronDown, ChevronUp, Search, FileAudio } from "lucide-react";
+import { User, Mail, Phone, Building2, Calendar, CreditCard, Download, ShieldCheck, Clock, GraduationCap, Loader2, Video, ChevronDown, ChevronUp, Search } from "lucide-react";
 import { useSEO } from "@/hooks/use-seo";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -34,6 +35,7 @@ interface SessionHistoryItem {
   startTime: string;
   endTime: string;
   durationMinutes: number;
+  summary?: string | null;
 }
 
 interface SubscriptionData {
@@ -748,40 +750,55 @@ export default function Profile() {
               </div>
             ) : subscriptionData ? (
               <div className="space-y-6">
-                {/* Usage Summary */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Total Usage Card */}
+                {sessionMinutesStatus && (
+                  <Card className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border-purple-200 dark:border-purple-800">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-1">Total Usage</p>
+                          <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                            {Math.floor((sessionMinutesStatus.usedMinutes || 0) / 60)}h {(sessionMinutesStatus.usedMinutes || 0) % 60}m
+                          </p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {subscriptionData.sessionsUsed || "0"} session{(subscriptionData.sessionsUsed || "0") !== "1" ? "s" : ""}
+                          </p>
+                        </div>
+                        <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full">
+                          <Clock className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Usage Summary with Session Minutes */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="p-4 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 rounded-lg border border-border/30">
-                    <p className="text-xs text-muted-foreground mb-1">Sessions Used</p>
+                    <p className="text-xs text-muted-foreground mb-1">Total Sessions</p>
                     <p className="text-2xl font-bold text-foreground" data-testid="text-sessions-used">
                       {subscriptionData.sessionsUsed || "0"}
-                      {subscriptionData.sessionsLimit && (
-                        <span className="text-sm text-muted-foreground ml-1">/ {subscriptionData.sessionsLimit}</span>
-                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {subscriptionData.minutesUsed || "0"} minutes used
                     </p>
                   </div>
                   <div className="p-4 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 rounded-lg border border-border/30">
-                    <p className="text-xs text-muted-foreground mb-1">Minutes Used</p>
-                    <p className="text-2xl font-bold text-foreground" data-testid="text-minutes-used">
-                      {subscriptionData.minutesUsed || "0"}
-                      {subscriptionData.minutesLimit && (
-                        <span className="text-sm text-muted-foreground ml-1">/ {subscriptionData.minutesLimit}</span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 rounded-lg border border-border/30">
-                    <p className="text-xs text-muted-foreground mb-1">Remaining Sessions</p>
-                    <p className="text-2xl font-bold text-foreground" data-testid="text-sessions-remaining">
-                      {subscriptionData.sessionsLimit 
-                        ? Math.max(0, parseInt(subscriptionData.sessionsLimit) - parseInt(subscriptionData.sessionsUsed || "0"))
-                        : "∞"}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 rounded-lg border border-border/30">
-                    <p className="text-xs text-muted-foreground mb-1">Remaining Minutes</p>
-                    <p className="text-2xl font-bold text-foreground" data-testid="text-minutes-remaining">
-                      {subscriptionData.minutesLimit 
+                    <p className="text-xs text-muted-foreground mb-1">Minutes Remaining</p>
+                    <p className="text-2xl font-bold text-purple-600 dark:text-purple-400" data-testid="text-minutes-remaining-detailed">
+                      {sessionMinutesStatus?.totalMinutesRemaining || 
+                       (subscriptionData.minutesLimit && subscriptionData.minutesLimit !== 'unlimited'
                         ? Math.max(0, parseInt(subscriptionData.minutesLimit) - parseInt(subscriptionData.minutesUsed || "0"))
-                        : "∞"}
+                        : "Unlimited")}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {subscriptionData.minutesUsed || sessionMinutesStatus?.usedMinutes || 0} used / {sessionMinutesStatus?.totalMinutes !== Infinity ? sessionMinutesStatus?.totalMinutes || subscriptionData.minutesLimit : 'Unlimited'} total
+                    </p>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 rounded-lg border border-border/30">
+                    <p className="text-xs text-muted-foreground mb-1">Next Expiry</p>
+                    <p className="text-sm font-semibold text-foreground" data-testid="text-expiry-date">
+                      {sessionMinutesStatus?.nextExpiryDate ? formatDate(sessionMinutesStatus.nextExpiryDate) : "N/A"}
                     </p>
                   </div>
                 </div>
@@ -898,65 +915,8 @@ export default function Profile() {
 }
 
 // Enhanced Session History Table Component
-function EnhancedSessionHistoryTable({ sessionHistory }: { sessionHistory?: any[] }) {
-  const [selectedSession, setSelectedSession] = useState<string | null>(null);
-  const [showConversation, setShowConversation] = useState(false);
-
-  // Fetch conversation data for selected session from the new endpoint
-  const { data: sessionData, isLoading: isLoadingConversation, error: conversationError } = useQuery<{
-    session: any;
-    messages: Array<{
-      id: string;
-      content: string;
-      sender: string;
-      speakerLabel: string | null;
-      timestamp: string;
-      discoveryQuestions: any;
-      discoveryInsights: any;
-      caseStudies: any;
-      competitorAnalysis: any;
-      solutionRecommendations: any;
-      productFeatures: any;
-      nextSteps: any;
-      bantQualification: any;
-      solutions: any;
-      problemStatement: string | null;
-      recommendedSolutions: any;
-      suggestedNextPrompt: string | null;
-      customerIdentification: any;
-    }>;
-    messageCount: number;
-    aiResponseCount: number;
-  }>({
-    queryKey: [`/api/session/${selectedSession}`],
-    queryFn: async () => {
-      if (!selectedSession) return null;
-      const response = await apiRequest(`GET`, `/api/session/${selectedSession}`);
-      return response;
-    },
-    enabled: !!selectedSession,
-    retry: false, // Don't retry on 404
-  });
-  
-  const conversationData = sessionData;
-
-  // Calculate statistics from conversation data
-  const statistics = conversationData ? {
-    totalMessages: conversationData.messages.length,
-    aiMessages: conversationData.messages.filter(m => m.sender === 'assistant').length,
-    userMessages: conversationData.messages.filter(m => m.sender === 'user').length,
-    messagesWithAiData: conversationData.messages.filter(m => 
-      m.discoveryQuestions || m.caseStudies || m.competitorAnalysis || 
-      m.solutionRecommendations || m.productFeatures || m.nextSteps ||
-      m.bantQualification || m.solutions || m.problemStatement ||
-      m.recommendedSolutions || m.suggestedNextPrompt
-    ).length,
-  } : {
-    totalMessages: 0,
-    aiMessages: 0,
-    userMessages: 0,
-    messagesWithAiData: 0,
-  };
+function EnhancedSessionHistoryTable({ sessionHistory }: { sessionHistory?: SessionHistoryItem[] }) {
+  const [selectedSummary, setSelectedSummary] = useState<{ summary: string; sessionNumber: number } | null>(null);
 
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -978,17 +938,30 @@ function EnhancedSessionHistoryTable({ sessionHistory }: { sessionHistory?: any[
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   };
 
-  const handleViewConversation = (sessionId: string) => {
-    setSelectedSession(sessionId);
-    setShowConversation(true);
+  const parseSummarySections = (summaryText: string) => {
+    const sectionRegex = /([A-Za-z][A-Za-z &]+):/g;
+    const matches = [...summaryText.matchAll(sectionRegex)];
+    if (matches.length === 0) {
+      return null;
+    }
+
+    return matches.map((match, index) => {
+      const title = match[1].trim();
+      const start = (match.index ?? 0) + match[0].length;
+      const end = index < matches.length - 1 ? (matches[index + 1].index ?? summaryText.length) : summaryText.length;
+      const rawContent = summaryText.slice(start, end).trim();
+      const items = rawContent
+        .split(/;|\n/)
+        .map((item) => item.replace(/^\s*[-•]\s*/, "").trim())
+        .filter(Boolean);
+
+      return { title, items };
+    });
   };
 
-  // Check if a session has conversation data (not a usage tracking entry)
-  const hasConversationData = (sessionId: string) => {
-    // Usage tracking sessions typically start with "usage_" 
-    // Real conversation sessions typically start with "session_"
-    return sessionId.startsWith('session_') && !sessionId.startsWith('usage_');
-  };
+  const sortedSessions = sessionHistory
+    ? [...sessionHistory].sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+    : [];
 
   if (!sessionHistory || sessionHistory.length === 0) {
     return (
@@ -1012,22 +985,18 @@ function EnhancedSessionHistoryTable({ sessionHistory }: { sessionHistory?: any[
                 <th className="text-left p-3 text-xs font-semibold text-muted-foreground">Start Time</th>
                 <th className="text-left p-3 text-xs font-semibold text-muted-foreground">End Time</th>
                 <th className="text-left p-3 text-xs font-semibold text-muted-foreground">Duration</th>
-                <th className="text-left p-3 text-xs font-semibold text-muted-foreground">Session Type</th>
-                <th className="text-left p-3 text-xs font-semibold text-muted-foreground">Actions</th>
+                <th className="text-left p-3 text-xs font-semibold text-muted-foreground">Summary</th>
               </tr>
             </thead>
             <tbody>
-              {sessionHistory
-                .slice()
-                .reverse()
-                .map((session, index) => (
+              {sortedSessions.map((session, index) => (
                   <tr
                     key={`${session.sessionId}-${index}-${session.startTime}`}
                     className="border-t border-border hover:bg-muted/30 transition-colors"
                     data-testid={`session-${index}`}
                   >
                     <td className="p-3 text-sm font-mono text-muted-foreground">
-                      {sessionHistory.length - index}
+                      {index + 1}
                     </td>
                     <td className="p-3 text-sm text-foreground" data-testid={`session-start-${index}`}>
                       {formatDateTime(session.startTime)}
@@ -1038,52 +1007,18 @@ function EnhancedSessionHistoryTable({ sessionHistory }: { sessionHistory?: any[
                     <td className="p-3 text-sm font-semibold text-foreground" data-testid={`session-duration-${index}`}>
                       {formatDuration(session.durationMinutes)}
                     </td>
-                    <td className="p-3 text-sm text-foreground" data-testid={`session-type-${index}`}>
-                      <div className="flex items-center gap-2">
-                        {hasConversationData(session.sessionId) ? (
-                          <>
-                            <Badge variant="default" className="text-xs">
-                              AI Session
-                            </Badge>
-                            <Badge variant="secondary" className="text-xs">
-                              Conversation Data
-                            </Badge>
-                          </>
-                        ) : (
-                          <>
-                            <Badge variant="outline" className="text-xs">
-                              Usage Tracking
-                            </Badge>
-                            <Badge variant="secondary" className="text-xs bg-gray-100 text-gray-600">
-                              No AI Data
-                            </Badge>
-                          </>
-                        )}
-                      </div>
-                    </td>
                     <td className="p-3">
-                      {hasConversationData(session.sessionId) ? (
+                      {session.summary ? (
                         <Button
-                          onClick={() => handleViewConversation(session.sessionId)}
                           variant="outline"
                           size="sm"
-                          className="gap-2"
-                          data-testid={`button-view-conversation-${index}`}
+                          onClick={() => setSelectedSummary({ summary: session.summary!, sessionNumber: index + 1 })}
+                          className="text-xs"
                         >
-                          <FileAudio className="h-4 w-4" />
-                          View AI Data
+                          View Summary
                         </Button>
                       ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled
-                          className="gap-2 text-muted-foreground"
-                          data-testid={`button-no-data-${index}`}
-                        >
-                          <Clock className="h-4 w-4" />
-                          Usage Only
-                        </Button>
+                        <span className="text-xs text-muted-foreground italic">No summary</span>
                       )}
                     </td>
                   </tr>
@@ -1093,200 +1028,76 @@ function EnhancedSessionHistoryTable({ sessionHistory }: { sessionHistory?: any[
         </div>
       </div>
 
-      {/* Conversation Modal */}
-      {showConversation && selectedSession && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-background border border-border rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden">
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <h3 className="text-lg font-semibold">
-                Conversation Data - Session {selectedSession.split('_').pop()?.substring(0, 8)}
-              </h3>
-              <Button
-                onClick={() => setShowConversation(false)}
-                variant="ghost"
-                size="sm"
-              >
-                ✕
-              </Button>
-            </div>
-            <div className="p-4 overflow-y-auto max-h-[60vh]">
-              {isLoadingConversation ? (
-                <div className="space-y-3">
-                  <div className="h-4 bg-muted animate-pulse rounded"></div>
-                  <div className="h-4 bg-muted animate-pulse rounded"></div>
-                  <div className="h-4 bg-muted animate-pulse rounded"></div>
-                </div>
-              ) : conversationError ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileAudio className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p className="text-sm">No conversation data found</p>
-                  <p className="text-xs mt-1">This session may be a usage tracking entry without AI conversation data</p>
-                </div>
-              ) : conversationData && conversationData.messages.length > 0 ? (
-                <div className="space-y-4">
-                  {/* Statistics */}
-                  <div className="grid grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-foreground">{statistics.totalMessages}</p>
-                      <p className="text-xs text-muted-foreground">Total Messages</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-foreground">{statistics.aiMessages}</p>
-                      <p className="text-xs text-muted-foreground">AI Responses</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-foreground">{statistics.userMessages}</p>
-                      <p className="text-xs text-muted-foreground">User Messages</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-foreground">{statistics.messagesWithAiData}</p>
-                      <p className="text-xs text-muted-foreground">With AI Data</p>
-                    </div>
-                  </div>
+      {/* Summary Dialog */}
+      <Dialog open={!!selectedSummary} onOpenChange={(open) => !open && setSelectedSummary(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">
+              <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">Session Summary</span>
+            </DialogTitle>
+          </DialogHeader>
+          {selectedSummary ? (() => {
+            const sections = parseSummarySections(selectedSummary.summary);
+            const sectionStyles = [
+              {
+                container: "bg-purple-50 dark:bg-purple-950/30",
+                border: "border-purple-200 dark:border-purple-800",
+                title: "text-purple-700 dark:text-purple-300",
+                bullet: "text-purple-500",
+              },
+              {
+                container: "bg-blue-50 dark:bg-blue-950/30",
+                border: "border-blue-200 dark:border-blue-800",
+                title: "text-blue-700 dark:text-blue-300",
+                bullet: "text-blue-500",
+              },
+              {
+                container: "bg-emerald-50 dark:bg-emerald-950/30",
+                border: "border-emerald-200 dark:border-emerald-800",
+                title: "text-emerald-700 dark:text-emerald-300",
+                bullet: "text-emerald-500",
+              },
+              {
+                container: "bg-amber-50 dark:bg-amber-950/30",
+                border: "border-amber-200 dark:border-amber-800",
+                title: "text-amber-700 dark:text-amber-300",
+                bullet: "text-amber-500",
+              },
+            ];
 
-                  {/* Messages */}
-                  <div className="space-y-3">
-                    {conversationData.messages.map((message, index) => (
-                      <div
-                        key={message.id}
-                        className={`p-3 rounded-lg ${
-                          message.sender === 'assistant' 
-                            ? 'bg-blue-50 dark:bg-blue-950/30 border-l-4 border-blue-500' 
-                            : 'bg-gray-50 dark:bg-gray-950/30 border-l-4 border-gray-500'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <Badge variant={message.sender === 'assistant' ? 'default' : 'secondary'}>
-                              {message.sender === 'assistant' ? 'AI Assistant' : 'User'}
-                            </Badge>
-                            {message.speakerLabel && (
-                              <Badge variant="outline">{message.speakerLabel}</Badge>
-                            )}
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {formatDateTime(message.timestamp)}
-                          </span>
-                        </div>
-                        <p className="text-sm text-foreground mb-2">{message.content}</p>
-                        
-                        {/* AI Data */}
-                        {message.sender === 'assistant' && (
-                          <div className="space-y-2 mt-3 pt-3 border-t border-border/30">
-                            {message.problemStatement && (
-                              <div>
-                                <p className="text-xs font-semibold text-red-600 dark:text-red-400 mb-1">⚠️ Problem Statement:</p>
-                                <div className="text-xs text-muted-foreground bg-red-50 dark:bg-red-950/20 p-2 rounded">
-                                  {message.problemStatement}
-                                </div>
-                              </div>
-                            )}
-                            {message.discoveryQuestions && (
-                              <div>
-                                <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mb-1">🔍 Discovery Questions:</p>
-                                <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-2 rounded">
-                                  {Array.isArray(message.discoveryQuestions) 
-                                    ? message.discoveryQuestions.map((q, i) => <div key={i}>• {q}</div>)
-                                    : JSON.stringify(message.discoveryQuestions)
-                                  }
-                                </div>
-                              </div>
-                            )}
-                            {message.discoveryInsights && (
-                              <div>
-                                <p className="text-xs font-semibold text-cyan-600 dark:text-cyan-400 mb-1">💭 Discovery Insights:</p>
-                                <div className="text-xs text-muted-foreground bg-cyan-50 dark:bg-cyan-950/20 p-2 rounded">
-                                  {typeof message.discoveryInsights === 'object' && message.discoveryInsights !== null
-                                    ? Object.entries(message.discoveryInsights).map(([key, value]) => (
-                                        <div key={key}><strong>{key}:</strong> {Array.isArray(value) ? value.join(', ') : String(value)}</div>
-                                      ))
-                                    : JSON.stringify(message.discoveryInsights)
-                                  }
-                                </div>
-                              </div>
-                            )}
-                            {message.recommendedSolutions && (
-                              <div>
-                                <p className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">💡 Recommended Solutions:</p>
-                                <div className="text-xs text-muted-foreground bg-green-50 dark:bg-green-950/20 p-2 rounded">
-                                  {Array.isArray(message.recommendedSolutions) 
-                                    ? message.recommendedSolutions.map((s, i) => <div key={i}>• {s}</div>)
-                                    : JSON.stringify(message.recommendedSolutions)
-                                  }
-                                </div>
-                              </div>
-                            )}
-                            {message.solutionRecommendations && (
-                              <div>
-                                <p className="text-xs font-semibold text-green-600 dark:text-green-400 mb-1">🎯 Solution Recommendations:</p>
-                                <div className="text-xs text-muted-foreground bg-green-50 dark:bg-green-950/20 p-2 rounded">
-                                  {Array.isArray(message.solutionRecommendations) 
-                                    ? message.solutionRecommendations.map((s, i) => <div key={i}>• {s}</div>)
-                                    : JSON.stringify(message.solutionRecommendations)
-                                  }
-                                </div>
-                              </div>
-                            )}
-                            {message.caseStudies && (
-                              <div>
-                                <p className="text-xs font-semibold text-yellow-600 dark:text-yellow-400 mb-1">📚 Case Studies:</p>
-                                <div className="text-xs text-muted-foreground bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded">
-                                  {Array.isArray(message.caseStudies) 
-                                    ? message.caseStudies.map((c, i) => <div key={i}>• {c}</div>)
-                                    : JSON.stringify(message.caseStudies)
-                                  }
-                                </div>
-                              </div>
-                            )}
-                            {message.nextSteps && (
-                              <div>
-                                <p className="text-xs font-semibold text-purple-600 dark:text-purple-400 mb-1">📋 Next Steps:</p>
-                                <div className="text-xs text-muted-foreground bg-purple-50 dark:bg-purple-950/20 p-2 rounded">
-                                  {Array.isArray(message.nextSteps) 
-                                    ? message.nextSteps.map((step, i) => <div key={i}>• {step}</div>)
-                                    : JSON.stringify(message.nextSteps)
-                                  }
-                                </div>
-                              </div>
-                            )}
-                            {message.bantQualification && (
-                              <div>
-                                <p className="text-xs font-semibold text-orange-600 dark:text-orange-400 mb-1">🎯 BANT Qualification:</p>
-                                <div className="text-xs text-muted-foreground bg-orange-50 dark:bg-orange-950/20 p-2 rounded">
-                                  {typeof message.bantQualification === 'object' 
-                                    ? Object.entries(message.bantQualification).map(([key, value]) => (
-                                        <div key={key}><strong>{key}:</strong> {typeof value === 'object' ? JSON.stringify(value) : String(value)}</div>
-                                      ))
-                                    : JSON.stringify(message.bantQualification)
-                                  }
-                                </div>
-                              </div>
-                            )}
-                            {message.suggestedNextPrompt && (
-                              <div>
-                                <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 mb-1">💬 Suggested Next Prompt:</p>
-                                <div className="text-xs text-muted-foreground bg-indigo-50 dark:bg-indigo-950/20 p-2 rounded italic">
-                                  "{message.suggestedNextPrompt}"
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
+            if (!sections) {
+              return (
+                <div className="p-4 bg-muted/30 rounded-lg">
+                  <p className="text-sm text-foreground whitespace-pre-wrap italic">{selectedSummary.summary}</p>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-4">
+                {sections.map((section, idx) => {
+                  const style = sectionStyles[idx % sectionStyles.length];
+                  return (
+                    <div key={`${section.title}-${idx}`} className={`rounded-lg border ${style.border} ${style.container}`}>
+                      <div className="px-4 py-3 border-b border-border/40">
+                        <h3 className={`text-xs font-semibold uppercase tracking-wide ${style.title}`}>{section.title}</h3>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileAudio className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p className="text-sm">No conversation messages found</p>
-                  <p className="text-xs mt-1">This session may not have AI conversation data</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+                      <ul className="p-4 space-y-2 text-sm text-foreground">
+                        {section.items.map((item, itemIndex) => (
+                          <li key={`${section.title}-item-${itemIndex}`} className="flex gap-2">
+                            <span className={`${style.bullet} mt-0.5`}>•</span>
+                            <span className="italic">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })() : null}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

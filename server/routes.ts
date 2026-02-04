@@ -236,7 +236,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? Math.round((conv.endedAt.getTime() - conv.createdAt.getTime()) / (1000 * 60))
           : conv.createdAt
           ? Math.round((new Date().getTime() - conv.createdAt.getTime()) / (1000 * 60))
-          : 0
+          : 0,
+        summary: conv.callSummary || null
       }));
 
       res.json({ conversations: userConversations, sessionHistory });
@@ -303,22 +304,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }));
         
         const summary = await generateCallSummary(conversationHistory, conversation.discoveryInsights, req.jwtUser?.userId);
-        const summaryText = `
-**Key Challenges:**
-${summary.keychallenges.map(c => `• ${c}`).join('\n')}
-
-**Discovery Insights:**
-${summary.discoveryInsights.map(i => `• ${i}`).join('\n')}
-
-**Objections & Responses:**
-${summary.objections.map(o => `• ${o}`).join('\n')}
-
-**Next Steps:**
-${summary.nextSteps.map(s => `• ${s}`).join('\n')}
-
-**Recommended Solutions:**
-${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
-        `.trim();
+        const summarySections = [
+          summary.keychallenges?.length ? `Key challenges: ${summary.keychallenges.join("; ")}.` : null,
+          summary.discoveryInsights?.length ? `Discovery insights: ${summary.discoveryInsights.join("; ")}.` : null,
+          summary.objections?.length ? `Objections & responses: ${summary.objections.join("; ")}.` : null,
+          summary.nextSteps?.length ? `Next steps: ${summary.nextSteps.join("; ")}.` : null,
+          summary.recommendedSolutions?.length ? `Recommended solutions: ${summary.recommendedSolutions.join("; ")}.` : null
+        ].filter(Boolean);
+        const summaryText = summarySections.join(" ");
         
         await storage.endConversation(req.params.sessionId, summaryText);
         
@@ -361,22 +354,14 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
         ).catch(err => console.error('Error updating conversation learnings:', err));
       }
       
-      // Add assistant message with full AI response data saved to database
-      const assistantMessage = await storage.addMessage({
-        conversationId: conversation.id,
+      // Do not store AI message or AI analysis data in the database
+      const assistantMessage = {
+        id: crypto.randomUUID(),
         content: aiResponse.response,
         sender: "assistant",
         speakerLabel: "AI Assistant",
-        discoveryQuestions: aiResponse.discoveryQuestions,
-        discoveryInsights: aiResponse.discoveryInsights,
-        nextSteps: aiResponse.nextSteps,
-        caseStudies: aiResponse.caseStudies,
-        bantQualification: aiResponse.bantQualification,
-        problemStatement: aiResponse.problemStatement,
-        recommendedSolutions: aiResponse.recommendedSolutions,
-        suggestedNextPrompt: aiResponse.nextQuestions?.[0] || null,
-        solutions: aiResponse.salesScript ? { script: aiResponse.salesScript } : undefined
-      });
+        timestamp: new Date().toISOString()
+      };
       
       res.json({
         userMessage,
@@ -2122,7 +2107,8 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
             ? Math.round((conv.endedAt.getTime() - conv.createdAt.getTime()) / (1000 * 60))
             : conv.createdAt
             ? Math.round((new Date().getTime() - conv.createdAt.getTime()) / (1000 * 60))
-            : 0
+            : 0,
+          summary: conv.callSummary || null
         }));
 
         console.log(`[DEBUG] Found ${sessionHistory.length} conversations for user ${userId}`);

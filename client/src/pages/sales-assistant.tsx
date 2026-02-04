@@ -432,6 +432,28 @@ export default function SalesAssistant() {
     }
   };
 
+  // Handler for stopping session and generating summary
+  const handleStopSession = async () => {
+    if (!sessionId) return;
+    
+    try {
+      // Send /end command to generate and save summary
+      await sendMessage(sessionId, "/end", undefined, domainExpertise);
+      
+      toast({
+        title: "Session Ended",
+        description: "Summary has been generated and saved",
+      });
+    } catch (error) {
+      console.error("Error generating summary:", error);
+      toast({
+        title: "Summary Generation Failed",
+        description: "Could not generate session summary",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Handler for initiating new session
   const handleNewSession = () => {
     // Don't allow starting new session while recording
@@ -786,6 +808,8 @@ export default function SalesAssistant() {
                 onTranscribingChange={setIsTranscribing}
                 onNewSession={handleNewSession}
                 resetVersion={resetVersion}
+                  sessionId={sessionId}
+                  onStop={handleStopSession}
               />
             </div>
 

@@ -470,29 +470,41 @@ export function AITokenUsage() {
                   No daily data available for this range.
                 </div>
               ) : (
-                <ChartContainer
-                  config={{
-                    total: { label: "Total Tokens", color: "hsl(var(--chart-1))" },
-                  }}
-                  className="h-[280px] w-full"
-                >
-                  <LineChart data={dailyData.daily}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      dataKey="day"
-                      tickFormatter={(value) => format(new Date(value), "MMM d")}
-                    />
-                    <YAxis tickFormatter={(value) => Number(value).toLocaleString()} />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Line
-                      type="monotone"
-                      dataKey="total_tokens"
-                      stroke="var(--color-total)"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </LineChart>
-                </ChartContainer>
+                <div className="h-[280px] w-full">
+                  <ChartContainer
+                    config={{
+                      total: { label: "Total Tokens", color: "hsl(var(--chart-1))" },
+                    }}
+                    className="h-full w-full"
+                  >
+                    <LineChart 
+                      data={dailyData.daily.map(d => ({
+                        ...d,
+                        total_tokens: Number(d.total_tokens),
+                        prompt_tokens: Number(d.prompt_tokens),
+                        completion_tokens: Number(d.completion_tokens),
+                        request_count: Number(d.request_count)
+                      }))}
+                      width={800}
+                      height={280}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="day"
+                        tickFormatter={(value) => format(new Date(value), "MMM d")}
+                      />
+                      <YAxis tickFormatter={(value) => Number(value).toLocaleString()} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Line
+                        type="monotone"
+                        dataKey="total_tokens"
+                        stroke="var(--color-total)"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ChartContainer>
+                </div>
               )}
             </div>
 

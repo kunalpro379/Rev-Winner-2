@@ -33,6 +33,8 @@ interface LiveTranscriptProps {
   onSendMessage: (message: string, speakerLabel?: string) => void;
   shouldStop?: boolean;
   onStopped?: () => void;
+  sessionId?: string | null;
+  onStop?: () => Promise<void>;
 }
 
 const DEFAULT_SPEAKERS: Speaker[] = [
@@ -42,7 +44,7 @@ const DEFAULT_SPEAKERS: Speaker[] = [
   { id: "speaker4", name: "Speaker", color: "bg-orange-500", initials: "S" },
 ];
 
-export function LiveTranscript({ onSendMessage, shouldStop = false, onStopped }: LiveTranscriptProps) {
+export function LiveTranscript({ onSendMessage, shouldStop = false, onStopped, sessionId, onStop }: LiveTranscriptProps) {
   const [interimTranscript, setInterimTranscript] = useState("");
   const [fullTranscript, setFullTranscript] = useState("");
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
@@ -434,7 +436,13 @@ export function LiveTranscript({ onSendMessage, shouldStop = false, onStopped }:
             
             {(isListening || isPaused) && (
               <Button
-                onClick={stopListening}
+                onClick={async () => {
+                  // Generate summary before stopping
+                  if (onStop && sessionId) {
+                    await onStop();
+                  }
+                  stopListening();
+                }}
                 variant="destructive"
                 className="rounded-lg btn-professional h-10"
                 data-testid="button-stop"
