@@ -206,11 +206,21 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
       }
     },
     onError: (error) => {
+      console.error("Transcription error:", error);
       toast({
         title: "Transcription Error",
         description: error,
         variant: "destructive"
       });
+      // Auto-restart on error if still in transcribing mode
+      if (isTranscribing) {
+        console.log("🔄 Auto-restarting transcription after error...");
+        setTimeout(() => {
+          if (isTranscribing) {
+            startTranscription(true, captureMeetingAudio).catch(console.error);
+          }
+        }, 2000);
+      }
     }
   });
 

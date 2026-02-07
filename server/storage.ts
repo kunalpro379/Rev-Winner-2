@@ -438,17 +438,22 @@ export class MemStorage implements IStorage {
   }
   
   async getUserDomainExpertises(userId: string): Promise<DomainExpertise[]> {
-    const { db } = await import("./db");
-    const { domainExpertise } = await import("@shared/schema");
-    const { eq, and } = await import("drizzle-orm");
-    
-    const domains = await db.select()
-      .from(domainExpertise)
-      .where(and(
-        eq(domainExpertise.userId, userId),
-        eq(domainExpertise.isActive, true)
-      ));
-    return domains;
+    try {
+      const { db } = await import("./db");
+      const { domainExpertise } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const domains = await db.select()
+        .from(domainExpertise)
+        .where(and(
+          eq(domainExpertise.userId, userId),
+          eq(domainExpertise.isActive, true)
+        ));
+      return domains;
+    } catch (error) {
+      console.error("Error fetching user domain expertises:", error);
+      return []; // Return empty array instead of throwing
+    }
   }
   
   async getDomainExpertise(id: string, userId: string): Promise<DomainExpertise | undefined> {
@@ -1079,97 +1084,431 @@ class DbStorage implements IStorage {
 
   // Train Me feature - Domain Expertise management
   async createDomainExpertise(domain: InsertDomainExpertise): Promise<DomainExpertise> {
-    throw new Error("Domain expertise management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { domainExpertise } = await import("@shared/schema");
+      
+      const [created] = await db.insert(domainExpertise).values(domain).returning();
+      return created;
+    } catch (error) {
+      console.error("Error creating domain expertise:", error);
+      throw error;
+    }
   }
 
   async getUserDomainExpertises(userId: string): Promise<DomainExpertise[]> {
-    throw new Error("Domain expertise management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { domainExpertise } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const domains = await db.select()
+        .from(domainExpertise)
+        .where(and(
+          eq(domainExpertise.userId, userId),
+          eq(domainExpertise.isActive, true)
+        ));
+      return domains;
+    } catch (error) {
+      console.error("Error fetching user domain expertises:", error);
+      return []; // Return empty array instead of throwing
+    }
   }
 
   async getDomainExpertise(id: string, userId: string): Promise<DomainExpertise | undefined> {
-    throw new Error("Domain expertise management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { domainExpertise } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const [domain] = await db.select()
+        .from(domainExpertise)
+        .where(and(
+          eq(domainExpertise.id, id),
+          eq(domainExpertise.userId, userId),
+          eq(domainExpertise.isActive, true)
+        ));
+      return domain;
+    } catch (error) {
+      console.error("Error fetching domain expertise:", error);
+      return undefined;
+    }
   }
 
   async getDomainExpertiseByName(name: string, userId: string): Promise<DomainExpertise | undefined> {
-    throw new Error("Domain expertise management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { domainExpertise } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const [domain] = await db.select()
+        .from(domainExpertise)
+        .where(and(
+          eq(domainExpertise.name, name),
+          eq(domainExpertise.userId, userId),
+          eq(domainExpertise.isActive, true)
+        ));
+      return domain;
+    } catch (error) {
+      console.error("Error fetching domain expertise by name:", error);
+      return undefined;
+    }
   }
 
   async updateDomainExpertise(id: string, userId: string, updates: UpdateDomainExpertise): Promise<DomainExpertise | undefined> {
-    throw new Error("Domain expertise management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { domainExpertise } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const [updated] = await db.update(domainExpertise)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(and(
+          eq(domainExpertise.id, id),
+          eq(domainExpertise.userId, userId)
+        ))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating domain expertise:", error);
+      return undefined;
+    }
   }
 
   async deleteDomainExpertise(id: string, userId: string): Promise<void> {
-    throw new Error("Domain expertise management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { domainExpertise } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      await db.update(domainExpertise)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(and(
+          eq(domainExpertise.id, id),
+          eq(domainExpertise.userId, userId)
+        ));
+    } catch (error) {
+      console.error("Error deleting domain expertise:", error);
+      throw error;
+    }
   }
 
   // Train Me feature - Training Documents management
   async createTrainingDocument(document: InsertTrainingDocument): Promise<TrainingDocument> {
-    throw new Error("Training document management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { trainingDocuments } = await import("@shared/schema");
+      
+      const [created] = await db.insert(trainingDocuments).values(document).returning();
+      return created;
+    } catch (error) {
+      console.error("Error creating training document:", error);
+      throw error;
+    }
   }
 
   async getTrainingDocumentsByDomain(domainId: string, userId: string): Promise<TrainingDocument[]> {
-    throw new Error("Training document management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { trainingDocuments } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const docs = await db.select()
+        .from(trainingDocuments)
+        .where(and(
+          eq(trainingDocuments.domainExpertiseId, domainId),
+          eq(trainingDocuments.userId, userId)
+        ));
+      return docs;
+    } catch (error) {
+      console.error("Error fetching training documents by domain:", error);
+      return [];
+    }
   }
 
   async getAllUserTrainingDocuments(userId: string): Promise<TrainingDocument[]> {
-    throw new Error("Training document management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { trainingDocuments } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      const docs = await db.select()
+        .from(trainingDocuments)
+        .where(eq(trainingDocuments.userId, userId));
+      return docs;
+    } catch (error) {
+      console.error("Error fetching all user training documents:", error);
+      return [];
+    }
   }
 
   async countUserTrainingDocuments(userId: string): Promise<number> {
-    throw new Error("Training document management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { trainingDocuments } = await import("@shared/schema");
+      const { eq, count } = await import("drizzle-orm");
+      
+      const result = await db.select({ count: count() })
+        .from(trainingDocuments)
+        .where(eq(trainingDocuments.userId, userId));
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error("Error counting user training documents:", error);
+      return 0;
+    }
   }
 
   async getTrainingDocument(id: string, userId: string): Promise<TrainingDocument | undefined> {
-    throw new Error("Training document management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { trainingDocuments } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const [doc] = await db.select()
+        .from(trainingDocuments)
+        .where(and(
+          eq(trainingDocuments.id, id),
+          eq(trainingDocuments.userId, userId)
+        ));
+      return doc;
+    } catch (error) {
+      console.error("Error fetching training document:", error);
+      return undefined;
+    }
   }
 
   async updateTrainingDocument(id: string, userId: string, updates: Partial<TrainingDocument>): Promise<TrainingDocument | undefined> {
-    throw new Error("Training document management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { trainingDocuments } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const [updated] = await db.update(trainingDocuments)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(and(
+          eq(trainingDocuments.id, id),
+          eq(trainingDocuments.userId, userId)
+        ))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating training document:", error);
+      return undefined;
+    }
   }
 
   async deleteTrainingDocument(id: string, userId: string): Promise<void> {
-    throw new Error("Training document management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { trainingDocuments } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      await db.delete(trainingDocuments)
+        .where(and(
+          eq(trainingDocuments.id, id),
+          eq(trainingDocuments.userId, userId)
+        ));
+    } catch (error) {
+      console.error("Error deleting training document:", error);
+      throw error;
+    }
   }
 
   async searchTrainingDocuments(userId: string, query: string, domainId?: string): Promise<TrainingDocument[]> {
-    throw new Error("Training document management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { trainingDocuments } = await import("@shared/schema");
+      const { eq, and, ilike, or } = await import("drizzle-orm");
+      
+      const searchPattern = `%${query}%`;
+      const conditions = [eq(trainingDocuments.userId, userId)];
+      
+      if (domainId) {
+        conditions.push(eq(trainingDocuments.domainExpertiseId, domainId));
+      }
+      
+      conditions.push(
+        or(
+          ilike(trainingDocuments.title, searchPattern),
+          ilike(trainingDocuments.content, searchPattern)
+        )!
+      );
+      
+      const docs = await db.select()
+        .from(trainingDocuments)
+        .where(and(...conditions));
+      return docs;
+    } catch (error) {
+      console.error("Error searching training documents:", error);
+      return [];
+    }
   }
 
   // Knowledge Base management
   async createKnowledgeEntry(entry: InsertKnowledgeEntry): Promise<KnowledgeEntry> {
-    throw new Error("Knowledge base management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { knowledgeEntries } = await import("@shared/schema");
+      
+      const [created] = await db.insert(knowledgeEntries).values(entry).returning();
+      return created;
+    } catch (error) {
+      console.error("Error creating knowledge entry:", error);
+      throw error;
+    }
   }
 
   async getKnowledgeEntriesByDomain(domainId: string, userId: string): Promise<KnowledgeEntry[]> {
-    throw new Error("Knowledge base management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { knowledgeEntries } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const entries = await db.select()
+        .from(knowledgeEntries)
+        .where(and(
+          eq(knowledgeEntries.domainExpertiseId, domainId),
+          eq(knowledgeEntries.userId, userId)
+        ));
+      return entries;
+    } catch (error) {
+      console.error("Error fetching knowledge entries by domain:", error);
+      return [];
+    }
   }
 
   async getAllUserKnowledgeEntries(userId: string): Promise<KnowledgeEntry[]> {
-    throw new Error("Knowledge base management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { knowledgeEntries } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      const entries = await db.select()
+        .from(knowledgeEntries)
+        .where(eq(knowledgeEntries.userId, userId));
+      return entries;
+    } catch (error) {
+      console.error("Error fetching all user knowledge entries:", error);
+      return [];
+    }
   }
 
   async getKnowledgeEntry(id: string, userId: string): Promise<KnowledgeEntry | undefined> {
-    throw new Error("Knowledge base management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { knowledgeEntries } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const [entry] = await db.select()
+        .from(knowledgeEntries)
+        .where(and(
+          eq(knowledgeEntries.id, id),
+          eq(knowledgeEntries.userId, userId)
+        ));
+      return entry;
+    } catch (error) {
+      console.error("Error fetching knowledge entry:", error);
+      return undefined;
+    }
   }
 
   async updateKnowledgeEntry(id: string, userId: string, updates: Partial<KnowledgeEntry>): Promise<KnowledgeEntry | undefined> {
-    throw new Error("Knowledge base management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { knowledgeEntries } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      const [updated] = await db.update(knowledgeEntries)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(and(
+          eq(knowledgeEntries.id, id),
+          eq(knowledgeEntries.userId, userId)
+        ))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("Error updating knowledge entry:", error);
+      return undefined;
+    }
   }
 
   async updateKnowledgeEntryEmbedding(id: string, embedding: number[]): Promise<void> {
-    throw new Error("Knowledge base management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { knowledgeEntries } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      await db.update(knowledgeEntries)
+        .set({ embedding, updatedAt: new Date() })
+        .where(eq(knowledgeEntries.id, id));
+    } catch (error) {
+      console.error("Error updating knowledge entry embedding:", error);
+      throw error;
+    }
   }
 
   async deleteKnowledgeEntry(id: string, userId: string): Promise<void> {
-    throw new Error("Knowledge base management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { knowledgeEntries } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      await db.delete(knowledgeEntries)
+        .where(and(
+          eq(knowledgeEntries.id, id),
+          eq(knowledgeEntries.userId, userId)
+        ));
+    } catch (error) {
+      console.error("Error deleting knowledge entry:", error);
+      throw error;
+    }
   }
 
   async deleteKnowledgeEntriesByDomain(domainId: string, userId: string): Promise<void> {
-    throw new Error("Knowledge base management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { knowledgeEntries } = await import("@shared/schema");
+      const { eq, and } = await import("drizzle-orm");
+      
+      await db.delete(knowledgeEntries)
+        .where(and(
+          eq(knowledgeEntries.domainExpertiseId, domainId),
+          eq(knowledgeEntries.userId, userId)
+        ));
+    } catch (error) {
+      console.error("Error deleting knowledge entries by domain:", error);
+      throw error;
+    }
   }
 
   async searchKnowledgeEntries(userId: string, query: string, category?: string): Promise<KnowledgeEntry[]> {
-    throw new Error("Knowledge base management not implemented in DbStorage yet");
+    try {
+      const { db } = await import("./db");
+      const { knowledgeEntries } = await import("@shared/schema");
+      const { eq, and, ilike, or } = await import("drizzle-orm");
+      
+      const searchPattern = `%${query}%`;
+      const conditions = [eq(knowledgeEntries.userId, userId)];
+      
+      if (category) {
+        conditions.push(eq(knowledgeEntries.category, category));
+      }
+      
+      conditions.push(
+        or(
+          ilike(knowledgeEntries.title, searchPattern),
+          ilike(knowledgeEntries.content, searchPattern)
+        )!
+      );
+      
+      const entries = await db.select()
+        .from(knowledgeEntries)
+        .where(and(...conditions));
+      return entries;
+    } catch (error) {
+      console.error("Error searching knowledge entries:", error);
+      return [];
+    }
   }
 
   // Subscription Plan management

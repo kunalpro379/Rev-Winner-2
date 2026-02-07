@@ -154,6 +154,12 @@ export function setupTranscriptionRoutes(server: Server): Router {
 
         clientWs.on('message', (data: Buffer | ArrayBuffer | Buffer[]) => {
           if (dgConnection.getReadyState() === 1) {
+            // Handle keepalive (empty buffer)
+            if (Buffer.isBuffer(data) && data.length === 0) {
+              console.log('💓 Keepalive ping received');
+              return;
+            }
+            
             // Convert Buffer to ArrayBuffer for Deepgram
             if (Buffer.isBuffer(data)) {
               dgConnection.send(new Uint8Array(data).buffer);

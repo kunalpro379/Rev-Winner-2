@@ -1563,49 +1563,37 @@ export async function generateCombinedAnalysis(
       (async () => {
         if (!userId) return { content: "", hasTraining: false, isDomainSpecific: false };
         try {
-          // DOMAIN ISOLATION: First try to get domain-specific training context
-          // This prioritizes Train Me documents from the same domain as the conversation
-          const domainTrainingContext = await getTrainingDocumentContext(
-            userId, 
-            8000, // Increased token limit for better context
-            true, 
-            transcriptText.slice(-500), // Use transcript as search query for relevance
-            15, // Higher semantic search limit for better coverage
-            domainExpertise // Pass domain for domain-specific isolation
-          );
+          // CRITICAL FIX: Use AI Context Builder for proper Train Me integration
+          const { buildEnhancedAIContext } = await import("./ai-context-builder");
           
-          if (domainTrainingContext && domainTrainingContext.trim().length > 100) {
-            console.log(`🎯 DOMAIN-FIRST: Loaded Train Me knowledge for "${domainExpertise}" (${domainTrainingContext.length} chars)`);
-            return { 
-              content: `\n=== DOMAIN-SPECIFIC TRAINING (PRIORITY - Use this first for accurate responses) ===\n${domainTrainingContext.slice(0, 3000)}\n=== END DOMAIN TRAINING ===\n`, 
-              hasTraining: true,
-              isDomainSpecific: true
-            };
-          }
-          
-          // FALLBACK: If no domain-specific training, try universal knowledge
-          console.log(`⚠️ No domain-specific Train Me for "${domainExpertise}" - falling back to universal knowledge`);
-          const universalContext = await getTrainingDocumentContext(
+          const aiContext = await buildEnhancedAIContext({
             userId,
-            5000,
-            true,
-            transcriptText.slice(-300),
-            10,
-            undefined // No domain filter = universal
-          );
+            transcript: transcriptText,
+            feature: 'conversation_analysis',
+            domainName: domainExpertise,
+            includePlaybooks: true,
+            strictIsolation: false, // Allow universal fallback
+            allowUniversalFallback: true
+          });
           
-          if (universalContext && universalContext.trim().length > 100) {
-            console.log(`UNIVERSAL FALLBACK: Using general training documents (${universalContext.length} chars)`);
+          if (aiContext.trainMeContext && aiContext.trainMeContext.trim().length > 100) {
+            console.log(`🎯 TRAIN ME INTEGRATED: "${aiContext.domainUsed}" with ${aiContext.trainMeContext.length} chars (source: ${aiContext.source})`);
             return { 
-              content: `\n=== UNIVERSAL TRAINING KNOWLEDGE (Fallback - domain-specific not available) ===\n${universalContext.slice(0, 2000)}\n=== END UNIVERSAL TRAINING ===\n`, 
+              content: aiContext.knowledgeContext, 
               hasTraining: true,
-              isDomainSpecific: false
+              isDomainSpecific: aiContext.isolationEnforced
             };
           }
           
-          return { content: "", hasTraining: false, isDomainSpecific: false };
+          // FALLBACK: If no Train Me knowledge, use universal
+          console.log(`⚠️ No Train Me knowledge for "${domainExpertise}" - using universal fallback`);
+          return { 
+            content: aiContext.knowledgeContext || "", 
+            hasTraining: false,
+            isDomainSpecific: false
+          };
         } catch (error: any) {
-          console.error("Error fetching training documents:", error.message);
+          console.error("Error fetching Train Me knowledge:", error.message);
           return { content: "", hasTraining: false, isDomainSpecific: false };
         }
       })(),
@@ -3325,25 +3313,36 @@ export async function generateShiftGearsTips(
     const isPricingQuery = /pric(e|ing|es)|cost|fee|rate|subscription|per\s*(user|seat|month|year)|how\s*much|budget|quote|₹|\$|euro|inr|usd/.test(lowerText);
     
     // PERFORMANCE: Run training context and knowledge imports in parallel
-    // ENHANCED: Use SEMANTIC SEARCH for contextually relevant knowledge
-    // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
-    // SPEED OPTIMIZATION: Use last 800 chars of conversation for semantic search relevance
-    const recentConversation = conversationText.slice(-800);
-    
-    // Build enhanced semantic query for pricing questions
-    let semanticQuery = recentConversation;
-    if (isPricingQuery) {
-      semanticQuery = `pricing price cost fee subscription rate per user per seat ${recentConversation}`;
-      console.log(' ShiftGears: PRICING QUERY DETECTED - Searching for pricing data in training materials');
-    }
-    
-    const [trainingContext, knowledgeModule] = await Promise.all([
-      userId ? getTrainingDocumentContext(userId, 18000, false, semanticQuery, 15, domainExpertise) : Promise.resolve(""),
+    // CRITICAL FIX: Use AI Context Builder for proper Train Me integration
+    const [aiContextResult, knowledgeModule] = await Promise.all([
+      (async () => {
+        if (!userId) return null;
+        try {
+          const { buildEnhancedAIContext } = await import("./ai-context-builder");
+          return await buildEnhancedAIContext({
+            userId,
+            transcript: conversationText,
+            feature: 'shift_gears',
+            domainName: domainExpertise,
+            includePlaybooks: false, // Speed optimization
+            strictIsolation: true, // Strict domain isolation for Shift Gears
+            allowUniversalFallback: true
+          });
+        } catch (error: any) {
+          console.error("Error building AI context:", error.message);
+          return null;
+        }
+      })(),
       import("./knowledge-service")
     ]);
     
-    // DOMAIN-FIRST STRATEGY: If domain-specific training exists, prioritize it heavily
-    const hasDomainTraining = trainingContext && trainingContext.trim().length > 100;
+    // Extract training context and knowledge from AI Context Builder
+    const trainingContext = aiContextResult?.knowledgeContext || "";
+    const hasDomainTraining = aiContextResult?.trainMeContext && aiContextResult.trainMeContext.trim().length > 100;
+    
+    if (aiContextResult?.domainUsed) {
+      console.log(`🎯 Shift Gears using Train Me: "${aiContextResult.domainUsed}" (${aiContextResult.entriesCount || 0} entries, source: ${aiContextResult.source})`);
+    }
     
     // BALANCED: Lightweight knowledge without playbooks for speed, but keep full keyword context
     const { knowledgeService } = knowledgeModule;
@@ -3355,9 +3354,9 @@ export async function generateShiftGearsTips(
       ...(domainExpertise ? domainExpertise.toLowerCase().split(/\s+/).filter(w => w.length > 2) : [])
     ];
     
-    // SPEED: Only fetch universal knowledge if no domain training exists
-    const knowledge = hasDomainTraining 
-      ? { relevantProducts: [], relevantCaseStudies: [], relevantPlaybooks: [] }
+    // Use knowledge from AI Context Builder (already includes Train Me + Universal fallback)
+    const knowledge = aiContextResult 
+      ? { relevantProducts: [], relevantCaseStudies: [], relevantPlaybooks: [] } // Already in context
       : await knowledgeService.buildKnowledgeContext({
           problemKeywords: keywords.problemKeywords,
           productKeywords: enhancedProductKeywords,
@@ -3367,9 +3366,11 @@ export async function generateShiftGearsTips(
     
     console.log(`⚡ ShiftGears prep: ${Date.now() - startTime}ms | Domain: ${domainExpertise} | HasTraining: ${hasDomainTraining}`);
     
-    // Get structured prompt from registry (pass conversationText for dynamic domain detection)
-    const { promptRegistry } = await import("./prompt-registry");
-    const systemPrompt = promptRegistry.buildShiftGearsPrompt(knowledge, domainExpertise, trainingContext, conversationText);
+    // Get structured prompt from registry (use systemPrompt from AI Context Builder)
+    const systemPrompt = aiContextResult?.systemPrompt || (() => {
+      const { promptRegistry } = require("./prompt-registry");
+      return promptRegistry.buildShiftGearsPrompt(knowledge, domainExpertise, trainingContext, conversationText);
+    })();
     
     let client;
     let model;

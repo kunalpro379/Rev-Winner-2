@@ -83,6 +83,7 @@ export default function SalesAssistant() {
   const [showNewSessionDialog, setShowNewSessionDialog] = useState(false);
   const [showMeetingPreview, setShowMeetingPreview] = useState(false);
   const [resetVersion, setResetVersion] = useState(0);
+  const [summaryGenerationTriggered, setSummaryGenerationTriggered] = useState(false); // Track if summary already generated
   const [domainExpertise, setDomainExpertise] = useState<string>(() => {
     // Load from localStorage or prompt user to set domain
     try {
@@ -261,6 +262,33 @@ export default function SalesAssistant() {
       processTranscriptEntries(transcriptEntries);
     }
   }, [transcriptEntries, processTranscriptEntries]);
+
+  // Handle page unload/navigation - generate summary in background
+  // IMPORTANT: Only generate summary if user is navigating away, not on pause
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // CRITICAL: Only generate summary on actual navigation/close, not on pause
+      // Check: session exists, has transcript, and summary not already generated
+      if (sessionId && currentTranscript && currentTranscript.trim().length > 0 && !summaryGenerationTriggered) {
+        setSummaryGenerationTriggered(true);
+        
+        // Generate summary in background without blocking navigation
+        // This runs when user closes tab, refreshes, or navigates away
+        sendMessage(sessionId, "/end", undefined, domainExpertise).catch(err => {
+          console.error("Background summary generation on unload failed:", err);
+        });
+        
+        console.log("🔄 Background summary generation triggered on page unload");
+        // Don't show confirmation dialog - let user navigate freely
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [sessionId, currentTranscript, domainExpertise, summaryGenerationTriggered]);
 
   // Send message mutation
   const sendMessageMutation = useMutation({
@@ -442,19 +470,56 @@ export default function SalesAssistant() {
   const handleStopSession = async () => {
     if (!sessionId) return;
     
+    // Prevent duplicate summary generation
+    if (summaryGenerationTriggered) {
+      console.log("⚠️ Summary already triggered, skipping duplicate");
+      return;
+    }
+    
     try {
-      // Send /end command to generate and save summary
-      await sendMessage(sessionId, "/end", undefined, domainExpertise);
+      setSummaryGenerationTriggered(true); // Mark as triggered
       
+      // Generate summary in background without blocking UI
+      // This allows user to navigate away or continue working
+      const summaryPromise = sendMessage(sessionId, "/end", undefined, domainExpertise);
+      
+      // Show immediate feedback
       toast({
         title: "Session Ended",
-        description: "Summary has been generated and saved",
+        description: "Summary is being generated in the background...",
       });
+      
+      console.log("🔄 Background summary generation started (End button)");
+      
+      // Handle summary generation in background
+      summaryPromise
+        .then(() => {
+          console.log("✅ Background summary generation completed");
+          // Optionally show success notification if user is still on page
+          if (document.visibilityState === 'visible') {
+            toast({
+              title: "Summary Ready",
+              description: "Your session summary has been generated",
+            });
+          }
+        })
+        .catch((error) => {
+          console.error("❌ Background summary generation failed:", error);
+          // Only show error if user is still on page
+          if (document.visibilityState === 'visible') {
+            toast({
+              title: "Summary Generation Failed",
+              description: "Could not generate session summary",
+              variant: "destructive"
+            });
+          }
+        });
     } catch (error) {
-      console.error("Error generating summary:", error);
+      console.error("Error initiating summary generation:", error);
+      setSummaryGenerationTriggered(false); // Reset on error
       toast({
-        title: "Summary Generation Failed",
-        description: "Could not generate session summary",
+        title: "Error",
+        description: "Could not start summary generation",
         variant: "destructive"
       });
     }
@@ -503,6 +568,7 @@ export default function SalesAssistant() {
       setNextQuestions([]);
       setIsAnalyzing(false);
       setIsLoadingMinutes(false);
+      setSummaryGenerationTriggered(false); // RESET summary flag for new session
       clearIntelligenceSuggestions();
       setIsTranscribing(false);
       

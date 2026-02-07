@@ -408,10 +408,10 @@ export default function TrainMe() {
                 New Domain
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent aria-describedby="create-domain-description">
               <DialogHeader>
                 <DialogTitle>Create Domain Expertise</DialogTitle>
-                <DialogDescription>
+                <DialogDescription id="create-domain-description">
                   Create a new knowledge domain. You can upload up to 100 documents per domain.
                 </DialogDescription>
               </DialogHeader>
@@ -819,9 +819,12 @@ function DomainCard({
                 Add URL
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent aria-describedby="add-url-description">
               <DialogHeader>
                 <DialogTitle>Add URL to {domain.name}</DialogTitle>
+                <DialogDescription id="add-url-description">
+                  Add a URL to extract content from and add to this domain.
+                </DialogDescription>
                 <DialogDescription>
                   Add a web page URL to extract content from
                 </DialogDescription>

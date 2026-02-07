@@ -33,6 +33,9 @@ export function useDeepgramTranscription({
   const tabStreamRef = useRef<MediaStream | null>(null);
   const onResultRef = useRef(onResult);
   const onErrorRef = useRef(onError);
+  const keepaliveIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isReconnectingRef = useRef(false);
 
   useEffect(() => {
     onResultRef.current = onResult;
@@ -56,6 +59,18 @@ export function useDeepgramTranscription({
       ws.onopen = () => {
         console.log('📡 Deepgram WebSocket connected');
         setIsConnected(true);
+        isReconnectingRef.current = false;
+        
+        // Start keepalive ping every 10 seconds to prevent connection timeout
+        if (keepaliveIntervalRef.current) {
+          clearInterval(keepaliveIntervalRef.current);
+        }
+        keepaliveIntervalRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            // Send empty buffer as keepalive
+            ws.send(new ArrayBuffer(0));
+          }
+        }, 10000);
       };
 
       ws.onmessage = (event) => {
@@ -97,6 +112,24 @@ export function useDeepgramTranscription({
       ws.onclose = () => {
         console.log('📡 Deepgram WebSocket disconnected');
         setIsConnected(false);
+        
+        // Clear keepalive
+        if (keepaliveIntervalRef.current) {
+          clearInterval(keepaliveIntervalRef.current);
+          keepaliveIntervalRef.current = null;
+        }
+        
+        // Auto-reconnect if still transcribing and not already reconnecting
+        if (isTranscribing && !isReconnectingRef.current) {
+          isReconnectingRef.current = true;
+          console.log('🔄 Connection lost, attempting to reconnect in 2 seconds...');
+          reconnectTimeoutRef.current = setTimeout(() => {
+            if (isTranscribing) {
+              console.log('🔄 Reconnecting WebSocket...');
+              connectWebSocket();
+            }
+          }, 2000);
+        }
       };
 
       wsRef.current = ws;
@@ -104,9 +137,20 @@ export function useDeepgramTranscription({
       console.error('Failed to create WebSocket:', error);
       onErrorRef.current?.('Failed to connect to transcription service');
     }
-  }, []);
+  }, [isTranscribing]);
 
   const disconnectWebSocket = useCallback(() => {
+    // Clear keepalive and reconnect timers
+    if (keepaliveIntervalRef.current) {
+      clearInterval(keepaliveIntervalRef.current);
+      keepaliveIntervalRef.current = null;
+    }
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    isReconnectingRef.current = false;
+    
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;

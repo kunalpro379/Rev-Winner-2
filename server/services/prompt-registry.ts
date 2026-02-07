@@ -286,25 +286,50 @@ Remember:
   }
 
   buildConversationAnalysisPrompt(knowledge: KnowledgeContext, customPrompt?: string, domainName?: string, trainingContext?: string): string {
-    const productsText = this.formatProducts(knowledge.relevantProducts);
-    const caseStudiesText = this.formatCaseStudies(knowledge.relevantCaseStudies);
     const cappedTraining = this.capTrainingContext(trainingContext, 10000);
+    
+    // DOMAIN ISOLATION: When training context exists, skip generic knowledge
+    const hasTrainingContext = cappedTraining && cappedTraining.trim().length > 100;
+    const useGenericKnowledge = !hasTrainingContext;
+    
+    const productsText = useGenericKnowledge ? this.formatProducts(knowledge.relevantProducts) : '';
+    const caseStudiesText = useGenericKnowledge ? this.formatCaseStudies(knowledge.relevantCaseStudies) : '';
     
     return `You are an expert sales analyst helping a sales representative close deals.
 
 CRITICAL CONTEXT - UNDERSTAND THE SALES SCENARIO:
-You are assisting a SALES REPRESENTATIVE who is trying to SELL the products listed below to a PROSPECT/CUSTOMER.
-- The products in "OUR PRODUCTS (WHAT WE'RE SELLING)" are what the sales rep is offering to the prospect
+You are assisting a SALES REPRESENTATIVE who is trying to SELL ${domainName || 'products'} to a PROSPECT/CUSTOMER.
+- The products/services are what the sales rep is offering to the prospect
 - The prospect/customer does NOT already own these products - they are POTENTIAL buyers
 - Your analysis should help the sales rep position these products effectively based on the conversation
 - Identify opportunities to recommend our products as solutions to the prospect's challenges
 
-${customPrompt ? `Sales Context: ${customPrompt}\n\n` : ''}${domainName ? `DOMAIN EXPERTISE (Our Selling Focus): ${domainName}\n\n` : ''}${cappedTraining ? `TRAINING CONTEXT:\n${cappedTraining}\n\n` : ''}
-OUR PRODUCTS (WHAT WE'RE SELLING):
+${customPrompt ? `Sales Context: ${customPrompt}\n\n` : ''}${domainName ? `DOMAIN EXPERTISE (Our Selling Focus): ${domainName}\n\n` : ''}${cappedTraining ? `🔒 MANDATORY KNOWLEDGE SOURCE - ${domainName?.toUpperCase() || 'DOMAIN'} TRAINING MATERIALS:
+⚠️ CRITICAL: The following training materials are the ONLY source of truth for this domain. 
+You MUST base ALL analysis and recommendations on ONLY the information below.
+Do NOT use generic IT/technology/SaaS responses - use ONLY the specific products, services, and messaging from these documents.
+
+=== START OF ${domainName?.toUpperCase() || 'DOMAIN'} TRAINING CONTENT ===
+${cappedTraining}
+=== END OF TRAINING CONTENT ===
+
+STRICT RULES FOR ANALYSIS:
+1. ONLY recommend products/services mentioned in the training content above
+2. ONLY use the value propositions and differentiators from the training content
+3. Base all insights on the ACTUAL conversation + training content
+4. Do NOT fabricate generic case studies or metrics - use ONLY examples from training content
+5. If no specific information exists in training, acknowledge the gap rather than making up generic content
+
+` : ''}${!hasTrainingContext && domainName ? `📚 USING UNIVERSAL KNOWLEDGE BASE FOR "${domainName?.toUpperCase()}"
+No specific training documents found for this domain. Using the universal knowledge base to provide helpful analysis.
+
+NOTE: For more tailored analysis specific to ${domainName}, training documents can be uploaded in the Train Me section.
+
+` : ''}${useGenericKnowledge ? `OUR PRODUCTS (WHAT WE'RE SELLING):
 ${productsText}
 
 SUCCESS STORIES (USE TO BUILD CREDIBILITY):
-${caseStudiesText}
+${caseStudiesText}` : ''}
 
 CRITICAL ANALYSIS INSTRUCTIONS:
 1. **Understand the Sales Context**: The sales rep is SELLING these products to the prospect - the prospect does NOT already have them
@@ -313,6 +338,7 @@ CRITICAL ANALYSIS INSTRUCTIONS:
 4. **Identify Buyer Stage**: awareness (learning), consideration (comparing options), decision (ready to buy), or negotiation (discussing terms)
 5. **Detect Objections**: Note any concerns or hesitations the prospect raises
 6. **Provide Contextual Responses**: Base all recommendations on what was ACTUALLY discussed in the conversation
+7. **Domain-Specific Insights**: Use ${domainName || 'domain'} expertise to provide industry-specific recommendations
 
 RESPONSE FORMAT (JSON):
 {
@@ -330,7 +356,8 @@ IMPORTANT REMINDERS:
 - The prospect is a POTENTIAL buyer, not an existing customer
 - Only recommend products that genuinely match the prospect's stated needs
 - Base all analysis on the actual conversation content - don't assume or fabricate needs
-- Help the sales rep position our products as the solution to the prospect's challenges`;
+- Help the sales rep position our products as the solution to the prospect's challenges
+- Use ${domainName || 'domain'}-specific terminology and insights from the training materials`;
   }
 
   buildPresentToWinPrompt(feature: 'pitch_deck' | 'battle_card' | 'case_study', knowledge: KnowledgeContext, customPrompt?: string, conversationContext?: string, domainExpertise?: string): string {
