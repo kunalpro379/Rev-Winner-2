@@ -136,6 +136,50 @@ function cleanJSONResponse(content: string): string {
   return cleaned;
 }
 
+// UNIVERSAL SAFE JSON PARSER - handles truncated/malformed JSON with fallback
+function safeJSONParse<T = any>(content: string, fallback: T, context: string = 'unknown'): T {
+  try {
+    const cleaned = cleanJSONResponse(content);
+    return JSON.parse(cleaned);
+  } catch (parseError: any) {
+    console.error(`⚠️ JSON parse error in ${context}:`, parseError.message);
+    console.error(`Raw content (first 200 chars): ${content.substring(0, 200)}`);
+    console.error(`Raw content (last 200 chars): ${content.substring(Math.max(0, content.length - 200))}`);
+    
+    // Try to repair truncated JSON
+    try {
+      const cleaned = cleanJSONResponse(content);
+      let repaired = cleaned;
+      
+      // Fix unterminated strings by adding closing quote
+      const openQuotes = (repaired.match(/"/g) || []).length;
+      if (openQuotes % 2 !== 0) {
+        repaired = repaired + '"';
+      }
+      
+      // Fix unclosed braces/brackets
+      const openBraces = (repaired.match(/\{/g) || []).length;
+      const closeBraces = (repaired.match(/\}/g) || []).length;
+      for (let i = closeBraces; i < openBraces; i++) {
+        repaired = repaired + '}';
+      }
+      
+      const openBrackets = (repaired.match(/\[/g) || []).length;
+      const closeBrackets = (repaired.match(/\]/g) || []).length;
+      for (let i = closeBrackets; i < openBrackets; i++) {
+        repaired = repaired + ']';
+      }
+      
+      const parsed = JSON.parse(repaired);
+      console.log(`✅ JSON repaired successfully in ${context}`);
+      return parsed;
+    } catch (repairError) {
+      console.error(`❌ JSON repair failed in ${context}, using fallback`);
+      return fallback;
+    }
+  }
+}
+
 // Cache for training document context to avoid repeated DB queries
 const trainingContextCache = new Map<string, { context: string, timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
@@ -1384,7 +1428,7 @@ export async function generateSalesResponse(
       model,
       messages: messages as any,
       response_format: { type: "json_object" },
-      max_tokens: 600, // Increased from 400 to accommodate 5-10 discovery questions
+      max_tokens: 300, // OPTIMIZED: Reduced from 400 to prevent truncation and speed up response
       temperature: 0.5,
     });
     console.log(`${engine} API response received successfully`);
@@ -1399,16 +1443,39 @@ export async function generateSalesResponse(
       throw new Error("No content in DeepSeek API response");
     }
     
-    let result;
-    try {
-      const cleanedContent = cleanJSONResponse(messageContent);
-      result = JSON.parse(cleanedContent);
-    } catch (parseError) {
-      console.error("JSON parse error:", parseError);
-      console.error("Raw response content (first 500 chars):", messageContent.substring(0, 500));
-      console.error("Raw response content (last 500 chars):", messageContent.substring(Math.max(0, messageContent.length - 500)));
-      throw new Error(`Failed to parse AI response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
-    }
+    // Use safe JSON parser with fallback
+    const fallbackResponse = {
+      response: "I understand. Could you tell me more about your current challenges and what you're looking to achieve?",
+      discoveryInsights: {
+        painPoints: [],
+        currentEnvironment: "",
+        requirements: [],
+        budget: undefined,
+        authority: undefined,
+        need: undefined,
+        timeline: undefined,
+        decisionMakers: []
+      },
+      discoveryQuestions: [
+        "What challenges are you currently facing with your existing solution?",
+        "What are your main priorities for improvement?",
+        "Who else is involved in evaluating solutions like this?"
+      ],
+      bantQualification: {
+        budget: { asked: false, question: "What is your budget range for this project?" },
+        authority: { asked: false, question: "Who will be involved in the final decision-making process?" },
+        need: { asked: false, question: "What is the primary business challenge you're looking to solve?" },
+        timeline: { asked: false, question: "What is your expected timeline for implementation?" }
+      },
+      nextQuestions: [
+        "Can you walk me through your current process?",
+        "What would an ideal solution look like for you?"
+      ],
+      recommendedModules: [],
+      caseStudies: []
+    };
+    
+    const result = safeJSONParse(messageContent, fallbackResponse, 'generateSalesResponse');
     
     // CRITICAL: Sanitize discovery questions to ensure contextual awareness
     // Questions should NOT assume prospect owns the product - they're EVALUATING it
@@ -1894,7 +1961,7 @@ Return VALID JSON:
     
     try {
       const cleanedContent = cleanJSONResponse(messageContent);
-      result = JSON.parse(cleanedContent);
+      result = safeJSONParse(cleanedContent, {}, 'generateSalesResponse');
       
       // Check if AI returned multi-product format
       if (result.products && Array.isArray(result.products) && result.products.length > 0) {
@@ -2276,13 +2343,20 @@ Return JSON:
     }
     
     let result;
-    try {
-      const cleanedContent = cleanJSONResponse(messageContent);
-      result = JSON.parse(cleanedContent);
-    } catch (parseError) {
-      console.error("JSON parse error in fast analysis:", parseError);
-      throw new Error(`Failed to parse AI response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
-    }
+    const fallback = {
+      discoveryInsights: { painPoints: [], currentEnvironment: "", requirements: [] },
+      discoveryQuestions: [],
+      nextQuestions: [],
+      bantQualification: {
+        budget: { asked: false },
+        authority: { asked: false },
+        need: { asked: false },
+        timeline: { asked: false }
+      },
+      recommendedModules: [],
+      caseStudies: []
+    };
+    result = safeJSONParse(cleanJSONResponse(messageContent), fallback, 'generateCombinedAnalysis');
     
     // CRITICAL: Sanitize discovery questions to ensure contextual awareness
     const rawQuestions = result.discoveryQuestions || [];
@@ -2414,7 +2488,8 @@ Return JSON with these sections:
     }
     
     const cleanedContent = cleanJSONResponse(messageContent);
-    const result = JSON.parse(cleanedContent);
+    const fallback = { solutions: [], valueProposition: [], technicalAnswers: [], caseStudies: [], competitorAnalysis: [], whyBetter: [] };
+    const result = safeJSONParse(cleanedContent, fallback, 'generateSalesScript');
     
     return {
       solutions: result.solutions || [],
@@ -2549,7 +2624,8 @@ IMPORTANT: All suggestions must be for the SALES REP to use when responding to C
     }
 
     const cleanedContent = cleanJSONResponse(messageContent);
-    const result = JSON.parse(cleanedContent);
+    const fallback = { suggestions: [], insights: [], roles: undefined };
+    const result = safeJSONParse(cleanedContent, fallback, 'generateCoachingSuggestions');
     console.log('Coaching suggestions generated:', result.suggestions?.length || 0, 'insights:', result.insights?.length || 0);
     
     if (result.roles) {
@@ -2593,7 +2669,7 @@ export async function generateResponse(prompt: string, conversationHistory: any[
     }
 
     const messages = [
-      { role: "system", content: "You are a helpful AI assistant. Provide clear, accurate responses." },
+      { role: "system", content: "You are a helpful AI assistant. Provide clear, accurate responses in valid JSON format when requested. Never include markdown code fences or extra text outside the JSON structure." },
       ...conversationHistory,
       { role: "user", content: prompt }
     ];
@@ -2603,9 +2679,26 @@ export async function generateResponse(prompt: string, conversationHistory: any[
       messages: messages as any,
       max_tokens: 2000,
       temperature: 0.7,
+      timeout: 8000, // 8 second timeout for faster failures
     });
 
-    return completion.choices[0]?.message?.content || "No response generated";
+    const rawResponse = completion.choices[0]?.message?.content || "No response generated";
+    
+    // Clean response: remove markdown code fences, "Based on" preambles, and extra whitespace
+    let cleanedResponse = rawResponse
+      .replace(/```json\s*/gi, '')
+      .replace(/```\s*/g, '')
+      .trim();
+    
+    // If response starts with text before JSON, try to extract just the JSON
+    if (cleanedResponse.startsWith('Based on') || cleanedResponse.startsWith('Here')) {
+      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        cleanedResponse = jsonMatch[0];
+      }
+    }
+    
+    return cleanedResponse;
   } catch (error) {
     console.error('Error generating AI response:', error);
     throw new Error('Failed to generate AI response');
@@ -2667,7 +2760,8 @@ Provide a structured summary in JSON format:
       throw new Error("No content in DeepSeek API response");
     }
     const cleanedContent = cleanJSONResponse(messageContent);
-    const result = JSON.parse(cleanedContent);
+    const fallback = { keychallenges: [], discoveryInsights: [], objections: [], nextSteps: [], recommendedSolutions: [] };
+    const result = safeJSONParse(cleanedContent, fallback, 'generateCallSummary');
     
     return {
       keychallenges: result.keychallenges || [],
@@ -2935,7 +3029,15 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
       throw new Error("No content in AI response");
     }
     const cleanedContent = cleanJSONResponse(messageContent);
-    const result = JSON.parse(cleanedContent);
+    const fallback = {
+      attendees: ["Not mentioned in conversation"],
+      discussionSummary: "Unable to generate meeting minutes",
+      keyDecisions: [],
+      actionItems: [],
+      nextSteps: [],
+      notes: ""
+    };
+    const result = safeJSONParse(cleanedContent, fallback, 'generateMeetingMinutes');
     
     // Use actual meeting start time from session metadata (not current time)
     const meetingTime = meetingStartTime || new Date();
@@ -3094,7 +3196,8 @@ Cover: core platform, enterprise, analytics, automation, integrations, mobile, A
     }
     
     const cleanedContent = cleanJSONResponse(messageContent);
-    const result = JSON.parse(cleanedContent);
+    const fallback = [];
+    const result = safeJSONParse(cleanedContent, fallback, 'generateProductReference');
     
     // Handle both array and object with array property
     const products = Array.isArray(result) ? result : (result.products || result.items || []);
@@ -3477,6 +3580,7 @@ RESPONSE FORMAT (JSON only):
       response_format: { type: "json_object" },
       temperature: 0.12, // OPTIMIZED: Slightly lower for maximum accuracy and consistency
       max_tokens: 450, // OPTIMIZED: Slightly increased for richer tips while staying fast
+      timeout: 5000, // 5 second timeout for real-time performance
     });
     
     console.log(`⚡ ShiftGears AI call: ${Date.now() - aiStartTime}ms | Model: ${fastModel}`);
@@ -3493,7 +3597,8 @@ RESPONSE FORMAT (JSON only):
     }
     
     const cleanedContent = cleanJSONResponse(messageContent);
-    const result = JSON.parse(cleanedContent);
+    const fallback = { tips: [] };
+    const result = safeJSONParse(cleanedContent, fallback, 'generateShiftGearsTips');
     const tips = result.tips || [];
     
     // LOG: Verify AI response is contextual with total timing
@@ -3720,7 +3825,8 @@ Example:
     }
     
     const cleanedContent = cleanJSONResponse(messageContent);
-    const result = JSON.parse(cleanedContent);
+    const fallback = { queries: [] };
+    const result = safeJSONParse(cleanedContent, fallback, 'generateQueryPitches');
     const queries = result.queries || [];
     
     // LOG: Verify AI response is contextual
@@ -3775,27 +3881,36 @@ export async function generatePresentToWin(
     if (type === 'pitch-deck') {
       console.log(`⚡ ULTRA-FAST pitch deck`);
       
-      // PRIORITY 1: Fetch Train Me documents (reduced for speed)
+      // PRIORITY 1: Fetch Train Me documents (INCREASED for better context)
       // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
-      const trainingContext = await getTrainingDocumentContext(userId, 4000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
+      const trainingContext = await getTrainingDocumentContext(userId, 8000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
       console.log(`Pitch Deck - Training documents loaded: ${trainingContext ? trainingContext.length : 0} chars`);
       
-      // Ultra-optimized: last 1000 chars only for speed
-      const ultraContext = conversationContext.length > 1000
-        ? conversationContext.slice(-1000)
+      // ENHANCED: Use last 2000 chars for better conversation context
+      const ultraContext = conversationContext.length > 2000
+        ? conversationContext.slice(-2000)
         : conversationContext;
       
       // Inject intelligence engine supplement
       const supplement = buildPromptSupplement(conversationContext, domainExpertise, 'pitch_deck');
       const supplementText = formatPromptSupplement(supplement);
       
-      // Build compact training context section
+      // Build ENHANCED training context section
       const trainingSection = trainingContext && trainingContext.trim().length > 0
-        ? `\n=== TRAINING DOCS ===\n${trainingContext.slice(0, 2000)}\n===\n`
+        ? `\n=== YOUR TRAIN ME KNOWLEDGE (Use this for accurate product info, pricing, features) ===\n${trainingContext.slice(0, 4000)}\n=== END TRAIN ME ===\n`
         : '';
       
       const prompt = `${supplementText}${trainingSection}
-${domainExpertise} pitch (5 slides). Context: ${ultraContext}
+
+=== CONVERSATION CONTEXT (Use this to understand customer needs) ===
+${ultraContext}
+=== END CONVERSATION ===
+
+CRITICAL: Generate a ${domainExpertise} pitch deck that:
+1. Uses ACTUAL product details from Train Me knowledge above
+2. Addresses SPECIFIC pain points mentioned in the conversation
+3. Shows how YOUR product solves THEIR problems (not generic)
+4. Uses real features, pricing, and benefits from Train Me data
 
 JSON:
 {
@@ -3814,6 +3929,7 @@ JSON:
         response_format: { type: "json_object" },
         temperature: 0.2,
         max_tokens: 500,
+        timeout: 8000, // 8 second timeout for pitch deck
       });
 
       // Track token usage for pitch deck
@@ -3824,7 +3940,8 @@ JSON:
       const content = response.choices?.[0]?.message?.content;
       if (!content) throw new Error("No content in AI response");
       const cleanedContent = cleanJSONResponse(content);
-      const result = JSON.parse(cleanedContent);
+      const fallback = { slides: [] };
+      const result = safeJSONParse(cleanedContent, fallback, 'generatePresentToWin-pitch-deck');
       
       // Inject intelligence metadata into result
       result._meta = {
@@ -3842,15 +3959,15 @@ JSON:
     } else if (type === 'case-study') {
       console.log(`⚡ Generating contextual case study for domain: ${domainExpertise}`);
       
-      // PRIORITY 1: Fetch Train Me documents for contextual accuracy (reduced for speed)
+      // PRIORITY 1: Fetch Train Me documents for contextual accuracy (INCREASED)
       // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
-      const trainingContext = await getTrainingDocumentContext(userId, 6000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
+      const trainingContext = await getTrainingDocumentContext(userId, 10000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
       const hasTrainingDocs = trainingContext && trainingContext.trim().length > 100;
       console.log(`Case Study - Training documents loaded: ${trainingContext ? trainingContext.length : 0} chars`);
       
-      // Use optimized conversation context for speed
-      const conversationSummary = conversationContext.length > 1500
-        ? conversationContext.slice(-1500)
+      // ENHANCED: Use last 2500 chars for better conversation context
+      const conversationSummary = conversationContext.length > 2500
+        ? conversationContext.slice(-2500)
         : conversationContext;
       
       // Inject intelligence engine supplement with case study tagging
@@ -3860,15 +3977,15 @@ JSON:
       // Determine source priority
       const sourceType = hasTrainingDocs ? 'train_me' : 'knowledge_base';
       
-      // Build compact training context section for speed
+      // Build ENHANCED training context section
       const trainingSection = hasTrainingDocs
         ? `
-=== PRIORITY KNOWLEDGE SOURCE: TRAINING DOCUMENTS ===
-${trainingContext.slice(0, 4000)}
-=== END TRAINING DOCUMENTS ===
+=== PRIORITY KNOWLEDGE SOURCE: YOUR TRAIN ME DOCUMENTS ===
+${trainingContext.slice(0, 6000)}
+=== END TRAIN ME DOCUMENTS ===
 
 CRITICAL INSTRUCTIONS FOR CASE STUDY GENERATION:
-1. SEARCH the training documents above for ANY real case studies, customer success stories, testimonials, or documented results
+1. SEARCH the Train Me documents above for ANY real case studies, customer success stories, testimonials, or documented results
 2. If you find real case study data (company names, actual metrics, real outcomes), EXTRACT and use that data directly
 3. Use actual customer names, real statistics, and documented results from the training materials
 4. Set verificationType to "real" and verificationLabel to "Verified Case Study" if using documented data
@@ -3934,6 +4051,7 @@ JSON format:
         response_format: { type: "json_object" },
         temperature: 0.2,
         max_tokens: 500,
+        timeout: 8000, // 8 second timeout for case study
       });
 
       // Track token usage for case study
@@ -3944,7 +4062,8 @@ JSON format:
       const content = response.choices?.[0]?.message?.content;
       if (!content) throw new Error("No content in AI response");
       const cleanedContent = cleanJSONResponse(content);
-      const result = JSON.parse(cleanedContent);
+      const fallback = { title: "", customer: "", industry: "", challenge: "", solution: "", outcomes: [] };
+      const result = safeJSONParse(cleanedContent, fallback, 'generatePresentToWin-case-study');
       
       // Inject intelligence metadata into result - respect AI's determination of verification type
       const isVerified = result.verificationType === 'real' || result.verificationType === 'anonymized';
@@ -3975,14 +4094,14 @@ JSON format:
     } else if (type === 'battle-card') {
       console.log(`🎯 Generating battle card for domain: ${domainExpertise}`);
       
-      // PRIORITY 1: Fetch Train Me documents (reduced for speed)
+      // PRIORITY 1: Fetch Train Me documents (INCREASED for better competitive intel)
       // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
-      const trainingContext = await getTrainingDocumentContext(userId, 6000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
+      const trainingContext = await getTrainingDocumentContext(userId, 10000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
       console.log(`Battle Card - Training documents loaded: ${trainingContext ? trainingContext.length : 0} chars`);
       
-      // Optimized context (up to 1500 chars for speed)
-      const fullContext = conversationContext.length > 1500
-        ? conversationContext.slice(-1500)
+      // ENHANCED: Use last 2500 chars for better conversation context
+      const fullContext = conversationContext.length > 2500
+        ? conversationContext.slice(-2500)
         : conversationContext;
       
       // Inject intelligence engine supplement for honest battle cards
@@ -4698,12 +4817,15 @@ Examples: If this is an HR platform, competitors might include Workday, ADP, Rip
 IMPORTANT: NEVER use "Gong", "Clari Copilot", or other sales intelligence tools as competitors 
 UNLESS "${competitorSet.yourProduct}" is specifically a sales/conversation intelligence product.`;
 
-      // Build compact training context section for speed
+      // Build ENHANCED training context section with clear instructions
       const trainingSection = trainingContext && trainingContext.trim().length > 0
         ? `
-=== TRAINING DOCS (USE FIRST) ===
-${trainingContext.slice(0, 3000)}
-===
+=== YOUR TRAIN ME KNOWLEDGE (PRIORITY SOURCE - USE THIS FIRST) ===
+${trainingContext.slice(0, 6000)}
+=== END TRAIN ME KNOWLEDGE ===
+
+CRITICAL: The Train Me knowledge above contains YOUR ACTUAL product details, features, pricing, and competitive advantages.
+Use this information to create an ACCURATE and SPECIFIC battle card, not generic comparisons.
 `
         : '';
 
@@ -4711,14 +4833,19 @@ ${trainingContext.slice(0, 3000)}
 
 You are a sales expert creating a competitive battle card for ${competitorSet.yourProduct} (${competitorSet.category}).
 
-${trainingSection}CONVERSATION CONTEXT:
+${trainingSection}
+
+=== CONVERSATION CONTEXT (Customer's actual discussion) ===
 ${fullContext}
+=== END CONVERSATION ===
 
 ${competitorSection}
 
 CRITICAL INSTRUCTIONS:
-0. TRAINING DOCUMENT PRIORITY: If training documents are provided above, use their specific product features, differentiators, 
-   pricing, and competitive positioning FIRST. Only supplement with general knowledge where training documents don't cover.
+0. TRAIN ME PRIORITY: If Train Me knowledge is provided above, use those SPECIFIC product features, differentiators, 
+   pricing, and competitive positioning. This is YOUR ACTUAL PRODUCT DATA - use it to create accurate comparisons.
+1. CONVERSATION CONTEXT: Address the SPECIFIC pain points and needs discussed in the conversation above.
+2. BE SPECIFIC: Use real features, capabilities, and benefits from Train Me data, not generic statements.
 1. COMPETITOR SELECTION (STRICTLY ENFORCED):
    ${conversationCompetitors.length > 0 
      ? `⭐ MANDATORY: Use competitors marked with ⭐ (mentioned by customer) as competitor1 and competitor2
@@ -4804,6 +4931,7 @@ Generate a detailed, factual battle card that CLEARLY shows ${competitorSet.your
             response_format: { type: "json_object" },
             temperature: 0.2,
             max_tokens: 1500,
+            timeout: 10000, // 10 second timeout for battle cards
           });
 
           const content = response.choices?.[0]?.message?.content;
@@ -5254,7 +5382,8 @@ Keep each point to ONE line (max 15 words). Focus on the most important and acti
     }
     
     const cleanedContent = cleanJSONResponse(messageContent);
-    const result = JSON.parse(cleanedContent);
+    const fallback = { learnings: [] };
+    const result = safeJSONParse(cleanedContent, fallback, 'generateDocumentSummary');
     
     // Handle different response formats
     if (Array.isArray(result)) {

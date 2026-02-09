@@ -187,6 +187,10 @@ export function useDeepgramTranscription({
 
   const startTranscription = useCallback(async (includeMic = true, includeTab = false) => {
     try {
+      console.log(`🎤 startTranscription called with: includeMic=${includeMic}, includeTab=${includeTab}`);
+      console.log(`🖥️ Device detection: isIOS=${/iPhone|iPad|iPod/i.test(navigator.userAgent)}, isMobile=${/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)}`);
+      console.log(`📺 getDisplayMedia available: ${typeof navigator.mediaDevices?.getDisplayMedia === 'function'}`);
+      
       if (!enabled) {
         onErrorRef.current?.('Transcription service not enabled');
         return;
@@ -195,6 +199,8 @@ export function useDeepgramTranscription({
       // Check if on iOS/mobile and trying to capture meeting audio
       const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      console.log(`🔍 Capture check: includeTab=${includeTab}, isIOS=${isIOS}, isMobile=${isMobile}`);
       
       if (includeTab && (isIOS || isMobile)) {
         const errorMsg = isIOS 

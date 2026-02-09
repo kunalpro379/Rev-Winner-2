@@ -32,6 +32,9 @@ import { checkEntitlement } from "./middleware/entitlement";
 import { logSuperUserAccess } from "./utils/accessControl";
 import crypto from "crypto";
 
+// Performance optimization: Cache for partner services recommendations
+const partnerServicesCache = new Map<string, { data: any; timestamp: number }>();
+
 // Helper: Check if user has active enterprise license
 async function hasActiveEnterpriseLicense(userId: string): Promise<boolean> {
   try {
@@ -333,7 +336,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Generate AI response with sales framework context
       const domainExpertise = req.body.domainExpertise || "Generic Product";
-      const aiResponse = await generateSalesResponse(
+      
+      // CRITICAL: 10-second timeout for messages (increased from 8s for reliability)
+      const responsePromise = generateSalesResponse(
         req.body.content,
         conversationHistory,
         conversation.discoveryInsights,
@@ -341,6 +346,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.jwtUser?.userId,
         conversation.id
       );
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('AI response timeout after 10 seconds')), 10000)
+      );
+      
+      let aiResponse;
+      try {
+        aiResponse = await Promise.race([responsePromise, timeoutPromise]) as any;
+      } catch (timeoutError: any) {
+        console.error('⏱️ AI response timeout or error:', timeoutError.message);
+        // Return a fallback response instead of 500 error
+        aiResponse = {
+          response: "I'm processing your message. Could you tell me more about what you're looking for?",
+          discoveryInsights: {
+            painPoints: [],
+            currentEnvironment: "",
+            requirements: [],
+            decisionMakers: []
+          },
+          discoveryQuestions: [
+            "What challenges are you currently facing?",
+            "What are your main priorities?",
+            "Who else is involved in this decision?"
+          ],
+          nextQuestions: [],
+          recommendedModules: [],
+          caseStudies: []
+        };
+      }
       
       // Update conversation learnings in background (don't await to keep response fast)
       if (req.jwtUser?.userId) {
@@ -1043,7 +1076,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { extractTechEnvironment } = await import("./services/mind-map-extraction");
       console.log('🗺️ Map/Flow: Calling AI extraction...');
-      const mindMapData = await extractTechEnvironment(sessionId, transcript, domainExpertise, userId);
+      
+      // CRITICAL: 10-second timeout for Map/Flow (background feature, can take longer)
+      const extractionPromise = extractTechEnvironment(sessionId, transcript, domainExpertise, userId);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Map/Flow generation timeout after 10 seconds')), 10000)
+      );
+      
+      const mindMapData = await Promise.race([extractionPromise, timeoutPromise]) as any;
       console.log(`🗺️ Map/Flow: Generated ${mindMapData.nodes?.length || 0} nodes, ${mindMapData.edges?.length || 0} edges`);
 
       if (mindMapData.nodes?.length === 0 && transcript.trim().length >= 200) {
@@ -1132,7 +1172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return { phase: 'discovery', readinessScore: 15, signals };
   };
 
-  // Relationship Building One-liners endpoint with conversation phase awareness
+  // Relationship Building One-liners endpoint with conversation phase awareness (ULTRA-OPTIMIZED)
   app.get("/api/conversations/:sessionId/one-liners", authenticateToken, checkEntitlement, async (req, res) => {
     try {
       const { sessionId } = req.params;
@@ -1146,35 +1186,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Fetch actual messages for context
       const messages = await storage.getMessages(conversation.id);
-      const conversationText = messages.length > 0 
-        ? messages.map((m: any) => `${m.sender}: ${m.content}`).join('\n')
-        : '';
       
-      const painPoints = (conversation.discoveryInsights as any)?.painPoints || [];
-      const requirements = (conversation.discoveryInsights as any)?.requirements || [];
-      const clientName = conversation.clientName || "the client";
-
-      // PERFORMANCE: Cache one-liners to avoid repeated AI calls for same conversation state
-      const { aiCache } = await import("./services/ai-cache");
-      const cacheKey = `oneliners:${sessionId}:${messages.length}`;
-      
-      // Skip cache if refresh is requested
-      if (!refresh) {
-        const cachedOneliners = aiCache.get(cacheKey);
-        if (cachedOneliners) {
-          console.log(`✅ One-liners from cache for session ${sessionId} (${messages.length} messages)`);
-          return res.json(cachedOneliners);
-        }
-      } else {
-        console.log(`🔄 Regenerating one-liners for session ${sessionId} (refresh requested)`);
-      }
-      
-      // Detect conversation phase
-      const phaseAnalysis = detectConversationPhase(conversationText, messages.length, conversation.discoveryInsights);
-      console.log(`📊 Conversation phase: ${phaseAnalysis.phase} (readiness: ${phaseAnalysis.readinessScore}%)`);
-      
-      // Provide default phase-aware one-liners for early conversation
-      if (messages.length < 3) {
+      // ULTRA-FAST: Return cached or default for first 5 messages (no AI needed)
+      if (messages.length < 5 && !refresh) {
+        const phaseAnalysis = { phase: 'discovery', readinessScore: 15 };
         const defaultOneliners = [
           {
             id: "opener-1",
@@ -1216,122 +1231,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ oneliners: defaultOneliners, phase: phaseAnalysis.phase, readinessScore: phaseAnalysis.readinessScore });
       }
 
-      // Phase-specific strategic guidance for the AI prompt
+      const conversationText = messages.length > 0 
+        ? messages.map((m: any) => `${m.sender}: ${m.content}`).join('\n')
+        : '';
+      
+      const painPoints = (conversation.discoveryInsights as any)?.painPoints || [];
+      const requirements = (conversation.discoveryInsights as any)?.requirements || [];
+      const clientName = conversation.clientName || "the client";
+
+      // PERFORMANCE: Cache one-liners to avoid repeated AI calls for same conversation state
+      const { aiCache } = await import("./services/ai-cache");
+      const cacheKey = `oneliners:${sessionId}:${messages.length}`;
+      
+      // Skip cache if refresh is requested
+      if (!refresh) {
+        const cachedOneliners = aiCache.get(cacheKey);
+        if (cachedOneliners) {
+          console.log(`✅ One-liners from cache for session ${sessionId} (${messages.length} messages)`);
+          return res.json(cachedOneliners);
+        }
+      } else {
+        console.log(`🔄 Regenerating one-liners for session ${sessionId} (refresh requested)`);
+      }
+      
+      // Detect conversation phase
+      const phaseAnalysis = detectConversationPhase(conversationText, messages.length, conversation.discoveryInsights);
+      console.log(`📊 Conversation phase: ${phaseAnalysis.phase} (readiness: ${phaseAnalysis.readinessScore}%)`);
+
+      // Phase-specific strategic guidance for the AI prompt (SHORTENED)
       const phaseGuidance: Record<string, string> = {
-        discovery: `PHASE: Discovery - Focus on building rapport, understanding their world, and uncovering deep needs.
-STRATEGIC GOAL: Earn the right to ask qualifying questions by showing genuine interest and expertise.
-RAPPORT APPROACH: Be curious, empathetic, and position yourself as someone who truly wants to understand their situation.`,
-        
-        qualification: `PHASE: Qualification - Focus on understanding decision-making process, budget, and timeline.
-STRATEGIC GOAL: Gently confirm this is a real opportunity while maintaining rapport and trust.
-RAPPORT APPROACH: Be supportive of their process, acknowledge the complexity of decisions, and offer to help navigate.`,
-        
-        presentation: `PHASE: Presentation/Demo - Focus on connecting solutions to their specific needs.
-STRATEGIC GOAL: Create "aha moments" by showing exactly how you solve their stated problems.
-RAPPORT APPROACH: Reference their earlier comments, celebrate their insights, and paint a picture of success.`,
-        
-        objection_handling: `PHASE: Objection Handling - Focus on understanding and addressing concerns.
-STRATEGIC GOAL: Turn objections into opportunities to demonstrate value and build trust.
-RAPPORT APPROACH: Validate their concerns as smart questions, share relevant examples, and offer proof points.`,
-        
-        closing: `PHASE: Closing - Focus on confirming value and facilitating the decision.
-STRATEGIC GOAL: Make it easy to move forward with confidence and clarity.
-RAPPORT APPROACH: Reinforce their smart decision, summarize the value, and express excitement about partnering.`
+        discovery: `PHASE: Discovery - Build rapport, understand needs.`,
+        qualification: `PHASE: Qualification - Understand decision process, budget, timeline.`,
+        presentation: `PHASE: Presentation - Connect solutions to their needs.`,
+        objection_handling: `PHASE: Objection Handling - Address concerns with proof.`,
+        closing: `PHASE: Closing - Confirm value, facilitate decision.`
       };
 
-      // Generate AI-powered phase-aware one-liners
-      const onelinerPrompt = `You are an elite sales coach. Analyze this conversation and generate 4 strategic rapport-building statements.
+      // ULTRA-OPTIMIZED: Minimal prompt, last 800 chars only
+      const onelinerPrompt = `Sales coach. 4 rapport statements for ${phaseAnalysis.phase} phase.
 
-CONVERSATION CONTEXT:
-${conversationText.slice(-3000)}
+CONVERSATION:
+${conversationText.slice(-800)}
 
-DETECTED PHASE: ${phaseAnalysis.phase.toUpperCase()}
-READINESS TO CLOSE: ${phaseAnalysis.readinessScore}%
-SIGNALS DETECTED: ${phaseAnalysis.signals.slice(0, 5).join(', ')}
-
-PAIN POINTS IDENTIFIED: ${painPoints.join(', ') || 'Still discovering'}
-REQUIREMENTS MENTIONED: ${requirements.join(', ') || 'Still gathering'}
-CLIENT: ${clientName}
-
-${phaseGuidance[phaseAnalysis.phase]}
-
-CRITICAL INSTRUCTIONS:
-1. Generate statements that SHOW SUPPORT to the prospect while STRATEGICALLY moving toward closing
-2. Be SMART and IMPRESSIVE - not pushy or salesy
-3. Each statement should feel like something a trusted advisor would say
-4. Include a mix of emotional connection and logical progression
-5. Reference SPECIFIC details from the conversation when possible
-
-Generate 4 rapport statements in these categories:
-- EMPATHY: Acknowledge their situation with genuine understanding (not sympathy)
-- INSIGHT: Share valuable perspective that positions you as an expert
-- CURIOSITY: Ask a question that advances the conversation strategically
-- REASSURANCE: Build confidence in moving forward together
-
-Return JSON format:
+JSON only:
 {
   "phase": "${phaseAnalysis.phase}",
   "readinessScore": ${phaseAnalysis.readinessScore},
   "oneliners": [
-    {
-      "id": "unique-id",
-      "category": "empathy|insight|curiosity|reassurance",
-      "text": "The rapport statement - conversational, supportive, and strategic",
-      "situation": "Specific moment in conversation when to use this",
-      "tone": "supportive|consultative|curious|confident",
-      "strategicIntent": "How this moves the conversation toward closing"
-    }
+    {"id": "1", "category": "empathy", "text": "Statement", "situation": "When", "tone": "tone", "strategicIntent": "Goal"},
+    {"id": "2", "category": "insight", "text": "Statement", "situation": "When", "tone": "tone", "strategicIntent": "Goal"},
+    {"id": "3", "category": "curiosity", "text": "Statement", "situation": "When", "tone": "tone", "strategicIntent": "Goal"},
+    {"id": "4", "category": "reassurance", "text": "Statement", "situation": "When", "tone": "tone", "strategicIntent": "Goal"}
   ]
 }`;
 
       const openaiService = await import("./services/openai");
-      const response = await openaiService.generateResponse(onelinerPrompt, []);
+      
+      // CRITICAL: 5 second timeout for one-liners (increased from 3s)
+      const responsePromise = openaiService.generateResponse(onelinerPrompt, []);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 5000)
+      );
       
       let oneliners;
       try {
+        const response = await Promise.race([responsePromise, timeoutPromise]) as string;
         const cleanedResponse = response
           .replace(/```json\s*/g, '')
           .replace(/```\s*/g, '')
           .trim();
         
         oneliners = JSON.parse(cleanedResponse);
-        // Ensure phase info is included
         oneliners.phase = oneliners.phase || phaseAnalysis.phase;
         oneliners.readinessScore = oneliners.readinessScore || phaseAnalysis.readinessScore;
         console.log(`Generated ${oneliners.oneliners?.length || 0} phase-aware rapport statements for ${phaseAnalysis.phase} phase`);
       } catch (parseError) {
-        console.error('Failed to parse one-liners response:', parseError);
-        // Phase-aware fallback one-liners
+        console.error('One-liners generation failed (using fallback):', parseError);
+        // Phase-aware fallback one-liners (SHORTENED)
         const phaseFallbacks: Record<string, any[]> = {
           discovery: [
-            { id: "discovery-empathy", category: "empathy", text: "I can tell you've been dealing with this challenge for a while. That kind of firsthand experience is invaluable for finding the right solution.", situation: "After they describe a frustrating situation", tone: "supportive", strategicIntent: "Build trust through validation" },
-            { id: "discovery-insight", category: "insight", text: "What you're describing reminds me of several organizations that went on to become our most successful implementations. There's a pattern here.", situation: "When seeing familiar success indicators", tone: "consultative", strategicIntent: "Create optimism and credibility" },
-            { id: "discovery-curiosity", category: "curiosity", text: "If we could wave a magic wand and fix this tomorrow, what would change most for your team?", situation: "To understand their vision of success", tone: "curious", strategicIntent: "Establish value criteria" },
-            { id: "discovery-reassurance", category: "reassurance", text: "You're asking exactly the right questions. That kind of thoroughness is what separates successful projects from the rest.", situation: "After detailed questions from prospect", tone: "confident", strategicIntent: "Encourage engagement and questions" }
+            { id: "d1", category: "empathy", text: "I can tell you've been dealing with this challenge. Your experience is invaluable for finding the right solution.", situation: "After frustration", tone: "supportive", strategicIntent: "Build trust" },
+            { id: "d2", category: "insight", text: "What you're describing reminds me of organizations that became our most successful implementations.", situation: "Seeing success indicators", tone: "consultative", strategicIntent: "Create optimism" },
+            { id: "d3", category: "curiosity", text: "If we could fix this tomorrow, what would change most for your team?", situation: "Understanding vision", tone: "curious", strategicIntent: "Establish value" },
+            { id: "d4", category: "reassurance", text: "You're asking exactly the right questions. That thoroughness separates successful projects.", situation: "After questions", tone: "confident", strategicIntent: "Encourage engagement" }
           ],
           qualification: [
-            { id: "qual-empathy", category: "empathy", text: "I completely understand the need to bring others into this decision. Complex projects deserve that kind of careful consideration.", situation: "When discussing stakeholder involvement", tone: "supportive", strategicIntent: "Support their process while advancing" },
-            { id: "qual-insight", category: "insight", text: "The organizations that see the fastest ROI usually have a champion like you who's done this level of homework upfront.", situation: "Recognizing their preparation", tone: "consultative", strategicIntent: "Position them as the internal champion" },
-            { id: "qual-curiosity", category: "curiosity", text: "What would help you feel confident recommending this to your team? I'd love to help you build that case.", situation: "When sensing they need support for internal buy-in", tone: "curious", strategicIntent: "Offer partnership in the decision process" },
-            { id: "qual-reassurance", category: "reassurance", text: "Based on what you've shared, I'm confident we can put together something that works within your parameters.", situation: "After discussing constraints", tone: "confident", strategicIntent: "Remove doubt about feasibility" }
+            { id: "q1", category: "empathy", text: "I understand the need to bring others in. Complex projects deserve careful consideration.", situation: "Stakeholder discussion", tone: "supportive", strategicIntent: "Support process" },
+            { id: "q2", category: "insight", text: "Organizations with fastest ROI have a champion like you who's done this homework.", situation: "Recognizing prep", tone: "consultative", strategicIntent: "Position as champion" },
+            { id: "q3", category: "curiosity", text: "What would help you feel confident recommending this? I'd love to help build that case.", situation: "Need internal support", tone: "curious", strategicIntent: "Offer partnership" },
+            { id: "q4", category: "reassurance", text: "Based on what you've shared, I'm confident we can work within your parameters.", situation: "After constraints", tone: "confident", strategicIntent: "Remove doubt" }
           ],
           presentation: [
-            { id: "pres-empathy", category: "empathy", text: "I know evaluating solutions takes a lot of mental energy. Let me focus on what matters most to you and skip what doesn't.", situation: "At the start of a demo or walkthrough", tone: "supportive", strategicIntent: "Respect their time and show you listened" },
-            { id: "pres-insight", category: "insight", text: "This is exactly what I was hoping to show you - it maps directly to the challenge you mentioned earlier about [specific pain point].", situation: "When demonstrating relevant features", tone: "consultative", strategicIntent: "Connect solution to their stated needs" },
-            { id: "pres-curiosity", category: "curiosity", text: "How would your team react if they could do this starting next month?", situation: "After showing impressive capability", tone: "curious", strategicIntent: "Create urgency and envision success" },
-            { id: "pres-reassurance", category: "reassurance", text: "Everything you're seeing today is exactly what your team would have access to. No bait and switch here.", situation: "During feature showcase", tone: "confident", strategicIntent: "Build trust in the offering" }
+            { id: "p1", category: "empathy", text: "Evaluating solutions takes energy. Let me focus on what matters most to you.", situation: "Demo start", tone: "supportive", strategicIntent: "Respect time" },
+            { id: "p2", category: "insight", text: "This maps directly to your challenge about [pain point].", situation: "Showing features", tone: "consultative", strategicIntent: "Connect to needs" },
+            { id: "p3", category: "curiosity", text: "How would your team react if they could do this next month?", situation: "After capability", tone: "curious", strategicIntent: "Create urgency" },
+            { id: "p4", category: "reassurance", text: "Everything you're seeing is what your team would have. No bait and switch.", situation: "Feature showcase", tone: "confident", strategicIntent: "Build trust" }
           ],
           objection_handling: [
-            { id: "obj-empathy", category: "empathy", text: "That's a really smart question to ask. I'd be concerned too if I were in your position without more context.", situation: "When they raise a concern", tone: "supportive", strategicIntent: "Validate concern as reasonable" },
-            { id: "obj-insight", category: "insight", text: "Other clients had the same concern initially. Here's what they found after the first few weeks...", situation: "When addressing common objections", tone: "consultative", strategicIntent: "Provide social proof and resolution" },
-            { id: "obj-curiosity", category: "curiosity", text: "If we could address that concern completely, what else would you need to feel good about moving forward?", situation: "After addressing an objection", tone: "curious", strategicIntent: "Uncover all objections at once" },
-            { id: "obj-reassurance", category: "reassurance", text: "I'm glad you brought that up. It tells me you're thinking about this seriously, which is exactly what we want.", situation: "When concern is raised", tone: "confident", strategicIntent: "Frame objection as positive engagement" }
+            { id: "o1", category: "empathy", text: "That's a smart question. I'd be concerned too without more context.", situation: "Concern raised", tone: "supportive", strategicIntent: "Validate concern" },
+            { id: "o2", category: "insight", text: "Other clients had the same concern. Here's what they found after a few weeks...", situation: "Common objection", tone: "consultative", strategicIntent: "Provide proof" },
+            { id: "o3", category: "curiosity", text: "If we addressed that completely, what else would you need to feel good about moving forward?", situation: "After addressing", tone: "curious", strategicIntent: "Uncover all objections" },
+            { id: "o4", category: "reassurance", text: "I'm glad you brought that up. It shows you're thinking seriously.", situation: "Concern raised", tone: "confident", strategicIntent: "Frame as positive" }
           ],
           closing: [
-            { id: "close-empathy", category: "empathy", text: "I can tell you've put a lot of thought into this. It's clear you want to get it right for your team.", situation: "When sensing they're ready to decide", tone: "supportive", strategicIntent: "Acknowledge their careful consideration" },
-            { id: "close-insight", category: "insight", text: "Based on everything we've discussed, I'm genuinely excited about what we can accomplish together.", situation: "Summarizing the partnership potential", tone: "consultative", strategicIntent: "Express authentic enthusiasm" },
-            { id: "close-curiosity", category: "curiosity", text: "What would make the next step easiest for you - should I send over the proposal first, or schedule time with your team?", situation: "When facilitating the close", tone: "curious", strategicIntent: "Make it easy to say yes" },
-            { id: "close-reassurance", category: "reassurance", text: "You're making a smart decision. I'm confident you'll be one of those success stories we reference with future clients.", situation: "After agreement to proceed", tone: "confident", strategicIntent: "Reinforce their decision" }
+            { id: "c1", category: "empathy", text: "You've put a lot of thought into this. It's clear you want to get it right.", situation: "Ready to decide", tone: "supportive", strategicIntent: "Acknowledge consideration" },
+            { id: "c2", category: "insight", text: "Based on everything we've discussed, I'm genuinely excited about what we can accomplish.", situation: "Summarizing", tone: "consultative", strategicIntent: "Express enthusiasm" },
+            { id: "c3", category: "curiosity", text: "What would make the next step easiest - proposal first, or schedule with your team?", situation: "Facilitating close", tone: "curious", strategicIntent: "Make easy to say yes" },
+            { id: "c4", category: "reassurance", text: "You're making a smart decision. You'll be one of those success stories we reference.", situation: "After agreement", tone: "confident", strategicIntent: "Reinforce decision" }
           ]
         };
         
@@ -1342,8 +1348,8 @@ Return JSON format:
         };
       }
 
-      // Cache the result for 2 minutes to avoid repeated calls
-      aiCache.set(cacheKey, oneliners, 120000); // 120000ms = 2 minutes
+      // Cache the result for 2 minutes
+      aiCache.set(cacheKey, oneliners, 120000);
       console.log(`💾 Cached one-liners for session ${sessionId} (${messages.length} messages)`);
 
       res.json(oneliners);
@@ -1353,11 +1359,22 @@ Return JSON format:
     }
   });
 
-  // Partner Services Recommendations endpoint
+  // Partner Services Recommendations endpoint (OPTIMIZED with caching)
   app.get("/api/conversations/:sessionId/partner-services", async (req, res) => {
     try {
       const { sessionId } = req.params;
       const domainExpertise = req.query.domain as string || "Generic Product";
+      
+      // Cache key based on session and domain
+      const cacheKey = `partner-services:${sessionId}:${domainExpertise}`;
+      const CACHE_TTL = 60000; // 1 minute cache
+      
+      // Check cache first
+      const cached = partnerServicesCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+        console.log(`✅ Partner services cache HIT for ${sessionId}`);
+        return res.json(cached.data);
+      }
       
       // Get conversation data for analysis
       const conversation = await storage.getConversation(sessionId);
@@ -1432,6 +1449,9 @@ Return JSON format:
             }
           ]
         };
+        
+        // Cache default recommendations
+        partnerServicesCache.set(cacheKey, { data: defaultRecommendations, timestamp: Date.now() });
         return res.json(defaultRecommendations);
       }
 
@@ -1454,7 +1474,8 @@ As a trusted ${domainExpertise} advisor, recommend 3 strategic products or servi
 - Strategic alignment with customer's stated goals
 - Specific ${domainExpertise} products, features, modules, or services
 
-Provide consultant-quality ${domainExpertise} recommendations in JSON format:
+IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after the JSON structure. Do not use markdown code fences.
+
 {
   "recommendations": [
     {
@@ -1480,15 +1501,13 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
       
       let recommendations;
       try {
-        // Clean the response by removing markdown code fences and extra whitespace
-        const cleanedResponse = response
-          .replace(/```json\s*/g, '')
-          .replace(/```\s*/g, '')
-          .trim();
-        
-        console.log(`AI response length: ${response.length}, cleaned length: ${cleanedResponse.length}`);
-        recommendations = JSON.parse(cleanedResponse);
+        // Response is already cleaned by generateResponse
+        console.log(`AI response length: ${response.length}`);
+        recommendations = JSON.parse(response);
         console.log(`Partner services recommendations generated: ${recommendations.recommendations?.length || 0} services`);
+        
+        // Cache successful response
+        partnerServicesCache.set(cacheKey, { data: recommendations, timestamp: Date.now() });
       } catch (parseError) {
         console.error('Failed to parse partner services response:', parseError);
         console.error('Raw AI response:', response.substring(0, 500) + '...');
@@ -2090,63 +2109,42 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
         } : 'NULL');
       }
 
-      // Get actual session usage history from sessionUsage table (accurate tracking)
-      // BUT only show sessions where AI features were actually used (has conversation)
+      // FIXED: Get session history from conversations table directly
+      // This is the source of truth for AI feature usage
       let sessionHistory = [];
       try {
-        // First, get all conversations (AI feature usage)
+        console.log(`[DEBUG] Fetching conversations for user ${userId}`);
+        
+        // Get all conversations for this user
         const userConversations = await db.select()
           .from(conversations)
           .where(eq(conversations.userId, userId))
-          .orderBy(desc(conversations.createdAt));
+          .orderBy(desc(conversations.createdAt))
+          .limit(50);
         
-        // Create a map of sessionId -> conversation data
-        const conversationMap = new Map();
-        userConversations.forEach(conv => {
-          conversationMap.set(conv.sessionId, {
-            summary: conv.callSummary,
-            createdAt: conv.createdAt,
-            endedAt: conv.endedAt
-          });
+        console.log(`[DEBUG] Found ${userConversations.length} conversations`);
+
+        // Convert conversations to session history format
+        sessionHistory = userConversations.map(conv => {
+          const startTime = conv.createdAt || new Date();
+          const endTime = conv.endedAt || conv.createdAt || new Date();
+          const durationMs = endTime.getTime() - startTime.getTime();
+          const durationMinutes = Math.max(1, Math.ceil(durationMs / (1000 * 60)));
+
+          return {
+            sessionId: conv.sessionId,
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
+            durationMinutes: durationMinutes,
+            summary: conv.callSummary || null
+          };
         });
 
-        // Get session usage data for sessions that have conversations
-        const sessionIds = Array.from(conversationMap.keys());
-        
-        if (sessionIds.length > 0) {
-          const userSessions = await db.select()
-            .from(sessionUsage)
-            .where(eq(sessionUsage.userId, userId))
-            .orderBy(desc(sessionUsage.startTime))
-            .limit(50);
-
-          // Only include sessions that have actual conversations (AI feature usage)
-          sessionHistory = userSessions
-            .filter(session => {
-              // Must be ended AND have a conversation
-              return session.status === 'ended' && 
-                     session.endTime && 
-                     conversationMap.has(session.sessionId);
-            })
-            .map(session => {
-              const conv = conversationMap.get(session.sessionId);
-              return {
-                sessionId: session.sessionId,
-                startTime: session.startTime.toISOString(),
-                endTime: session.endTime!.toISOString(),
-                durationMinutes: session.durationSeconds 
-                  ? Math.ceil(parseInt(session.durationSeconds) / 60)
-                  : 0,
-                summary: conv?.summary || null
-              };
-            });
-        }
-
-        console.log(`[DEBUG] Found ${sessionHistory.length} AI feature sessions (with conversations) for user ${userId}`);
+        console.log(`[DEBUG] Returning ${sessionHistory.length} sessions in history`);
       } catch (error) {
-        console.error(`[DEBUG] Error fetching session usage:`, error);
-        // Fall back to subscription session history if database query fails
-        sessionHistory = subscription.sessionHistory || [];
+        console.error(`[DEBUG] Error fetching conversations:`, error);
+        // Fall back to empty array if query fails
+        sessionHistory = [];
       }
       
       res.json({

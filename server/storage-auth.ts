@@ -654,6 +654,8 @@ export class AuthStorage implements IAuthStorage {
   }
   
   async getValidPasswordResetToken(token: string): Promise<PasswordResetToken | null> {
+    console.log(`[Token Validation] Checking token: ${token.substring(0, 20)}...`);
+    
     const [resetToken] = await db.select().from(passwordResetTokens).where(
       and(
         eq(passwordResetTokens.token, token),
@@ -661,6 +663,24 @@ export class AuthStorage implements IAuthStorage {
         gte(passwordResetTokens.expiresAt, new Date())
       )
     );
+    
+    if (!resetToken) {
+      // Check if token exists at all
+      const [anyToken] = await db.select().from(passwordResetTokens).where(
+        eq(passwordResetTokens.token, token)
+      );
+      
+      if (!anyToken) {
+        console.log(`[Token Validation] Token not found in database`);
+      } else if (anyToken.isUsed) {
+        console.log(`[Token Validation] Token already used`);
+      } else if (anyToken.expiresAt < new Date()) {
+        console.log(`[Token Validation] Token expired at: ${anyToken.expiresAt}`);
+      }
+    } else {
+      console.log(`[Token Validation] Token valid for email: ${resetToken.email}`);
+    }
+    
     return resetToken || null;
   }
   

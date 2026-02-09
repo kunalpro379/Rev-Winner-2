@@ -498,13 +498,15 @@ export class TrainMeIntelligence {
     if (entryIds.length === 0) return;
     
     try {
+      // Fix: Use inArray instead of ANY for proper array handling
+      const { inArray } = await import('drizzle-orm');
       await db
         .update(knowledgeEntries)
         .set({ 
           usageCount: sql`${knowledgeEntries.usageCount} + 1`,
           updatedAt: new Date()
         })
-        .where(sql`${knowledgeEntries.id} = ANY(${entryIds})`);
+        .where(inArray(knowledgeEntries.id, entryIds));
     } catch (error) {
       console.warn('Failed to increment usage count:', error);
     }

@@ -263,7 +263,8 @@ JSON only.`;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        response = await client.chat.completions.create({
+        // CRITICAL: 10-second timeout for Map/Flow AI call
+        const aiCallPromise = client.chat.completions.create({
           model: fastModel,
           messages: [
             { role: "system", content: systemPrompt },
@@ -273,6 +274,12 @@ JSON only.`;
           temperature: 0.1,
           max_tokens: 4500
         });
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('AI call timeout after 10 seconds')), 10000)
+        );
+        
+        response = await Promise.race([aiCallPromise, timeoutPromise]) as any;
         
         break; // Success, exit retry loop
       } catch (apiError: any) {

@@ -560,12 +560,25 @@ export default function AdminUserDetail() {
                         durationText = `${minutes}m (ongoing)`;
                       }
                       
+                      // Format times in IST (Indian Standard Time)
+                      const formatIST = (date: Date) => {
+                        return date.toLocaleString('en-IN', {
+                          timeZone: 'Asia/Kolkata',
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: false
+                        });
+                      };
+                      
                       return (
                         <TableRow key={session.id}>
                           <TableCell className="font-mono text-sm">{session.sessionId.substring(0, 12)}...</TableCell>
-                          <TableCell>{format(startTime, "MMM d, yyyy HH:mm")}</TableCell>
+                          <TableCell>{formatIST(startTime)}</TableCell>
                           <TableCell>
-                            {endTime ? format(endTime, "MMM d, yyyy HH:mm") : (
+                            {endTime ? formatIST(endTime) : (
                               <span className="text-muted-foreground italic">Not ended</span>
                             )}
                           </TableCell>

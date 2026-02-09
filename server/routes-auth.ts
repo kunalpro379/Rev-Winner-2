@@ -498,17 +498,49 @@ export function setupAuthRoutes(app: Router) {
   // Reset password
   app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
     try {
+      console.log(`[Password Reset] ========== NEW REQUEST ==========`);
+      console.log(`[Password Reset] Headers:`, JSON.stringify(req.headers));
+      console.log(`[Password Reset] Body:`, JSON.stringify(req.body));
+      console.log(`[Password Reset] Body type:`, typeof req.body);
+      console.log(`[Password Reset] Body keys:`, Object.keys(req.body || {}));
+      
+      // Validate request body
+      if (!req.body || Object.keys(req.body).length === 0) {
+        console.log(`[Password Reset] ❌ Empty request body`);
+        return res.status(400).json({ message: "Request body is empty" });
+      }
+      
+      // Check if required fields exist
+      if (!req.body.token) {
+        console.log(`[Password Reset] ❌ Missing token field`);
+        return res.status(400).json({ message: "Reset token is required" });
+      }
+      
+      if (!req.body.password) {
+        console.log(`[Password Reset] ❌ Missing password field`);
+        return res.status(400).json({ message: "Password is required" });
+      }
+      
       const { token, password } = resetPasswordSchema.parse(req.body);
+      
+      console.log(`[Password Reset] ✓ Validation passed`);
+      console.log(`[Password Reset] Token: ${token.substring(0, 20)}...`);
+      console.log(`[Password Reset] Password length: ${password.length}`);
       
       // Verify reset token
       const resetToken = await authStorage.getValidPasswordResetToken(token);
       if (!resetToken) {
+        console.log(`[Password Reset] ❌ Token validation failed - token not found or expired`);
         return res.status(400).json({ message: "Invalid or expired reset token" });
       }
+      
+      console.log(`[Password Reset] Token valid for email: ${resetToken.email}`);
       
       // Update password
       await authStorage.updateUserPassword(resetToken.email, password);
       await authStorage.markPasswordResetTokenAsUsed(resetToken.id);
+      
+      console.log(`[Password Reset] Password updated successfully for: ${resetToken.email}`);
       
       // Get user for audit log
       const user = await authStorage.getUserByEmail(resetToken.email);
@@ -526,6 +558,7 @@ export function setupAuthRoutes(app: Router) {
       res.json({ message: "Password reset successful. You can now log in with your new password." });
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.log(`[Password Reset] Validation error:`, error.errors);
         return res.status(400).json({ message: "Validation error", errors: error.errors });
       }
       console.error("Password reset error:", error);

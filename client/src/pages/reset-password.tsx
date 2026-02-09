@@ -37,6 +37,9 @@ export default function ResetPassword() {
     // Get token from URL query parameters
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
+    
+    console.log('[Reset Password] Token from URL:', token ? token.substring(0, 20) + '...' : 'null');
+    
     if (!token) {
       toast({
         title: "Invalid Reset Link",
@@ -48,12 +51,15 @@ export default function ResetPassword() {
       setResetToken(token);
       // Set the token in the form
       form.setValue('token', token);
+      console.log('[Reset Password] Token set in form');
     }
   }, [toast, setLocation, form]);
 
   async function onSubmit(values: z.infer<typeof resetPasswordSchema>) {
     setIsSubmitting(true);
     try {
+      console.log('[Reset Password] Submitting with values:', { token: values.token?.substring(0, 20) + '...', hasPassword: !!values.password });
+      
       const response = await apiRequest("POST", "/api/auth/reset-password", values);
       const data = await response.json();
 
@@ -70,6 +76,7 @@ export default function ResetPassword() {
       // Redirect to login after 3 seconds
       setTimeout(() => setLocation("/login"), 3000);
     } catch (error: any) {
+      console.error('[Reset Password] Error:', error);
       toast({
         title: "Reset Failed",
         description: error.message || "Unable to reset password. The link may have expired.",
@@ -132,6 +139,19 @@ export default function ResetPassword() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {/* Hidden token field */}
+              <FormField
+                control={form.control}
+                name="token"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormControl>
+                      <Input type="hidden" {...field} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              
               <FormField
                 control={form.control}
                 name="password"

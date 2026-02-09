@@ -66,12 +66,20 @@ const DEFAULT_SPEAKERS: Speaker[] = [
 ];
 
 const isMobileDevice = () => {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-    (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
+  const ua = navigator.userAgent;
+  const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+  const hasTouch = navigator.maxTouchPoints && navigator.maxTouchPoints > 2;
+  const isMobile = isMobileUA || hasTouch;
+  console.log(`📱 isMobileDevice check: UA=${isMobileUA}, Touch=${hasTouch}, Result=${isMobile}`);
+  return isMobile;
 };
 
 const isDesktopBrowser = () => {
-  return !isMobileDevice() && typeof navigator.mediaDevices?.getDisplayMedia === 'function';
+  const hasDisplayMedia = typeof navigator.mediaDevices?.getDisplayMedia === 'function';
+  const notMobile = !isMobileDevice();
+  const isDesktop = notMobile && hasDisplayMedia;
+  console.log(`🖥️ isDesktopBrowser check: notMobile=${notMobile}, hasDisplayMedia=${hasDisplayMedia}, Result=${isDesktop}`);
+  return isDesktop;
 };
 
 export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing = false, shouldStop = false, onStopped, onStartTimer, onStopTimer, onTranscriptUpdate, onTranscribingChange, onNewSession, resetVersion = 0, sessionId, onStop }: EnhancedLiveTranscriptProps) {
@@ -372,6 +380,8 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
         }
       }
       
+      console.log(`🚀 handleStart - About to call startTranscription(true, ${captureMeetingAudio})`);
+      console.log(`🖥️ isDesktopBrowser(): ${isDesktopBrowser()}, isMobileDevice(): ${isMobileDevice()}`);
       await startTranscription(true, captureMeetingAudio);
     } catch (error: any) {
       toast({
