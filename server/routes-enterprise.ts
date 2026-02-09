@@ -5,6 +5,23 @@ import { z } from "zod";
 import { randomBytes } from "crypto";
 import { eventLogger } from './services/event-logger';
 import { PaymentGatewayFactory } from './services/payments/PaymentGatewayFactory';
+import { currencyConverter } from "./services/currency-converter";
+import { DEFAULT_PAYMENT_GATEWAY } from "./config/payment.config";
+
+// Get the base URL for payment callbacks
+function getBaseUrl(req: Request): string {
+  if (process.env.APP_URL) {
+    return process.env.APP_URL;
+  }
+  const protocol = req.protocol;
+  const host = req.get('host');
+  return `${protocol}://${host}`;
+}
+
+// Get Cashfree mode for frontend SDK
+function getCashfreeMode(): 'sandbox' | 'production' {
+  return process.env.CASHFREE_ENVIRONMENT === 'SANDBOX' ? 'sandbox' : 'production';
+}
 
 // Helper function to get Razorpay key ID based on environment
 function getRazorpayKeyId(): string | undefined {
@@ -668,16 +685,22 @@ export function setupEnterpriseRoutes(app: Express) {
     totalSeats: z.number().int().min(5, "Minimum 5 seats required"),
     packageType: z.enum(['monthly', 'annual']),
     companyName: z.string().min(1, "Company name is required").max(255),
-    billingEmail: z.string().email("Valid email required")
+    billingEmail: z.string().email("Valid email required"),
+    paymentGateway: z.enum(['cashfree', 'razorpay']).optional(),
   });
 
   const verifyPurchaseSchema = z.object({
     orderId: z.string().min(1),
-    companyName: z.string().min(1),
-    billingEmail: z.string().email(),
-    totalSeats: z.number().int().min(5),
-    packageType: z.enum(['monthly', 'annual']),
-    pricePerSeat: z.number().positive()
+    companyName: z.string().optional(), // Optional - will use server-stored value
+    billingEmail: z.string().email().optional(), // Optional - will use server-stored value
+    totalSeats: z.number().int().min(5).optional(), // Optional - will use server-stored value
+    packageType: z.enum(['monthly', 'annual']).optional(), // Optional - will use server-stored value
+    pricePerSeat: z.number().positive().optional(), // Optional - will use server-stored value
+    razorpay_payment_id: z.string().optional(),
+    razorpay_order_id: z.string().optional(),
+    razorpay_signature: z.string().optional(),
+    cfPaymentId: z.string().optional(),
+    cashfreeOrderId: z.string().optional(),
   });
 
   // Create order for bulk license purchase (new organization)
@@ -695,7 +718,10 @@ export function setupEnterpriseRoutes(app: Express) {
         });
       }
       
-      const { totalSeats, packageType, companyName, billingEmail } = validation.data;
+      const { totalSeats, packageType, companyName, billingEmail, paymentGateway: requestedGateway } = validation.data;
+      
+      // Use requested gateway or fall back to configured default
+      const paymentGateway = requestedGateway || DEFAULT_PAYMENT_GATEWAY;
       
       // Check if user already has an organization
       const existingOrg = await authStorage.getOrganizationByManagerId(userId);
@@ -713,39 +739,65 @@ export function setupEnterpriseRoutes(app: Express) {
       
       // Calculate pricing based on package type
       const pricePerSeat = packageType === 'annual' ? 60 : 6; // $60/year or $6/month per seat
-      const totalAmount = totalSeats * pricePerSeat;
+      const totalAmountUSD = totalSeats * pricePerSeat;
+      
+      // IMPORTANT: Use INR for Cashfree (only supports INR), USD for Razorpay
+      let finalCurrency = paymentGateway === 'cashfree' ? 'INR' : 'USD';
+      let finalAmount = totalAmountUSD;
+      let conversionInfo = null;
+      
+      // Real-time currency conversion for Cashfree
+      if (paymentGateway === 'cashfree') {
+        try {
+          const conversion = await currencyConverter.convertCurrency(totalAmountUSD, 'USD', 'INR');
+          finalAmount = conversion.convertedAmount;
+          finalCurrency = 'INR';
+          conversionInfo = conversion;
+          console.log(`[Enterprise Cashfree] Converted ${conversion.originalAmount} USD to ${conversion.convertedAmount} INR (rate: ${conversion.exchangeRate})`);
+        } catch (error) {
+          console.error(`[Enterprise Cashfree] Currency conversion failed:`, error);
+          return res.status(500).json({ 
+            message: "Currency conversion failed. Please try again later.",
+            error: "CURRENCY_CONVERSION_ERROR"
+          });
+        }
+      }
       
       // Use PaymentGatewayFactory
-      const paymentGateway = PaymentGatewayFactory.getGateway();
-      const defaultGatewayProvider = PaymentGatewayFactory.getDefaultProvider();
+      const gateway = PaymentGatewayFactory.getGateway(paymentGateway);
+      const baseUrl = getBaseUrl(req);
       
       const orderId = `ent_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      const orderResult = await paymentGateway.createOrder({
-        amount: totalAmount,
-        currency: "INR",
+      const orderResult = await gateway.createOrder({
+        amount: finalAmount,
+        currency: finalCurrency,
         receipt: orderId,
         customerName: `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Customer",
         customerEmail: user.email || billingEmail || 'customer@example.com',
         customerPhone: user.mobile || "9999999999",
-        notes: {
+        metadata: {
           type: "enterprise_license_purchase",
           userId,
           totalSeats: totalSeats.toString(),
           packageType,
           companyName,
           billingEmail,
-          pricePerSeat: pricePerSeat.toString()
+          pricePerSeat: pricePerSeat.toString(),
+          originalAmountUSD: totalAmountUSD.toString(),
+          returnUrl: `${baseUrl}/payment/success?orderId=${orderId}&type=enterprise`,
+          notifyUrl: `${baseUrl}/api/billing/webhook`,
         },
       });
       
       // Create pending payment record for idempotency tracking
       await authStorage.createPayment({
         userId,
-        razorpayOrderId: orderResult.orderId,
-        amount: totalAmount.toString(),
-        currency: "INR",
+        razorpayOrderId: orderResult.providerOrderId,
+        amount: Math.round(finalAmount * 100).toString(), // Store in smallest unit (paise/cents)
+        currency: finalCurrency,
         status: "pending",
+        paymentMethod: paymentGateway,
         metadata: JSON.stringify({
           type: "enterprise_license_purchase",
           companyName,
@@ -753,27 +805,47 @@ export function setupEnterpriseRoutes(app: Express) {
           totalSeats,
           packageType,
           pricePerSeat,
+          originalAmountUSD: totalAmountUSD,
           paymentSessionId: orderResult.paymentSessionId,
           providerOrderId: orderResult.providerOrderId,
-          gateway: defaultGatewayProvider,
+          gateway: paymentGateway,
         })
       });
       
-      res.json({ 
-        success: true, 
-        orderId: orderResult.orderId,
-        paymentSessionId: orderResult.paymentSessionId,
-        razorpayOrderId: orderResult.providerOrderId, // For Razorpay
-        razorpayKeyId: defaultGatewayProvider === 'razorpay' ? getRazorpayKeyId() : undefined,
-        gateway: defaultGatewayProvider,
-        amount: totalAmount,
-        currency: "INR",
-        pricePerSeat,
-        totalSeats,
-        packageType,
-        companyName,
-        billingEmail
-      });
+      // Return response based on gateway
+      if (paymentGateway === 'razorpay') {
+        res.json({ 
+          success: true, 
+          orderId: orderResult.providerOrderId,
+          razorpayOrderId: orderResult.providerOrderId,
+          razorpayKeyId: getRazorpayKeyId(),
+          gateway: 'razorpay',
+          amount: finalAmount,
+          currency: finalCurrency,
+          pricePerSeat,
+          totalSeats,
+          packageType,
+          companyName,
+          billingEmail
+        });
+      } else {
+        res.json({ 
+          success: true, 
+          orderId: orderResult.providerOrderId,
+          paymentSessionId: orderResult.paymentSessionId,
+          gatewayOrderId: orderResult.providerOrderId,
+          gateway: 'cashfree',
+          cashfreeMode: getCashfreeMode(),
+          cashfreeEnvironment: getCashfreeMode(),
+          amount: finalAmount,
+          currency: finalCurrency,
+          pricePerSeat,
+          totalSeats,
+          packageType,
+          companyName,
+          billingEmail
+        });
+      }
     } catch (error: any) {
       console.error("Error creating enterprise purchase order:", error);
       res.status(500).json({ message: "Failed to create purchase order", error: error.message });
@@ -814,7 +886,9 @@ export function setupEnterpriseRoutes(app: Express) {
 
       if (existingPayment.status === "success") {
         // Payment already processed, return success without re-provisioning
-        const metadata = JSON.parse((existingPayment.metadata as string) || "{}");
+        const metadata = typeof existingPayment.metadata === 'string'
+          ? JSON.parse(existingPayment.metadata)
+          : (existingPayment.metadata || {});
         return res.json({ 
           success: true, 
           message: "Purchase already processed",
@@ -823,43 +897,96 @@ export function setupEnterpriseRoutes(app: Express) {
         });
       }
       
-      // SECURITY: Validate client values against server-stored payment metadata
-      const paymentMetadata = JSON.parse((existingPayment.metadata as string) || "{}");
+      // SECURITY: Validate client values against server-stored payment metadata (only if provided)
+      const paymentMetadata = typeof existingPayment.metadata === 'string' 
+        ? JSON.parse(existingPayment.metadata) 
+        : (existingPayment.metadata || {});
       const serverTotalSeats = paymentMetadata.totalSeats;
       const serverPackageType = paymentMetadata.packageType;
       const serverPricePerSeat = paymentMetadata.pricePerSeat;
       const serverCompanyName = paymentMetadata.companyName;
       const serverBillingEmail = paymentMetadata.billingEmail;
 
-      // Verify all critical parameters match server-stored values
-      if (
-        totalSeats !== serverTotalSeats ||
-        packageType !== serverPackageType ||
-        pricePerSeat !== serverPricePerSeat ||
-        companyName !== serverCompanyName ||
-        billingEmail !== serverBillingEmail
-      ) {
-        return res.status(400).json({ 
-          message: "Verification data mismatch. Payment parameters do not match the original order.",
-          error: "PARAMETER_MISMATCH"
-        });
+      // Only validate if client provided values (for direct API calls)
+      // Skip validation if values not provided (for payment gateway redirects)
+      if (companyName && billingEmail && totalSeats && packageType && pricePerSeat) {
+        // Verify all critical parameters match server-stored values
+        if (
+          totalSeats !== serverTotalSeats ||
+          packageType !== serverPackageType ||
+          pricePerSeat !== serverPricePerSeat ||
+          companyName !== serverCompanyName ||
+          billingEmail !== serverBillingEmail
+        ) {
+          return res.status(400).json({ 
+            message: "Verification data mismatch. Payment parameters do not match the original order.",
+            error: "PARAMETER_MISMATCH"
+          });
+        }
       }
       
       // Verify payment status with payment gateway
-      const paymentGateway = PaymentGatewayFactory.getGateway();
-      const verifyResult = await paymentGateway.getPaymentStatus(orderId);
+      const gatewayProvider = paymentMetadata.gateway || DEFAULT_PAYMENT_GATEWAY;
+      const gateway = PaymentGatewayFactory.getGateway(gatewayProvider);
       
-      // Check if payment is successful (handle Razorpay status codes)
-      const isPaid = verifyResult.status === 'PAID' || 
-                     verifyResult.status === 'SUCCESS' || 
-                     verifyResult.status === 'captured' ||
-                     verifyResult.status === 'authorized';
+      let verifiedPaymentId: string;
       
-      if (!isPaid) {
-        return res.status(400).json({ 
-          message: "Payment not completed",
-          status: verifyResult.status
-        });
+      if (gatewayProvider === 'razorpay') {
+        // Razorpay verification
+        const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = validation.data;
+        
+        if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
+          return res.status(400).json({ message: "Missing Razorpay payment details" });
+        }
+        
+        const isValid = gateway.verifyPaymentSignature(
+          razorpay_order_id,
+          razorpay_payment_id,
+          razorpay_signature
+        );
+        
+        if (!isValid) {
+          return res.status(400).json({ message: "Payment verification failed" });
+        }
+        
+        verifiedPaymentId = razorpay_payment_id;
+      } else {
+        // Cashfree verification
+        const { cfPaymentId, cashfreeOrderId } = validation.data;
+        
+        // For Cashfree, we might not have payment details in the redirect
+        // We can fetch the payment status using the stored gateway order ID
+        let orderIdToCheck = cashfreeOrderId;
+        
+        if (!orderIdToCheck) {
+          // If cashfreeOrderId not provided, use the stored gateway order ID from payment
+          orderIdToCheck = existingPayment.razorpayOrderId; // This field stores gateway order ID for both Razorpay and Cashfree
+        }
+        
+        if (!orderIdToCheck) {
+          return res.status(400).json({ 
+            message: "Missing Cashfree payment details. Please contact support with your order ID.",
+            orderId: orderId
+          });
+        }
+        
+        console.log(`[Enterprise Verify] Checking Cashfree payment status for order: ${orderIdToCheck}`);
+        
+        const paymentStatus = await gateway.getPaymentStatus(orderIdToCheck);
+        
+        console.log(`[Enterprise Verify] Cashfree payment status:`, paymentStatus);
+        
+        const isPaid = paymentStatus.status === 'PAID' || 
+                       paymentStatus.status === 'SUCCESS';
+        
+        if (!isPaid) {
+          return res.status(400).json({ 
+            message: "Payment not completed",
+            status: paymentStatus.status
+          });
+        }
+        
+        verifiedPaymentId = cfPaymentId || paymentStatus.paymentId || orderIdToCheck;
       }
       
       // Double-check user doesn't already have an organization
@@ -872,7 +999,7 @@ export function setupEnterpriseRoutes(app: Express) {
       
       // Update payment status to success
       await authStorage.updatePayment(existingPayment.id, {
-        razorpayPaymentId: verifyResult.paymentId || orderId,
+        razorpayPaymentId: verifiedPaymentId,
         status: "success"
       });
       
@@ -925,7 +1052,7 @@ export function setupEnterpriseRoutes(app: Express) {
         totalSeats: provisionTotalSeats,
         pricePerSeat: provisionPricePerSeat.toString(),
         totalAmount: (provisionTotalSeats * provisionPricePerSeat).toString(),
-        currency: 'INR',
+        currency: existingPayment.currency || 'INR',
         startDate,
         endDate,
         razorpayOrderId: orderId,
@@ -939,9 +1066,9 @@ export function setupEnterpriseRoutes(app: Express) {
         adjustmentType: 'initial_purchase',
         deltaSeats: provisionTotalSeats,
         razorpayOrderId: orderId,
-        razorpayPaymentId: verifyResult.paymentId || orderId,
+        razorpayPaymentId: verifiedPaymentId,
         amount: (provisionTotalSeats * provisionPricePerSeat).toString(),
-        currency: 'USD',
+        currency: existingPayment.currency || 'INR',
         status: 'completed',
         addedBy: userId
       });

@@ -60,9 +60,18 @@ export function useSessionTimer() {
       setCurrentSessionId(null);
       setCurrentSessionTime(0);
       queryClient.invalidateQueries({ queryKey: ["/api/session-usage/total"] });
+      toast({
+        title: "Session Ended",
+        description: "Your session has been tracked successfully",
+      });
     },
     onError: (error: any) => {
       console.error("Failed to stop session timer:", error);
+      toast({
+        title: "Session Tracking Error",
+        description: "Failed to properly end session tracking",
+        variant: "destructive",
+      });
     },
   });
 
@@ -91,11 +100,30 @@ export function useSessionTimer() {
     }
   }, [isRunning, currentSessionId, stopSessionMutation]);
 
+  // Auto-stop session on page unload/close
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (isRunning && currentSessionId) {
+        // Use synchronous API call for page unload
+        navigator.sendBeacon(
+          `/api/session-usage/${currentSessionId}/stop`,
+          JSON.stringify({})
+        );
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isRunning, currentSessionId]);
+
   return {
     isRunning,
     currentSessionTime,
     totalUsage,
     startTimer,
     stopTimer,
+    currentSessionId,
   };
 }

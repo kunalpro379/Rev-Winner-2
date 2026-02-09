@@ -730,7 +730,7 @@ export function setupBillingRoutes(app: Router) {
           packageSku: packageId,
           addonType: 'session_minutes',
           pendingOrderId: pendingOrder.id,
-          returnUrl: `${baseUrl}/payment/success?orderId=${pendingOrder.id}`,
+          returnUrl: `${baseUrl}/payment/success?orderId=${pendingOrder.id}&type=sessionminutes`,
           notifyUrl: `${baseUrl}/api/billing/webhook`,
         },
         customerName: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email?.split('@')[0] || 'Customer',
@@ -1253,9 +1253,27 @@ export function setupBillingRoutes(app: Router) {
       const gateway = PaymentGatewayFactory.getGateway(paymentGateway);
       const baseUrl = getBaseUrl(req);
       
-      // Keep all payments in USD - no currency conversion
-      let finalCurrency = pkg.currency || 'USD';
+      // IMPORTANT: Use INR for Cashfree (only supports INR), USD for Razorpay
+      let finalCurrency = paymentGateway === 'cashfree' ? 'INR' : (pkg.currency || 'USD');
       let finalAmount = pkg.price;
+      let conversionInfo = null;
+      
+      // Real-time currency conversion for Cashfree
+      if (paymentGateway === 'cashfree' && (pkg.currency === 'USD' || !pkg.currency)) {
+        try {
+          const conversion = await currencyConverter.convertCurrency(pkg.price, 'USD', 'INR');
+          finalAmount = conversion.convertedAmount;
+          finalCurrency = 'INR';
+          conversionInfo = conversion;
+          console.log(`[Train Me Cashfree] Converted ${conversion.originalAmount} USD to ${conversion.convertedAmount} INR (rate: ${conversion.exchangeRate})`);
+        } catch (error) {
+          console.error(`[Train Me Cashfree] Currency conversion failed:`, error);
+          return res.status(500).json({ 
+            message: "Currency conversion failed. Please try again later.",
+            error: "CURRENCY_CONVERSION_ERROR"
+          });
+        }
+      }
 
       const order = await gateway.createOrder({
         amount: finalAmount,
@@ -1266,7 +1284,7 @@ export function setupBillingRoutes(app: Router) {
           packageSku: trainMeAddon.id,
           addonType: 'train_me',
           pendingOrderId: pendingOrder.id,
-          returnUrl: `${baseUrl}/payment/success?orderId=${pendingOrder.id}`,
+          returnUrl: `${baseUrl}/payment/success?orderId=${pendingOrder.id}&type=trainme`,
           notifyUrl: `${baseUrl}/api/billing/webhook`,
         },
         customerName: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email?.split('@')[0] || 'Customer',
@@ -3027,8 +3045,58 @@ export function setupBillingRoutes(app: Router) {
         return res.status(400).json({ message: "Order ID is required" });
       }
 
-      // Fetch pending order
-      const pendingOrder = await billingStorage.getPendingOrderById(orderId, userId);
+      // Try to fetch pending order first
+      let pendingOrder = await billingStorage.getPendingOrderById(orderId, userId);
+      
+      // If no pending order found, check if this is an enterprise purchase
+      // Enterprise purchases use a different order ID format (ent_xxx)
+      if (!pendingOrder && orderId.startsWith('ent_')) {
+        console.log(`[Invoice Debug] Enterprise order detected: ${orderId}, looking in payments table`);
+        
+        // For enterprise purchases, look directly in payments table
+        const payment = await authStorage.getPaymentByRazorpayOrderId(orderId);
+        
+        if (!payment || payment.userId !== userId) {
+          return res.status(404).json({ message: "Order not found" });
+        }
+        
+        if (payment.status !== 'success') {
+          return res.status(400).json({ message: "Order is not completed yet" });
+        }
+        
+        // Parse metadata to get enterprise purchase details
+        const metadata = typeof payment.metadata === 'string'
+          ? JSON.parse(payment.metadata)
+          : (payment.metadata || {});
+        
+        // Build invoice data for enterprise purchase
+        const invoiceData = {
+          orderId: orderId,
+          userId: userId,
+          amount: payment.amount,
+          currency: payment.currency,
+          status: payment.status,
+          paymentMethod: payment.paymentMethod || 'Cashfree',
+          razorpayOrderId: payment.razorpayOrderId,
+          razorpayPaymentId: payment.razorpayPaymentId,
+          createdAt: payment.createdAt,
+          items: [{
+            name: `Enterprise License - ${metadata.totalSeats} seats (${metadata.packageType})`,
+            description: `Company: ${metadata.companyName}`,
+            quantity: metadata.totalSeats || 1,
+            unitPrice: metadata.pricePerSeat || 0,
+            amount: payment.amount
+          }],
+          customer: {
+            name: metadata.companyName || 'Enterprise Customer',
+            email: metadata.billingEmail || '',
+          },
+          type: 'enterprise_license'
+        };
+        
+        return res.json(invoiceData);
+      }
+      
       if (!pendingOrder) {
         return res.status(404).json({ message: "Order not found" });
       }

@@ -19,9 +19,11 @@ export default function PaymentSuccess() {
         // Get order ID and payment details from URL
         const params = new URLSearchParams(window.location.search);
         const orderIdParam = params.get('orderId');
+        const orderType = params.get('type'); // Get order type from URL
         const cfPaymentId = params.get('cf_payment_id') || params.get('payment_id');
         const razorpayPaymentId = params.get('razorpay_payment_id');
         const razorpaySignature = params.get('razorpay_signature');
+        const cashfreeOrderId = params.get('order_id'); // Cashfree order ID
 
         if (!orderIdParam) {
           setStatus('failed');
@@ -31,22 +33,61 @@ export default function PaymentSuccess() {
 
         setOrderId(orderIdParam);
 
-        // First, get the order details to determine the correct verification endpoint
+        // First, check if type parameter is provided (for enterprise orders)
         let verificationEndpoint = '/api/cart/verify'; // Default to cart verification
         let requestBody: any = {
           orderId: orderIdParam,
         };
 
-        // Add payment details if available
-        if (cfPaymentId) {
-          requestBody.cfPaymentId = cfPaymentId;
-        }
-        if (razorpayPaymentId && razorpaySignature) {
-          requestBody.razorpayPaymentId = razorpayPaymentId;
-          requestBody.razorpaySignature = razorpaySignature;
-        }
+        // Handle enterprise orders directly from type parameter
+        if (orderType === 'enterprise') {
+          verificationEndpoint = '/api/enterprise/verify-purchase';
+          // Don't send empty values - let server validate from stored data
+          requestBody = {
+            orderId: orderIdParam,
+            ...(cfPaymentId && { cfPaymentId }),
+            ...(cashfreeOrderId && { cashfreeOrderId }),
+            ...(razorpayPaymentId && { razorpay_payment_id: razorpayPaymentId }),
+            ...(razorpaySignature && { razorpay_signature: razorpaySignature }),
+          };
+          
+          console.log(`[Payment Success] Enterprise order detected, using endpoint: ${verificationEndpoint}`);
+        } else if (orderType === 'trainme') {
+          // Handle Train Me orders
+          verificationEndpoint = '/api/train-me/verify-payment';
+          requestBody = {
+            orderId: orderIdParam,
+            ...(cfPaymentId && { cfPaymentId }),
+            ...(cashfreeOrderId && { cashfreeOrderId }),
+            ...(razorpayPaymentId && { razorpay_payment_id: razorpayPaymentId }),
+            ...(razorpaySignature && { razorpay_signature: razorpaySignature }),
+          };
+          
+          console.log(`[Payment Success] Train Me order detected, using endpoint: ${verificationEndpoint}`);
+        } else if (orderType === 'sessionminutes') {
+          // Handle Session Minutes orders
+          verificationEndpoint = '/api/session-minutes/verify-payment';
+          requestBody = {
+            orderId: orderIdParam,
+            ...(cfPaymentId && { cfPaymentId }),
+            ...(cashfreeOrderId && { cashfreeOrderId }),
+            ...(razorpayPaymentId && { razorpay_payment_id: razorpayPaymentId }),
+            ...(razorpaySignature && { razorpay_signature: razorpaySignature }),
+          };
+          
+          console.log(`[Payment Success] Session Minutes order detected, using endpoint: ${verificationEndpoint}`);
+        } else {
+          // For non-enterprise orders, try to get order details to determine the correct endpoint
+          // Add payment details if available
+          if (cfPaymentId) {
+            requestBody.cfPaymentId = cfPaymentId;
+          }
+          if (razorpayPaymentId && razorpaySignature) {
+            requestBody.razorpayPaymentId = razorpayPaymentId;
+            requestBody.razorpaySignature = razorpaySignature;
+          }
 
-        try {
+          try {
           // Try to get order details to determine the correct endpoint
           const orderResponse = await apiRequest('GET', `/api/billing/order-details?orderId=${orderIdParam}`);
           if (orderResponse.ok) {
@@ -86,10 +127,11 @@ export default function PaymentSuccess() {
             
             console.log(`[Payment Success] Order type: ${orderData.addonType}, using endpoint: ${verificationEndpoint}`);
           }
-        } catch (orderError) {
-          console.warn('[Payment Success] Could not get order details, defaulting to cart verification:', orderError);
-          // Default to cart verification if we can't get order details
-        }
+          } catch (orderError) {
+            console.warn('[Payment Success] Could not get order details, defaulting to cart verification:', orderError);
+            // Default to cart verification if we can't get order details
+          }
+        } // End of if (orderType !== 'enterprise')
 
         // Verify payment with the correct backend endpoint
         const response = await apiRequest('POST', verificationEndpoint, requestBody);

@@ -68,84 +68,100 @@ export default function EnterprisePurchase() {
         throw new Error(orderData.message || "Failed to create order");
       }
 
-      // Load Razorpay script
-      const script = document.createElement("script");
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.async = true;
-      document.body.appendChild(script);
+      // Handle payment based on gateway
+      if (orderData.gateway === 'cashfree') {
+        // Cashfree payment flow
+        const { load } = await import("@cashfreepayments/cashfree-js");
+        const cashfree = await load({ mode: orderData.cashfreeMode || "sandbox" });
 
-      script.onload = () => {
-        const options = {
-          key: orderData.razorpayKeyId,
-          amount: Math.round(totalAmount * 100), // Razorpay expects paise
-          currency: orderData.currency || 'USD',
-          name: 'Rev Winner',
-          description: `Enterprise License - ${seats} Seats (${packageType})`,
-          order_id: orderData.razorpayOrderId,
-          handler: async function (response: any) {
-            try {
-              // Verify payment
-              const verifyResponse = await apiRequest("POST", "/api/enterprise/verify-purchase", {
-                orderId: orderData.orderId,
-                companyName,
-                billingEmail,
-                totalSeats: seats,
-                packageType,
-                pricePerSeat,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_signature: response.razorpay_signature,
-              });
-              const verifyData = await verifyResponse.json();
-
-              if (verifyData.success) {
-                toast({
-                  title: "Purchase Successful!",
-                  description: "Your enterprise license has been activated. Redirecting to dashboard..."
-                });
-
-                // Redirect to license manager dashboard
-                setTimeout(() => {
-                  setLocation("/license-manager");
-                }, 2000);
-              } else {
-                throw new Error(verifyData.message || "Verification failed");
-              }
-            } catch (error: any) {
-              toast({
-                title: "Verification Failed",
-                description: error.message || "Failed to verify payment",
-                variant: "destructive"
-              });
-              setIsProcessing(false);
-            }
-          },
-          modal: {
-            ondismiss: function () {
-              toast({
-                title: "Payment Cancelled",
-                description: "You cancelled the payment process."
-              });
-              setIsProcessing(false);
-            }
-          },
-          theme: {
-            color: '#7c3aed'
-          }
+        const checkoutOptions = {
+          paymentSessionId: orderData.paymentSessionId,
+          returnUrl: `${window.location.origin}/payment/success?orderId=${orderData.orderId}&type=enterprise`,
         };
 
-        const rzp = new (window as any).Razorpay(options);
-        rzp.open();
-      };
-
-      script.onerror = () => {
-        toast({
-          title: "Payment Gateway Error",
-          description: "Failed to load payment gateway. Please try again.",
-          variant: "destructive"
+        cashfree.checkout(checkoutOptions).then(() => {
+          console.log("Cashfree checkout initiated");
         });
-        setIsProcessing(false);
-      };
+      } else {
+        // Razorpay payment flow
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.async = true;
+        document.body.appendChild(script);
+
+        script.onload = () => {
+          const options = {
+            key: orderData.razorpayKeyId,
+            amount: Math.round(orderData.amount * 100), // Razorpay expects paise
+            currency: orderData.currency || 'USD',
+            name: 'Rev Winner',
+            description: `Enterprise License - ${seats} Seats (${packageType})`,
+            order_id: orderData.razorpayOrderId,
+            handler: async function (response: any) {
+              try {
+                // Verify payment
+                const verifyResponse = await apiRequest("POST", "/api/enterprise/verify-purchase", {
+                  orderId: orderData.orderId,
+                  companyName,
+                  billingEmail,
+                  totalSeats: seats,
+                  packageType,
+                  pricePerSeat,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_signature: response.razorpay_signature,
+                });
+                const verifyData = await verifyResponse.json();
+
+                if (verifyData.success) {
+                  toast({
+                    title: "Purchase Successful!",
+                    description: "Your enterprise license has been activated. Redirecting to dashboard..."
+                  });
+
+                  // Redirect to license manager dashboard
+                  setTimeout(() => {
+                    setLocation("/license-manager");
+                  }, 2000);
+                } else {
+                  throw new Error(verifyData.message || "Verification failed");
+                }
+              } catch (error: any) {
+                toast({
+                  title: "Verification Failed",
+                  description: error.message || "Failed to verify payment",
+                  variant: "destructive"
+                });
+                setIsProcessing(false);
+              }
+            },
+            modal: {
+              ondismiss: function () {
+                toast({
+                  title: "Payment Cancelled",
+                  description: "You cancelled the payment process."
+                });
+                setIsProcessing(false);
+              }
+            },
+            theme: {
+              color: '#7c3aed'
+            }
+          };
+
+          const rzp = new (window as any).Razorpay(options);
+          rzp.open();
+        };
+
+        script.onerror = () => {
+          toast({
+            title: "Payment Gateway Error",
+            description: "Failed to load payment gateway. Please try again.",
+            variant: "destructive"
+          });
+          setIsProcessing(false);
+        };
+      }
     } catch (error: any) {
       toast({
         title: "Purchase Failed",

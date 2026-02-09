@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { db } from '../db';
-import { subscriptions, addonPurchases, pendingOrders, licensePackages, organizations, authUsers, licenseAssignments } from '../../shared/schema';
-import { eq, and, lte, gte, sql } from 'drizzle-orm';
+import { subscriptions, addonPurchases, pendingOrders, licensePackages, organizations, authUsers, licenseAssignments, sessionUsage } from '../../shared/schema';
+import { eq, and, lte, gte, sql, isNull } from 'drizzle-orm';
 import { AuthStorage } from '../storage-auth';
 import { BillingStorage } from '../storage-billing';
 import { recordingsStorage } from '../storage-recordings';
@@ -392,6 +392,61 @@ async function runDailyMaintenance() {
 }
 
 /**
+ * Auto-close stale active sessions
+ * Sessions that have been active for more than 4 hours are automatically ended
+ */
+async function closeStaleActiveSessions() {
+  try {
+    console.log('Checking for stale active sessions...');
+    
+    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
+    
+    // Find sessions that are still active but started more than 4 hours ago
+    const staleSessions = await db
+      .select()
+      .from(sessionUsage)
+      .where(
+        and(
+          eq(sessionUsage.status, 'active'),
+          isNull(sessionUsage.endTime),
+          lte(sessionUsage.startTime, fourHoursAgo)
+        )
+      );
+    
+    if (staleSessions.length === 0) {
+      console.log('No stale sessions found');
+      return 0;
+    }
+    
+    console.log(`Found ${staleSessions.length} stale session(s) to close`);
+    
+    let closedCount = 0;
+    for (const session of staleSessions) {
+      const startTime = new Date(session.startTime);
+      const endTime = new Date(startTime.getTime() + (4 * 60 * 60 * 1000)); // Cap at 4 hours
+      const durationSeconds = 14400; // 4 hours in seconds
+      
+      await db
+        .update(sessionUsage)
+        .set({
+          endTime,
+          durationSeconds: durationSeconds.toString(),
+          status: 'ended'
+        })
+        .where(eq(sessionUsage.id, session.id));
+      
+      closedCount++;
+    }
+    
+    console.log(`Closed ${closedCount} stale session(s)`);
+    return closedCount;
+  } catch (error) {
+    console.error('Error closing stale sessions:', error);
+    return 0;
+  }
+}
+
+/**
  * Initialize all scheduled jobs
  */
 export function initializeScheduledJobs() {
@@ -409,10 +464,17 @@ export function initializeScheduledJobs() {
   });
   console.log('  ✓ Usage reconciliation job scheduled (every 6 hours)');
   
+  // Close stale active sessions every hour
+  cron.schedule('0 * * * *', closeStaleActiveSessions, {
+    timezone: 'UTC'
+  });
+  console.log('  ✓ Stale session cleanup job scheduled (every hour)');
+  
   // Run initial maintenance check on startup (after 30 seconds)
   setTimeout(() => {
     console.log('Running initial maintenance check...');
     runDailyMaintenance();
+    closeStaleActiveSessions();
   }, 30000);
   
   console.log('Scheduled jobs initialized successfully');
@@ -429,5 +491,6 @@ export {
   reconcileUsageTracking,
   sendExpiryWarnings,
   backupConversationMinutes,
+  closeStaleActiveSessions,
   runDailyMaintenance
 };

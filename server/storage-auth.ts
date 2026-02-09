@@ -1189,16 +1189,42 @@ export class AuthStorage implements IAuthStorage {
     const user = await this.getUserById(userId);
     if (!user) throw new Error('User not found');
     
-    const newTrialEndDate = new Date();
-    if (user.trialEndDate && user.trialEndDate > new Date()) {
-      // Extend from current trial end date
-      newTrialEndDate.setTime(user.trialEndDate.getTime());
-    }
-    newTrialEndDate.setDate(newTrialEndDate.getDate() + days);
+    // Get user's subscription
+    const subscription = await this.getSubscriptionByUserId(userId);
     
-    await this.updateUser(userId, {
-      trialEndDate: newTrialEndDate
-    });
+    if (subscription) {
+      // Extend subscription period
+      let newEndDate = new Date();
+      
+      if (subscription.currentPeriodEnd && subscription.currentPeriodEnd > new Date()) {
+        // Extend from current end date if it's in the future
+        newEndDate = new Date(subscription.currentPeriodEnd);
+      }
+      
+      newEndDate.setDate(newEndDate.getDate() + days);
+      
+      // Update subscription with new end date
+      await db.update(subscriptions)
+        .set({
+          currentPeriodEnd: newEndDate,
+          updatedAt: new Date()
+        })
+        .where(eq(subscriptions.id, subscription.id));
+    }
+    
+    // Also extend trial end date on user if applicable
+    if (user.trialEndDate) {
+      const newTrialEndDate = new Date();
+      if (user.trialEndDate > new Date()) {
+        // Extend from current trial end date
+        newTrialEndDate.setTime(user.trialEndDate.getTime());
+      }
+      newTrialEndDate.setDate(newTrialEndDate.getDate() + days);
+      
+      await this.updateUser(userId, {
+        trialEndDate: newTrialEndDate
+      });
+    }
   }
   
   async cancelSubscriptionWithReason(subscriptionId: string, reason: string): Promise<Subscription> {

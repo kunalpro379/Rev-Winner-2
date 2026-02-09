@@ -2090,30 +2090,61 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
         } : 'NULL');
       }
 
-      // Get actual conversation history from database
+      // Get actual session usage history from sessionUsage table (accurate tracking)
+      // BUT only show sessions where AI features were actually used (has conversation)
       let sessionHistory = [];
       try {
+        // First, get all conversations (AI feature usage)
         const userConversations = await db.select()
           .from(conversations)
           .where(eq(conversations.userId, userId))
-          .orderBy(desc(conversations.createdAt))
-          .limit(50);
+          .orderBy(desc(conversations.createdAt));
+        
+        // Create a map of sessionId -> conversation data
+        const conversationMap = new Map();
+        userConversations.forEach(conv => {
+          conversationMap.set(conv.sessionId, {
+            summary: conv.callSummary,
+            createdAt: conv.createdAt,
+            endedAt: conv.endedAt
+          });
+        });
 
-        sessionHistory = userConversations.map(conv => ({
-          sessionId: conv.sessionId,
-          startTime: conv.createdAt?.toISOString() || new Date().toISOString(),
-          endTime: conv.endedAt ? conv.endedAt.toISOString() : new Date().toISOString(),
-          durationMinutes: conv.endedAt && conv.createdAt
-            ? Math.round((conv.endedAt.getTime() - conv.createdAt.getTime()) / (1000 * 60))
-            : conv.createdAt
-            ? Math.round((new Date().getTime() - conv.createdAt.getTime()) / (1000 * 60))
-            : 0,
-          summary: conv.callSummary || null
-        }));
+        // Get session usage data for sessions that have conversations
+        const sessionIds = Array.from(conversationMap.keys());
+        
+        if (sessionIds.length > 0) {
+          const userSessions = await db.select()
+            .from(sessionUsage)
+            .where(eq(sessionUsage.userId, userId))
+            .orderBy(desc(sessionUsage.startTime))
+            .limit(50);
 
-        console.log(`[DEBUG] Found ${sessionHistory.length} conversations for user ${userId}`);
+          // Only include sessions that have actual conversations (AI feature usage)
+          sessionHistory = userSessions
+            .filter(session => {
+              // Must be ended AND have a conversation
+              return session.status === 'ended' && 
+                     session.endTime && 
+                     conversationMap.has(session.sessionId);
+            })
+            .map(session => {
+              const conv = conversationMap.get(session.sessionId);
+              return {
+                sessionId: session.sessionId,
+                startTime: session.startTime.toISOString(),
+                endTime: session.endTime!.toISOString(),
+                durationMinutes: session.durationSeconds 
+                  ? Math.ceil(parseInt(session.durationSeconds) / 60)
+                  : 0,
+                summary: conv?.summary || null
+              };
+            });
+        }
+
+        console.log(`[DEBUG] Found ${sessionHistory.length} AI feature sessions (with conversations) for user ${userId}`);
       } catch (error) {
-        console.error(`[DEBUG] Error fetching conversations:`, error);
+        console.error(`[DEBUG] Error fetching session usage:`, error);
         // Fall back to subscription session history if database query fails
         sessionHistory = subscription.sessionHistory || [];
       }

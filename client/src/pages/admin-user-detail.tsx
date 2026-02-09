@@ -541,19 +541,43 @@ export default function AdminUserDetail() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sessions.map((session: any) => (
-                      <TableRow key={session.id}>
-                        <TableCell className="font-mono text-sm">{session.sessionId.substring(0, 8)}...</TableCell>
-                        <TableCell>{format(new Date(session.startTime), "MMM d, yyyy HH:mm")}</TableCell>
-                        <TableCell>{session.endTime ? format(new Date(session.endTime), "MMM d, yyyy HH:mm") : "Active"}</TableCell>
-                        <TableCell>{session.durationSeconds ? Math.floor(Number(session.durationSeconds) / 60) + " min" : "-"}</TableCell>
-                        <TableCell>
-                          <Badge variant={session.status === "active" ? "default" : "secondary"}>
-                            {session.status}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {sessions.map((session: any) => {
+                      const startTime = new Date(session.startTime);
+                      const endTime = session.endTime ? new Date(session.endTime) : null;
+                      const isActive = session.status === "active";
+                      
+                      // Calculate duration
+                      let durationText = "-";
+                      if (session.durationSeconds) {
+                        const minutes = Math.floor(Number(session.durationSeconds) / 60);
+                        const seconds = Number(session.durationSeconds) % 60;
+                        durationText = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+                      } else if (isActive) {
+                        // For active sessions, calculate current duration
+                        const now = new Date();
+                        const durationMs = now.getTime() - startTime.getTime();
+                        const minutes = Math.floor(durationMs / 60000);
+                        durationText = `${minutes}m (ongoing)`;
+                      }
+                      
+                      return (
+                        <TableRow key={session.id}>
+                          <TableCell className="font-mono text-sm">{session.sessionId.substring(0, 12)}...</TableCell>
+                          <TableCell>{format(startTime, "MMM d, yyyy HH:mm")}</TableCell>
+                          <TableCell>
+                            {endTime ? format(endTime, "MMM d, yyyy HH:mm") : (
+                              <span className="text-muted-foreground italic">Not ended</span>
+                            )}
+                          </TableCell>
+                          <TableCell>{durationText}</TableCell>
+                          <TableCell>
+                            <Badge variant={isActive ? "default" : "secondary"}>
+                              {session.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}

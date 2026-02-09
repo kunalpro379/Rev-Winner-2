@@ -13,12 +13,6 @@ import { useSEO } from "@/hooks/use-seo";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-declare global {
-  interface Window {
-    Razorpay: any;
-  }
-}
-
 interface ProfileData {
   id: string;
   email: string;
@@ -170,13 +164,16 @@ export default function Profile() {
         return;
       }
 
-      // Step 1: Create order
+      // Step 1: Create order (backend will use Cashfree by default)
       const orderResponse = await fetch("/api/train-me/create-order", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${accessToken}`,
         },
+        body: JSON.stringify({
+          paymentGateway: 'cashfree' // Explicitly use Cashfree
+        }),
       });
 
       if (!orderResponse.ok) {
@@ -184,73 +181,121 @@ export default function Profile() {
         throw new Error(error.message || "Failed to create order");
       }
 
-      const { razorpayOrderId, razorpayKeyId, orderId, amount, currency } = await orderResponse.json();
+      const orderData = await orderResponse.json();
+      const { orderId, paymentSessionId, amount, currency, cashfreeEnvironment } = orderData;
 
-      // Step 2: Initialize Razorpay checkout
-      const options = {
-        key: razorpayKeyId,
-        amount: Math.round(parseFloat(amount) * 100),
-        currency: currency || 'INR',
-        name: 'Rev Winner',
-        description: 'Train Me Subscription',
-        order_id: razorpayOrderId,
-        handler: async function (response: any) {
-          try {
-            const verifyResponse = await fetch("/api/train-me/verify-payment", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${accessToken}`,
-              },
-              body: JSON.stringify({
-                orderId,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_signature: response.razorpay_signature,
-              }),
-            });
+      // Check if we got Cashfree response
+      if (paymentSessionId) {
+        // Cashfree payment flow
+        console.log('[Train Me] Using Cashfree payment gateway');
+        
+        // Load Cashfree SDK if not already loaded
+        if (!window.Cashfree) {
+          const script = document.createElement('script');
+          script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+          script.async = true;
+          await new Promise((resolve, reject) => {
+            script.onload = resolve;
+            script.onerror = reject;
+            document.body.appendChild(script);
+          });
+        }
 
-            const verifyData = await verifyResponse.json();
+        // Initialize Cashfree
+        const cashfree = window.Cashfree({
+          mode: cashfreeEnvironment === 'PRODUCTION' ? 'production' : 'sandbox'
+        });
 
-            if (verifyResponse.ok) {
-              queryClient.invalidateQueries({ queryKey: ["/api/train-me/status"] });
-              queryClient.invalidateQueries({ queryKey: ["/api/profile/invoices"] });
-              toast({
-                title: "Train Me Activated!",
-                description: "You now have 30 days of access to Train Me features.",
+        // Create checkout options
+        const checkoutOptions = {
+          paymentSessionId: paymentSessionId,
+          returnUrl: `${window.location.origin}/payment/success?orderId=${orderId}&type=trainme`,
+          redirectTarget: '_self'
+        };
+
+        // Open Cashfree checkout
+        cashfree.checkout(checkoutOptions).then(() => {
+          console.log('[Train Me] Cashfree checkout initiated');
+        }).catch((error: any) => {
+          console.error('[Train Me] Cashfree checkout error:', error);
+          toast({
+            title: "Payment Failed",
+            description: error.message || "Failed to open payment gateway",
+            variant: "destructive",
+          });
+          setIsPurchasing(false);
+        });
+      } else if (orderData.razorpayOrderId) {
+        // Razorpay payment flow (fallback)
+        console.log('[Train Me] Using Razorpay payment gateway');
+        
+        const options = {
+          key: orderData.razorpayKeyId,
+          amount: Math.round(parseFloat(amount) * 100),
+          currency: currency || 'INR',
+          name: 'Rev Winner',
+          description: 'Train Me Subscription',
+          order_id: orderData.razorpayOrderId,
+          handler: async function (response: any) {
+            try {
+              const verifyResponse = await fetch("/api/train-me/verify-payment", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify({
+                  orderId,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_signature: response.razorpay_signature,
+                }),
               });
-            } else {
+
+              const verifyData = await verifyResponse.json();
+
+              if (verifyResponse.ok) {
+                queryClient.invalidateQueries({ queryKey: ["/api/train-me/status"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/profile/invoices"] });
+                toast({
+                  title: "Train Me Activated!",
+                  description: "You now have 30 days of access to Train Me features.",
+                });
+              } else {
+                toast({
+                  title: "Verification Failed",
+                  description: verifyData.message || "Payment verification failed.",
+                  variant: "destructive",
+                });
+              }
+            } catch (error: any) {
               toast({
-                title: "Verification Failed",
-                description: verifyData.message || "Payment verification failed.",
+                title: "Verification Error",
+                description: error.message || "Failed to verify payment.",
                 variant: "destructive",
               });
             }
-          } catch (error: any) {
-            toast({
-              title: "Verification Error",
-              description: error.message || "Failed to verify payment.",
-              variant: "destructive",
-            });
-          }
-          setIsPurchasing(false);
-        },
-        modal: {
-          ondismiss: function () {
-            toast({
-              title: "Payment Cancelled",
-              description: "You cancelled the payment process.",
-            });
             setIsPurchasing(false);
+          },
+          modal: {
+            ondismiss: function () {
+              toast({
+                title: "Payment Cancelled",
+                description: "You cancelled the payment process.",
+              });
+              setIsPurchasing(false);
+            }
+          },
+          theme: {
+            color: '#6366f1'
           }
-        },
-        theme: {
-          color: '#6366f1'
-        }
-      };
+        };
 
-      const razorpay = new window.Razorpay(options);
-      razorpay.open();
+        const razorpay = new window.Razorpay(options);
+        razorpay.open();
+      } else {
+        throw new Error("Invalid payment gateway response");
+      }
 
     } catch (error: any) {
       toast({
@@ -316,40 +361,9 @@ export default function Profile() {
   };
 
   const handleDownloadInvoice = (invoice: Invoice) => {
-    if (invoice.receiptUrl) {
-      window.open(invoice.receiptUrl, "_blank");
-    } else {
-      // Generate a simple invoice view
-      const invoiceWindow = window.open("", "_blank");
-      if (invoiceWindow) {
-        invoiceWindow.document.write(`
-          <html>
-            <head>
-              <title>Invoice ${invoice.id}</title>
-              <style>
-                body { font-family: Arial, sans-serif; padding: 40px; }
-                .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
-                .details { margin: 20px 0; }
-                .row { display: flex; justify-content: space-between; margin: 10px 0; }
-              </style>
-            </head>
-            <body>
-              <div class="header">
-                <h1>Rev Winner - Invoice</h1>
-                <p>Invoice ID: ${invoice.id}</p>
-              </div>
-              <div class="details">
-                <div class="row"><strong>Date:</strong> ${formatDate(invoice.createdAt)}</div>
-                <div class="row"><strong>Amount:</strong> ${formatCurrency(invoice.amount, invoice.currency)}</div>
-                <div class="row"><strong>Status:</strong> ${invoice.status}</div>
-                <div class="row"><strong>Payment ID:</strong> ${invoice.razorpayPaymentId || "N/A"}</div>
-                <div class="row"><strong>Order ID:</strong> ${invoice.razorpayOrderId || "N/A"}</div>
-              </div>
-            </body>
-          </html>
-        `);
-      }
-    }
+    // Navigate to the invoice page instead of opening API endpoint
+    const orderId = invoice.metadata?.cartOrderId || invoice.metadata?.pendingOrderId || invoice.id;
+    setLocation(`/invoice?orderId=${orderId}`);
   };
 
   return (
@@ -940,7 +954,7 @@ function EnhancedSessionHistoryTable({ sessionHistory }: { sessionHistory?: Sess
 
   const parseSummarySections = (summaryText: string) => {
     const sectionRegex = /([A-Za-z][A-Za-z &]+):/g;
-    const matches = [...summaryText.matchAll(sectionRegex)];
+    const matches = Array.from(summaryText.matchAll(sectionRegex));
     if (matches.length === 0) {
       return null;
     }
