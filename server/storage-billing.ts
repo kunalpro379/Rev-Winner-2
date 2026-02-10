@@ -1014,19 +1014,34 @@ export class BillingStorage implements IBillingStorage {
       return { success: false, message: "Promo code usage limit reached" };
     }
 
-    // NEW: Validate category match
-    if (promo.category) {
+    // Validate category match - promo code MUST have a category
+    if (!promo.category || promo.category.trim() === '') {
+      return { 
+        success: false, 
+        message: "Invalid promo code configuration - no category set" 
+      };
+    }
+
+    // Skip validation if promo is for 'all' categories
+    if (promo.category === 'all') {
+      // Allow this promo on any item
+    } else {
       // Map addon types to promo categories
       const categoryMap: Record<string, string> = {
         'platform_access': 'platform_subscription',
+        'platform_subscription': 'platform_subscription',
         'session_minutes': 'session_minutes',
+        'usage_bundle': 'session_minutes',
         'train_me': 'train_me',
         'dai': 'dai',
+        'service': 'dai', // Map service to dai category
       };
 
       const itemCategory = categoryMap[item.addonType] || item.addonType;
+      const promoCategory = categoryMap[promo.category] || promo.category;
       
-      if (promo.category !== itemCategory) {
+      if (promoCategory !== itemCategory) {
+        console.log(`⚠️ Promo category mismatch: promo.category="${promo.category}" (mapped: "${promoCategory}"), itemCategory="${itemCategory}", addonType="${item.addonType}"`);
         return { 
           success: false, 
           message: `This promo code is only valid for ${promo.category} purchases` 

@@ -1077,10 +1077,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { extractTechEnvironment } = await import("./services/mind-map-extraction");
       console.log('🗺️ Map/Flow: Calling AI extraction...');
       
-      // CRITICAL: 10-second timeout for Map/Flow (background feature, can take longer)
+      // CRITICAL: 25-second timeout for Map/Flow (background feature, can take longer)
       const extractionPromise = extractTechEnvironment(sessionId, transcript, domainExpertise, userId);
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Map/Flow generation timeout after 10 seconds')), 10000)
+        setTimeout(() => reject(new Error('Map/Flow generation timeout after 25 seconds')), 25000)
       );
       
       const mindMapData = await Promise.race([extractionPromise, timeoutPromise]) as any;
@@ -2111,7 +2111,13 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
 
       // FIXED: Get session history from conversations table directly
       // This is the source of truth for AI feature usage
-      let sessionHistory = [];
+      let sessionHistory: Array<{
+        sessionId: string | null;
+        startTime: string;
+        endTime: string;
+        durationMinutes: number;
+        summary: any;
+      }> = [];
       try {
         console.log(`[DEBUG] Fetching conversations for user ${userId}`);
         
@@ -2307,253 +2313,6 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
           totalMinutesUsed: 0,
         }
       });
-    }
-  });
-
-  // Fetch session details with AI responses
-  app.get("/api/session/:sessionId", authenticateToken, async (req, res) => {
-    try {
-      const userId = req.jwtUser!.userId;
-      const { sessionId } = req.params;
-      
-      console.log(`[DEBUG] Fetching session details for sessionId: ${sessionId}, userId: ${userId}`);
-      
-      // Fetch conversation for this session
-      const conversation = await storage.getConversation(sessionId);
-      
-      if (!conversation) {
-        return res.status(404).json({ message: "Session not found" });
-      }
-      
-      // Verify the conversation belongs to the user
-      if (conversation.userId !== userId) {
-        return res.status(403).json({ message: "Unauthorized to view this session" });
-      }
-      
-      // Fetch all messages for this conversation
-      const messages = await storage.getMessages(conversation.id);
-      
-      // Format messages with AI response data
-      const formattedMessages = messages.map(msg => ({
-        id: msg.id,
-        content: msg.content,
-        sender: msg.sender,
-        speakerLabel: msg.speakerLabel,
-        timestamp: msg.timestamp,
-        // AI response data (only for assistant messages)
-        ...(msg.sender === 'assistant' && {
-          discoveryQuestions: msg.discoveryQuestions,
-          discoveryInsights: msg.discoveryInsights,
-          nextSteps: msg.nextSteps,
-          caseStudies: msg.caseStudies,
-          competitorAnalysis: msg.competitorAnalysis,
-          solutionRecommendations: msg.solutionRecommendations,
-          productFeatures: msg.productFeatures,
-          bantQualification: msg.bantQualification,
-          solutions: msg.solutions,
-          problemStatement: msg.problemStatement,
-          recommendedSolutions: msg.recommendedSolutions,
-          suggestedNextPrompt: msg.suggestedNextPrompt,
-          customerIdentification: msg.customerIdentification
-        })
-      }));
-      
-      res.json({
-        session: {
-          id: conversation.id,
-          sessionId: conversation.sessionId,
-          clientName: conversation.clientName,
-          status: conversation.status,
-          createdAt: conversation.createdAt,
-          endedAt: conversation.endedAt,
-          callSummary: conversation.callSummary,
-          discoveryInsights: conversation.discoveryInsights,
-        },
-        messages: formattedMessages,
-        messageCount: messages.length,
-        aiResponseCount: messages.filter(m => m.sender === 'assistant').length,
-      });
-    } catch (error: any) {
-      console.error(`[ERROR] Failed to fetch session details:`, error);
-      res.status(500).json({ 
-        message: "Failed to fetch session details", 
-        error: error.message || 'Unknown error'
-      });
-    }
-  });
-
-  // Check subscription limits (for settings page)
-  app.get("/api/subscriptions/check-limits", authenticateToken, async (req, res) => {
-    try {
-      const userId = req.jwtUser!.userId;
-      console.log(`[DEBUG] Checking subscription limits for userId: ${userId}`);
-      
-      // Check if user is super user (unlimited access)
-      const user = await authStorage.getUserById(userId);
-      const isSuperUser = user?.role === 'super_admin' || (req as any).jwtUser?.superUser === true;
-      
-      if (isSuperUser) {
-        return res.json({
-          canUseService: true,
-          planType: "professional",
-          status: "active",
-          sessionsUsed: 0,
-          sessionsLimit: null,
-          sessionsRemaining: null,
-          minutesUsed: 0,
-          minutesLimit: null,
-          minutesRemaining: null,
-        });
-      }
-
-      const now = new Date();
-
-      const hasPaymentReference = (purchase: any) => {
-        const metadata = (purchase?.metadata as any) || {};
-        const amount = (purchase?.purchaseAmount || '').toString();
-        const isFree = amount === '0' || amount === '0.00';
-        return Boolean(purchase?.gatewayTransactionId || metadata?.paymentId || isFree);
-      };
-      
-      // NEW: Check addon_purchases table for actual purchases
-      const platformPurchases = await db
-        .select()
-        .from(addonPurchases)
-        .where(
-          and(
-            eq(addonPurchases.userId, userId),
-            eq(addonPurchases.addonType, 'platform_access'),
-            eq(addonPurchases.status, 'active')
-          )
-        );
-
-      const sessionMinutesPurchases = await db
-        .select()
-        .from(addonPurchases)
-        .where(
-          and(
-            eq(addonPurchases.userId, userId),
-            eq(addonPurchases.addonType, 'session_minutes'),
-            eq(addonPurchases.status, 'active')
-          )
-        );
-
-      // Check for expired purchases + payment reference
-      const activePlatform = platformPurchases
-        .filter(p => !p.endDate || p.endDate > now)
-        .filter(hasPaymentReference)
-        .find(() => true);
-
-      const activeMinutes = sessionMinutesPurchases
-        .filter(p => !p.endDate || p.endDate > now)
-        .filter(hasPaymentReference);
-
-      // Calculate total remaining minutes
-      const totalMinutesRemaining = activeMinutes.reduce((sum, p) => sum + (p.totalUnits - p.usedUnits), 0);
-
-      console.log(`[DEBUG] Addon Purchases:`, {
-        hasPlatformAccess: !!activePlatform,
-        platformExpires: activePlatform?.endDate,
-        hasSessionMinutes: activeMinutes.length > 0,
-        totalMinutesRemaining
-      });
-
-      // KEY LOGIC: Users need BOTH platform access AND session minutes to use the service
-      const hasPlatformAccess = !!activePlatform;
-      const hasSessionMinutes = totalMinutesRemaining > 0;
-      const canUseService = hasPlatformAccess && hasSessionMinutes;
-
-      if (hasPlatformAccess || hasSessionMinutes) {
-        const planType = hasPlatformAccess ? 'professional' : 'free_trial';
-        const status = hasPlatformAccess ? 'active' : 'no_subscription';
-
-        console.log(`[DEBUG] Final Check (paid flow):`, {
-          planType,
-          status,
-          canUseService,
-          hasPlatformAccess,
-          hasSessionMinutes
-        });
-
-        return res.json({
-          canUseService,
-          planType,
-          status,
-          hasPlatformAccess,
-          hasSessionMinutes,
-          sessionsUsed: 0,
-          sessionsLimit: null,
-          sessionsRemaining: null,
-          minutesUsed: 0,
-          minutesLimit: null,
-          minutesRemaining: totalMinutesRemaining > 0 ? totalMinutesRemaining : 0,
-        });
-      }
-
-      const subscription = await authStorage.getSubscriptionByUserId(userId);
-      if (!subscription) {
-        console.log(`[DEBUG] No subscription found for user ${userId}, returning trial limits`);
-        return res.json({
-          canUseService: true,
-          planType: "trial",
-          status: "no_subscription",
-          hasPlatformAccess: false,
-          hasSessionMinutes: false,
-          sessionsUsed: 0,
-          sessionsLimit: 5,
-          sessionsRemaining: 5,
-          minutesUsed: 0,
-          minutesLimit: 60,
-          minutesRemaining: 60,
-        });
-      }
-
-      const sessionsUsed = parseInt(subscription.sessionsUsed || '0');
-      const sessionsLimit = subscription.sessionsLimit ? parseInt(subscription.sessionsLimit) : null;
-      const minutesUsed = parseInt(subscription.minutesUsed || '0');
-      const minutesLimit = subscription.minutesLimit ? parseInt(subscription.minutesLimit) : null;
-
-      const sessionsRemaining = sessionsLimit ? Math.max(0, sessionsLimit - sessionsUsed) : null;
-      const minutesRemaining = minutesLimit ? Math.max(0, minutesLimit - minutesUsed) : null;
-
-      const isTrialUser = subscription.status === 'trial' || (sessionsLimit !== null && minutesLimit !== null);
-      
-      // Check if trial has expired (all sessions OR all minutes used)
-      const trialExpired = isTrialUser && (
-        (sessionsLimit !== null && sessionsRemaining !== null && sessionsRemaining <= 0) ||
-        (minutesLimit !== null && minutesRemaining !== null && minutesRemaining <= 0)
-      );
-      
-      const trialCanUse = (subscription.status === 'trial' || subscription.status === 'active') &&
-        (sessionsLimit === null || (sessionsLimit !== null && sessionsRemaining !== null && sessionsRemaining > 0)) &&
-        (minutesLimit === null || (minutesLimit !== null && minutesRemaining !== null && minutesRemaining > 0));
-
-      console.log(`[DEBUG] Service access (trial flow):`, {
-        status: subscription.status,
-        isTrialUser,
-        trialExpired,
-        canUseService: trialCanUse,
-        sessionsCheck: `${sessionsLimit === null} || ${sessionsRemaining !== null && sessionsRemaining > 0}`,
-        minutesCheck: `${minutesLimit === null} || ${minutesRemaining !== null && minutesRemaining > 0}`
-      });
-
-      return res.json({
-        canUseService: trialCanUse,
-        planType: subscription.planType,
-        status: trialExpired ? 'trial_expired' : subscription.status,
-        hasPlatformAccess: false,
-        hasSessionMinutes: false,
-        trialExpired,
-        sessionsUsed,
-        sessionsLimit,
-        sessionsRemaining,
-        minutesUsed,
-        minutesLimit,
-        minutesRemaining,
-      });
-    } catch (error: any) {
-      console.error(`[DEBUG] Error checking subscription limits:`, error);
-      res.status(500).json({ message: "Failed to check subscription limits", error: error.message });
     }
   });
   

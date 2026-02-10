@@ -192,56 +192,42 @@ export async function extractTechEnvironment(
     const { client, model, engine } = aiConfig;
     console.log(`🗺️ Map/Flow: Using user's AI engine: ${engine}, model: ${model}`);
     
-    // Enhanced prompt for comprehensive sales intelligence mapping
-    const systemPrompt = `Sales intelligence analyst extracting complete picture from sales conversations. Output JSON only.
+    // Simplified prompt for faster generation
+    const systemPrompt = `Sales intelligence analyst. Extract key elements from conversation. Output JSON only.
 
-${trainMeKnowledge ? 'DOMAIN KNOWLEDGE:\n' + trainMeKnowledge.substring(0, 1500) + '\n\n' : ''}EXTRACT THESE SECTIONS IN ORDER:
+${trainMeKnowledge ? 'DOMAIN KNOWLEDGE:\n' + trainMeKnowledge.substring(0, 1000) + '\n\n' : ''}EXTRACT:
 
-1. TECH ENVIRONMENT: users_access, endpoints, network, infrastructure, applications, data_flow, security, operations, cloud, database, integration, vendor
+1. TECH STACK: Current systems, tools, infrastructure mentioned
+2. PEOPLE: Decision makers with roles and influence
+3. PAIN POINTS: Challenges, issues, inefficiencies
+4. PROCESSES: Key workflows or business processes
+5. FOLLOW-UPS: Questions to ask if info is incomplete
 
-2. DECISION MAKERS (category: decision_maker): Extract all people mentioned with their role, title, influence level (champion/influencer/blocker/economic_buyer/technical_buyer). Connect with "reports_to" edges to show hierarchy.
+CATEGORIES: users_access, endpoints, network, infrastructure, applications, data_flow, security, operations, cloud, database, integration, vendor, decision_maker, process, pain_point, follow_up
 
-3. PROCESSES (category: process): Map business processes, workflows, approval chains discussed. Show sequence with edges.
+STATUS: "confirmed" (explicit) | "assumed" (inferred) | "suggested" (AI-recommended)
 
-4. CALL TIMELINE (category: timeline): Key moments in the call - when topics shifted, objections raised, commitments made. Include timestamp or sequence.
-
-5. COMPLIANCE (category: compliance): Any regulatory requirements, certifications, or compliance needs mentioned (GDPR, HIPAA, SOC2, etc.).
-
-6. FOLLOW-UP QUESTIONS (category: follow_up): If the picture is incomplete, generate 3-5 strategic questions the seller should ask next. Mark these with "suggested" status.
-
-STATUS: "confirmed" (explicit) | "assumed" (inferred) | "suggested" (AI-recommended follow-ups)
-PAIN TYPES (pain_point only): security_risk, operational_inefficiency, scalability_limitation, cost_inefficiency
-
-OUTPUT FORMAT:
-{"nodes":[{"id":"str","label":"str","category":"str","details":"str","hoverText":"explanation","confidence":0-100,"status":"confirmed|assumed|suggested","painPointType":"optional","whyItMatters":"optional","recommendation":"optional","hierarchyLevel":"optional for decision_makers (1=top)","sequenceOrder":"optional for timeline/process (1,2,3...)"}],"edges":[{"id":"str","source":"node_id","target":"node_id","label":"relationship","type":"default|integration|dependency|data_flow|reports_to|sequence"}]}`;
+OUTPUT:
+{"nodes":[{"id":"str","label":"str","category":"str","details":"str","confidence":0-100,"status":"confirmed|assumed|suggested"}],"edges":[{"id":"str","source":"id","target":"id","label":"relationship","type":"default|integration|dependency|data_flow|reports_to"}]}`;
 
     let userPrompt: string;
     
     if (isReferenceMode) {
-      userPrompt = `Reference architecture for ${domainExpertiseInput || 'enterprise IT'}. Include typical infrastructure, apps, security, pain points, sample org structure with decision makers, and common compliance needs. All nodes "assumed". JSON only.`;
+      userPrompt = `Reference architecture for ${domainExpertiseInput || 'enterprise IT'}. Include typical infrastructure, apps, security, pain points. All nodes "assumed". JSON only.`;
     } else {
       // Truncate transcript for speed - keep most recent and relevant parts
-      const maxTranscriptLength = 5000;
+      const maxTranscriptLength = 3000; // Reduced from 5000
       const truncatedTranscript = transcript.length > maxTranscriptLength 
         ? '...' + transcript.slice(-maxTranscriptLength)
         : transcript;
       
-      userPrompt = `Analyze this sales conversation comprehensively:
+      userPrompt = `Analyze sales conversation:
 ${domainExpertiseInput ? `Domain: ${domainExpertiseInput}` : ''}
-${sellerIntent ? `Intent: ${sellerIntent}` : ''}
 
 TRANSCRIPT:
 ${truncatedTranscript}
 
-EXTRACT ALL:
-- Tech environment (systems, tools, infrastructure)
-- Decision makers with hierarchy (who reports to whom, their influence)
-- Business processes discussed
-- Call timeline (key moments, topic shifts, commitments)
-- Compliance/regulatory needs
-- Follow-up questions if picture is incomplete
-
-JSON only.`;
+Extract: tech stack, decision makers, pain points, processes, follow-up questions. JSON only.`;
     }
 
     console.log(`🧠 Map/Flow: ${isReferenceMode ? 'Reference mode' : 'Live extraction'} for ${transcript?.length || 0} chars`);
@@ -263,7 +249,7 @@ JSON only.`;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // CRITICAL: 10-second timeout for Map/Flow AI call
+        // CRITICAL: 20-second timeout for Map/Flow AI call (increased for complex conversations)
         const aiCallPromise = client.chat.completions.create({
           model: fastModel,
           messages: [
@@ -272,11 +258,11 @@ JSON only.`;
           ],
           response_format: { type: "json_object" },
           temperature: 0.1,
-          max_tokens: 4500
+          max_tokens: 3000 // Reduced from 4500 for faster response
         });
         
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('AI call timeout after 10 seconds')), 10000)
+          setTimeout(() => reject(new Error('AI call timeout after 20 seconds')), 20000)
         );
         
         response = await Promise.race([aiCallPromise, timeoutPromise]) as any;

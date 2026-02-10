@@ -346,6 +346,9 @@ export default function Invoice() {
         yPosition += 10;
         addText('PAYMENT SUMMARY:', 12, true);
         addText(`Subtotal: $${invoiceData?.summary?.subtotal?.toFixed(2) || '0.00'}`, 11);
+        if (invoiceData?.summary?.discount && invoiceData.summary.discount > 0) {
+          addText(`Discount: -$${invoiceData.summary.discount.toFixed(2)}`, 11);
+        }
         if (invoiceData?.summary?.gst && invoiceData.summary.gst > 0) {
           addText(`GST (${invoiceData.summary.gstRate}%): $${invoiceData.summary.gst.toFixed(2)}`, 11);
         }
@@ -653,6 +656,16 @@ export default function Invoice() {
                   ${invoiceData.summary.subtotal.toFixed(2)}
                 </span>
               </div>
+              {invoiceData.summary.discount > 0 && (
+                <div className="flex items-center justify-between text-base">
+                  <div className="flex items-center gap-2" style={{ color: '#16a34a' }}>
+                    <span>Discount</span>
+                  </div>
+                  <span className="font-semibold" style={{ color: '#16a34a' }}>
+                    -${invoiceData.summary.discount.toFixed(2)}
+                  </span>
+                </div>
+              )}
               {invoiceData.summary.gst > 0 && (
                 <div className="flex items-center justify-between text-base">
                   <div className="flex items-center gap-2" style={{ color: '#666666' }}>

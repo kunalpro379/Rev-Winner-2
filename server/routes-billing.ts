@@ -138,8 +138,27 @@ async function activateCartCheckout(
       const actualCurrency = pendingOrder.currency || 'USD';
       const itemCount = cartItems.length;
       
-      // For single item carts, use the full amount; for multi-item, calculate proportionally
-      const itemPaidAmount = itemCount === 1 ? totalPaidAmount : (totalPaidAmount * parseFloat(item.basePrice)) / parseFloat(metadata.subtotal || '1');
+      // Find the corresponding promo code info for this item
+      const itemPromoInfo = perItemPromoCodes.find(p => {
+        // Match by packageSku since cartItemId might not be available
+        const cartItem = cartItems.find(ci => ci.packageSku === item.packageSku);
+        return cartItem && p.cartItemId === cartItem.packageSku;
+      });
+      
+      // Calculate item's discounted price (basePrice - discount)
+      const itemBasePrice = parseFloat(item.basePrice) * item.quantity;
+      const itemDiscount = itemPromoInfo?.appliedDiscountAmount ? parseFloat(itemPromoInfo.appliedDiscountAmount) : 0;
+      const itemDiscountedPrice = itemBasePrice - itemDiscount;
+      
+      // Calculate proportionally based on DISCOUNTED price, not base price
+      const cartSubtotal = parseFloat(metadata.subtotal || '0');
+      const cartDiscount = parseFloat(metadata.discount || '0');
+      const cartDiscountedSubtotal = cartSubtotal - cartDiscount;
+      
+      // For single item carts, use the full amount; for multi-item, calculate proportionally based on discounted prices
+      const itemPaidAmount = itemCount === 1 ? totalPaidAmount : (totalPaidAmount * itemDiscountedPrice) / (cartDiscountedSubtotal || 1);
+      
+      console.log(`[Cart Activation] Item pricing - basePrice: ${itemBasePrice}, discount: ${itemDiscount}, discountedPrice: ${itemDiscountedPrice}, paidAmount: ${itemPaidAmount.toFixed(2)} ${actualCurrency}`);
       
       console.log(`[Cart Activation] Creating purchase: addonType=${mappedAddonType}, packageSku=${item.packageSku}, totalUnits=${pkg.totalUnits || 0}, paidAmount=${itemPaidAmount.toFixed(2)} ${actualCurrency}`);
 
@@ -651,11 +670,21 @@ export function setupBillingRoutes(app: Router) {
       if (promoCode) {
         const promo = await authStorage.validatePromoCode(promoCode);
         if (promo) {
-          // Validate promo code category matches the purchase type
-          if (promo.category && promo.category !== 'session_minutes') {
+          // Validate promo code MUST have a category
+          if (!promo.category || promo.category.trim() === '') {
             return res.status(400).json({ 
-              message: `This promo code is only valid for ${promo.category} purchases, not session minutes.` 
+              message: "Invalid promo code configuration" 
             });
+          }
+
+          // Validate promo code category matches the purchase type
+          if (promo.category !== 'all') {
+            const validCategories = ['session_minutes', 'usage_bundle'];
+            if (!validCategories.includes(promo.category)) {
+              return res.status(400).json({ 
+                message: `This promo code is only valid for ${promo.category} purchases, not session minutes.` 
+              });
+            }
           }
           
           validatedPromo = promo;
@@ -890,18 +919,19 @@ export function setupBillingRoutes(app: Router) {
                  paymentStatus.status === 'captured';
         verifiedPaymentId = cfPaymentId || paymentStatus.paymentId;
         
-        // DEVELOPMENT BYPASS: In sandbox mode, if payment is still ACTIVE, treat as paid for testing
-        // Remove this in production!
-        if (!isPaid && process.env.NODE_ENV === 'development' && paymentStatus.status === 'ACTIVE') {
-          console.log('⚠️ DEV MODE: Bypassing payment verification for testing');
-          isPaid = true;
-          verifiedPaymentId = gatewayOrderId;
-        }
+        // SECURITY: Payment bypass removed for production safety
+        // For testing, use Cashfree sandbox test cards instead
+        console.log(`[Payment Verification] Status: ${paymentStatus.status}, isPaid: ${isPaid}`);
       }
 
       if (!isPaid) {
-        await billingStorage.updatePendingOrderStatus(orderId, userId, 'failed');
-        return res.status(400).json({ message: "Payment not completed" });
+        // DON'T mark as failed immediately - payment might still be processing
+        // Only return error. Order will expire naturally after 30 minutes if not paid.
+        console.log(`[Session Minutes Verify] Payment not yet completed. Status: ${paymentStatus.status}`);
+        return res.status(400).json({ 
+          message: "Payment not yet completed. Please wait and try again.",
+          status: paymentStatus.status
+        });
       }
 
       // Check if user already has an active session minutes purchase
@@ -1446,9 +1476,13 @@ export function setupBillingRoutes(app: Router) {
       }
 
       if (!isPaid) {
-        await billingStorage.updatePendingOrderStatus(orderId, userId, 'failed');
-        return res.status(400).json({ message: "Payment not completed" });
-      }
+        // DON'T mark as failed immediately - payment might still be processing
+        console.log(`[Train Me Verify] Payment not yet completed. Status: ${paymentStatus.status}`);
+        return res.status(400).json({ 
+          message: "Payment not yet completed. Please wait and try again.",
+          status: paymentStatus.status
+        });
+      }      }
 
       // Check if user already has an active Train Me purchase
       // Due to unique constraint, we need to extend existing purchase instead of creating new one
@@ -1879,8 +1913,11 @@ export function setupBillingRoutes(app: Router) {
       }
 
       if (!isPaid) {
-        await billingStorage.updatePendingOrderStatus(orderId, userId, 'failed');
-        return res.status(400).json({ message: "Payment not completed" });
+        // DON'T mark as failed immediately - payment might still be processing
+        console.log(`[Platform Access Verify] Payment not yet completed`);
+        return res.status(400).json({ 
+          message: "Payment not yet completed. Please wait and try again."
+        });
       }
 
       // Create addon purchase using validated pending order data
@@ -2685,9 +2722,12 @@ export function setupBillingRoutes(app: Router) {
       }
       
       if (!isPaid) {
-        await billingStorage.updatePendingOrderStatus(orderId, userId, 'failed');
+        // DON'T mark as failed immediately - payment might still be processing
+        // Only return error. Order will expire naturally after 30 minutes if not paid.
+        console.log(`[Cart Verify] Payment not yet completed. Status: ${paymentStatus.status}`);
         return res.status(400).json({ 
-          message: "Payment verification failed"
+          message: "Payment not yet completed. Please wait and try again.",
+          status: paymentStatus.status
         });
       }
 
@@ -3163,6 +3203,15 @@ export function setupBillingRoutes(app: Router) {
         return res.status(404).json({ message: "User not found" });
       }
 
+      // CRITICAL FIX: Get discount information from pending order metadata
+      const orderMetadata = pendingOrder.metadata as any || {};
+      const cartDiscount = parseFloat(orderMetadata.discount?.toString() || '0');
+      const cartSubtotal = parseFloat(orderMetadata.subtotal?.toString() || '0');
+      const cartGstAmount = parseFloat(orderMetadata.gstAmount?.toString() || '0');
+      const cartTotal = parseFloat(orderMetadata.total?.toString() || '0');
+      
+      console.log(`[Invoice Debug] Cart metadata - subtotal: ${cartSubtotal}, discount: ${cartDiscount}, gst: ${cartGstAmount}, total: ${cartTotal}`);
+
       // Enhanced invoice items formatting with proper GST calculation
       const items = orderPurchases.length > 0 ? orderPurchases.map((purchase: any) => {
         const metadata = purchase.metadata as any || {};
@@ -3277,13 +3326,30 @@ export function setupBillingRoutes(app: Router) {
         })()
       ];
 
-      // Calculate totals from actual data
-      const subtotal = items.reduce((sum: number, item: any) => sum + parseFloat(item.totalAmount), 0);
-      const totalGst = items.reduce((sum: number, item: any) => sum + parseFloat(item.gstAmount), 0);
-      const grandTotal = subtotal + totalGst;
+      // CRITICAL FIX: Calculate totals using cart metadata if available (includes discount)
+      let subtotal: number;
+      let totalGst: number;
+      let grandTotal: number;
+      let discount: number;
       const currency = items[0]?.currency || pendingOrder.currency || 'USD';
+      
+      if (cartSubtotal > 0 && cartGstAmount >= 0 && cartTotal > 0) {
+        // Use cart metadata which has the correct breakdown including discount
+        subtotal = cartSubtotal;
+        discount = cartDiscount;
+        totalGst = cartGstAmount;
+        grandTotal = cartTotal;
+        console.log(`[Invoice Debug] Using cart metadata - subtotal: ${subtotal}, discount: ${discount}, gst: ${totalGst}, total: ${grandTotal}`);
+      } else {
+        // Fallback: Calculate from items (may not include discount)
+        subtotal = items.reduce((sum: number, item: any) => sum + parseFloat(item.totalAmount), 0);
+        totalGst = items.reduce((sum: number, item: any) => sum + parseFloat(item.gstAmount), 0);
+        discount = 0;
+        grandTotal = subtotal + totalGst;
+        console.log(`[Invoice Debug] Using item calculation - subtotal: ${subtotal}, gst: ${totalGst}, total: ${grandTotal}`);
+      }
 
-      console.log(`[Invoice Debug] Calculated totals - subtotal: ${subtotal}, gst: ${totalGst}, total: ${grandTotal}, currency: ${currency}`);
+      console.log(`[Invoice Debug] Calculated totals - subtotal: ${subtotal}, discount: ${discount}, gst: ${totalGst}, total: ${grandTotal}, currency: ${currency}`);
 
       // Enhanced invoice data with professional formatting
       const invoiceData = {
@@ -3324,9 +3390,11 @@ export function setupBillingRoutes(app: Router) {
         // Line Items
         items,
         
-        // Financial Summary
+        // Financial Summary (FIXED: Now includes discount)
         summary: {
           subtotal: parseFloat(subtotal.toFixed(2)),
+          discount: parseFloat(discount.toFixed(2)), // CRITICAL FIX: Include discount
+          subtotalAfterDiscount: parseFloat((subtotal - discount).toFixed(2)), // CRITICAL FIX: Show discounted subtotal
           gst: parseFloat(totalGst.toFixed(2)),
           gstRate: currency === 'INR' ? 18 : 0,
           total: parseFloat(grandTotal.toFixed(2)),

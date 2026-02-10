@@ -267,11 +267,34 @@ export default function Cart() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0">
-                  {/* Subtotal */}
+                  {/* Subtotal - Show original and discounted */}
                   <div className="flex items-center justify-between text-sm sm:text-base">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span className="font-semibold">${(cart?.subtotal ?? 0).toFixed(2)}</span>
+                    <div className="flex flex-col items-end gap-1">
+                      {cart?.discount && parseFloat(cart.discount.toString()) > 0 ? (
+                        <>
+                          <span className="text-sm line-through text-muted-foreground">
+                            ${(cart?.subtotal ?? 0).toFixed(2)}
+                          </span>
+                          <span className="font-semibold text-green-600 dark:text-green-400">
+                            ${((cart?.subtotal ?? 0) - parseFloat(cart.discount.toString())).toFixed(2)}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="font-semibold">${(cart?.subtotal ?? 0).toFixed(2)}</span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Show total discount if any */}
+                  {cart?.discount && parseFloat(cart.discount.toString()) > 0 && (
+                    <div className="flex items-center justify-between text-sm bg-green-50 dark:bg-green-950 p-2 rounded">
+                      <span className="text-green-700 dark:text-green-300 font-medium">Total Savings</span>
+                      <span className="font-semibold text-green-600 dark:text-green-400">
+                        -${parseFloat(cart.discount.toString()).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
 
                   <Separator />
 
