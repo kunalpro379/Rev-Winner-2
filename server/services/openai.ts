@@ -146,10 +146,17 @@ function safeJSONParse<T = any>(content: string, fallback: T, context: string = 
     console.error(`Raw content (first 200 chars): ${content.substring(0, 200)}`);
     console.error(`Raw content (last 200 chars): ${content.substring(Math.max(0, content.length - 200))}`);
     
-    // Try to repair truncated JSON
+    // Try to repair truncated JSON with safety limits
     try {
       const cleaned = cleanJSONResponse(content);
       let repaired = cleaned;
+      
+      // Safety: Limit repair attempts to prevent infinite loops
+      const MAX_REPAIR_LENGTH = 50000; // 50KB max
+      if (repaired.length > MAX_REPAIR_LENGTH) {
+        console.error(`❌ Content too large for repair (${repaired.length} chars), using fallback`);
+        return fallback;
+      }
       
       // Fix unterminated strings by adding closing quote
       const openQuotes = (repaired.match(/"/g) || []).length;
@@ -157,22 +164,51 @@ function safeJSONParse<T = any>(content: string, fallback: T, context: string = 
         repaired = repaired + '"';
       }
       
-      // Fix unclosed braces/brackets
+      // Fix unclosed braces/brackets with safety limit
       const openBraces = (repaired.match(/\{/g) || []).length;
       const closeBraces = (repaired.match(/\}/g) || []).length;
-      for (let i = closeBraces; i < openBraces; i++) {
-        repaired = repaired + '}';
+      const braceDiff = openBraces - closeBraces;
+      if (braceDiff > 0 && braceDiff < 20) { // Safety: max 20 missing braces
+        for (let i = 0; i < braceDiff; i++) {
+          repaired = repaired + '}';
+        }
       }
       
       const openBrackets = (repaired.match(/\[/g) || []).length;
       const closeBrackets = (repaired.match(/\]/g) || []).length;
-      for (let i = closeBrackets; i < openBrackets; i++) {
-        repaired = repaired + ']';
+      const bracketDiff = openBrackets - closeBrackets;
+      if (bracketDiff > 0 && bracketDiff < 20) { // Safety: max 20 missing brackets
+        for (let i = 0; i < bracketDiff; i++) {
+          repaired = repaired + ']';
+        }
       }
       
-      const parsed = JSON.parse(repaired);
-      console.log(`✅ JSON repaired successfully in ${context}`);
-      return parsed;
+      // AGGRESSIVE FIX: If still failing, try to extract valid JSON from the content
+      try {
+        const parsed = JSON.parse(repaired);
+        console.log(`✅ JSON repaired successfully in ${context}`);
+        return parsed;
+      } catch (stillFailing) {
+        // Last resort: Try to find and extract the main JSON object/array
+        const jsonMatch = repaired.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const extracted = jsonMatch[0];
+          // Try to close any unclosed structures in the extracted part
+          let finalAttempt = extracted;
+          const finalBraceDiff = (finalAttempt.match(/\{/g) || []).length - (finalAttempt.match(/\}/g) || []).length;
+          if (finalBraceDiff > 0 && finalBraceDiff < 10) {
+            finalAttempt += '}'.repeat(finalBraceDiff);
+          }
+          const finalBracketDiff = (finalAttempt.match(/\[/g) || []).length - (finalAttempt.match(/\]/g) || []).length;
+          if (finalBracketDiff > 0 && finalBracketDiff < 10) {
+            finalAttempt += ']'.repeat(finalBracketDiff);
+          }
+          const finalParsed = JSON.parse(finalAttempt);
+          console.log(`✅ JSON extracted and repaired in ${context}`);
+          return finalParsed;
+        }
+        throw stillFailing;
+      }
     } catch (repairError) {
       console.error(`❌ JSON repair failed in ${context}, using fallback`);
       return fallback;
@@ -246,13 +282,11 @@ async function getTrainingDocumentContext(
       return result.context;
     }
     
+    // If no knowledge base entries found, allow fallback to conversation context
+    // This means: if knowledge base exists, use it; if not, use conversation context
     if (effectiveStrict && !isUniversal) {
-      console.log(`🔒 STRICT ISOLATION: No entries in domain "${domainName}" - NOT falling back to universal or raw docs`);
-      return "";
-    }
-    
-    if (effectiveStrict && !isUniversal) {
-      console.log(`🔒 STRICT ISOLATION (legacy path): Non-universal domain "${domainName}" with no TrainMe entries - returning empty (no fallback)`);
+      console.log(`⚠️ Domain "${domainName}" has no knowledge entries - will use conversation context as fallback`);
+      // Return empty string to allow conversation context to be used
       return "";
     }
     
@@ -265,8 +299,14 @@ async function getTrainingDocumentContext(
       if (domain) {
         allKnowledgeEntries = await storage.getKnowledgeEntriesByDomain(domain.id, userId);
         console.log(`🔒 DOMAIN ISOLATION: Loaded ${allKnowledgeEntries.length} knowledge entries for domain "${domainName}" (ID: ${domain.id})`);
+        
+        // If domain exists but has no entries, allow conversation context fallback
+        if (allKnowledgeEntries.length === 0) {
+          console.log(`⚠️ Domain "${domainName}" exists but is empty - will use conversation context as fallback`);
+          return "";
+        }
       } else {
-        console.log(`🔒 STRICT ISOLATION: Domain "${domainName}" not found - returning empty (no universal fallback)`);
+        console.log(`⚠️ Domain "${domainName}" not found - will use conversation context as fallback`);
         return "";
       }
     } else {
@@ -1593,40 +1633,44 @@ export async function generateCombinedAnalysis(
       return cached;
     }
     
-    // PERFORMANCE: Parallelize ALL async operations for speed
+    // PERFORMANCE: Parallelize ALL async operations for speed with error handling
     const knowledgeServiceModule = await import("./knowledge-service");
     const knowledgeService = knowledgeServiceModule.knowledgeService;
     const keywords = knowledgeService.extractKeywordsFromTranscript(transcriptText);
     
-    // Run all async fetches in PARALLEL
+    // Run all async fetches in PARALLEL with individual error handling
     const [knowledgeContext, trainingContext] = await Promise.all([
-      // 1. Knowledge context (products, case studies)
+      // 1. Knowledge context (products, case studies) - with error handling
       (async () => {
-        const knowledgeCacheKey = `knowledge:${userId}:${keywords.problemKeywords.slice(0, 3).join(',')}:${keywords.productKeywords.slice(0, 3).join(',')}`;
-        let cached = aiCache.get<{ products: string; caseStudies: string }>(knowledgeCacheKey);
-        if (cached) {
-          console.log(`Using cached knowledge context`);
-          return cached;
+        try {
+          const knowledgeCacheKey = `knowledge:${userId}:${keywords.problemKeywords.slice(0, 3).join(',')}:${keywords.productKeywords.slice(0, 3).join(',')}`;
+          let cached = aiCache.get<{ products: string; caseStudies: string }>(knowledgeCacheKey);
+          if (cached) {
+            console.log(`Using cached knowledge context`);
+            return cached;
+          }
+          
+          const knowledge = await knowledgeService.buildKnowledgeContext({
+            problemKeywords: keywords.problemKeywords,
+            productKeywords: keywords.productKeywords,
+            industries: keywords.industries,
+            includePlaybooks: true, // Include playbooks for better preemptive insights
+          });
+          
+          const ctx = {
+            products: knowledgeService.formatProductsForPrompt(knowledge.relevantProducts),
+            caseStudies: knowledgeService.formatCaseStudiesForPrompt(knowledge.relevantCaseStudies),
+          };
+          aiCache.set(knowledgeCacheKey, ctx, 300);
+          console.log(`Retrieved ${knowledge.relevantProducts.length} products, ${knowledge.relevantCaseStudies.length} case studies`);
+          return ctx;
+        } catch (error: any) {
+          console.error("Error fetching knowledge context:", error.message);
+          return { products: "", caseStudies: "" };
         }
-        
-        const knowledge = await knowledgeService.buildKnowledgeContext({
-          problemKeywords: keywords.problemKeywords,
-          productKeywords: keywords.productKeywords,
-          industries: keywords.industries,
-          includePlaybooks: true, // Include playbooks for better preemptive insights
-        });
-        
-        const ctx = {
-          products: knowledgeService.formatProductsForPrompt(knowledge.relevantProducts),
-          caseStudies: knowledgeService.formatCaseStudiesForPrompt(knowledge.relevantCaseStudies),
-        };
-        aiCache.set(knowledgeCacheKey, ctx, 300);
-        console.log(`Retrieved ${knowledge.relevantProducts.length} products, ${knowledge.relevantCaseStudies.length} case studies`);
-        return ctx;
       })(),
       
-      // 2. Training documents - PRIORITY: Domain-specific Train Me knowledge first, then universal
-      // This ensures contextual responses from the same domain as the web app
+      // 2. Training documents - with error handling
       (async () => {
         if (!userId) return { content: "", hasTraining: false, isDomainSpecific: false };
         try {
@@ -2342,9 +2386,18 @@ Return JSON:
       throw new Error("No content in AI response");
     }
     
-    let result;
-    const fallback = {
-      discoveryInsights: { painPoints: [], currentEnvironment: "", requirements: [] },
+    let result: any;
+    const fallback: any = {
+      discoveryInsights: { 
+        painPoints: [], 
+        currentEnvironment: "", 
+        requirements: [],
+        budget: undefined,
+        authority: undefined,
+        need: undefined,
+        timeline: undefined,
+        decisionMakers: []
+      },
       discoveryQuestions: [],
       nextQuestions: [],
       bantQualification: {
@@ -2354,6 +2407,7 @@ Return JSON:
         timeline: { asked: false }
       },
       recommendedModules: [],
+      recommendedSolutions: [],
       caseStudies: []
     };
     result = safeJSONParse(cleanJSONResponse(messageContent), fallback, 'generateCombinedAnalysis');
@@ -2370,10 +2424,10 @@ Return JSON:
         painPoints: result.discoveryInsights?.painPoints || [],
         currentEnvironment: result.discoveryInsights?.currentEnvironment || "",
         requirements: result.discoveryInsights?.requirements || [],
-        budget: result.discoveryInsights?.budget,
-        authority: result.discoveryInsights?.authority,
-        need: result.discoveryInsights?.need,
-        timeline: result.discoveryInsights?.timeline,
+        budget: result.discoveryInsights?.budget || undefined,
+        authority: result.discoveryInsights?.authority || undefined,
+        need: result.discoveryInsights?.need || undefined,
+        timeline: result.discoveryInsights?.timeline || undefined,
         decisionMakers: result.discoveryInsights?.decisionMakers || []
       },
       discoveryQuestions: sanitizedDiscoveryQuestions,
@@ -2384,7 +2438,7 @@ Return JSON:
         timeline: { asked: false }
       },
       nextQuestions: sanitizedNextQuestions,
-      recommendedModules: result.recommendedSolutions || [],
+      recommendedModules: (result as any).recommendedSolutions || [],
       caseStudies: result.caseStudies || []
     };
   } catch (error) {
@@ -2625,7 +2679,7 @@ IMPORTANT: All suggestions must be for the SALES REP to use when responding to C
 
     const cleanedContent = cleanJSONResponse(messageContent);
     const fallback = { suggestions: [], insights: [], roles: undefined };
-    const result = safeJSONParse(cleanedContent, fallback, 'generateCoachingSuggestions');
+    const result: any = safeJSONParse(cleanedContent, fallback, 'generateCoachingSuggestions');
     console.log('Coaching suggestions generated:', result.suggestions?.length || 0, 'insights:', result.insights?.length || 0);
     
     if (result.roles) {
@@ -2679,7 +2733,6 @@ export async function generateResponse(prompt: string, conversationHistory: any[
       messages: messages as any,
       max_tokens: 2000,
       temperature: 0.7,
-      timeout: 8000, // 8 second timeout for faster failures
     });
 
     const rawResponse = completion.choices[0]?.message?.content || "No response generated";
@@ -3029,18 +3082,41 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
       throw new Error("No content in AI response");
     }
     const cleanedContent = cleanJSONResponse(messageContent);
-    const fallback = {
-      attendees: ["Not mentioned in conversation"],
+    const fallback: any = {
+      attendees: [],
       discussionSummary: "Unable to generate meeting minutes",
       keyDecisions: [],
       actionItems: [],
       nextSteps: [],
-      notes: ""
+      notes: "",
+      companyName: "",
+      opportunityName: "",
+      date: "",
+      time: "",
+      duration: "",
+      meetingType: "",
+      discoveryQA: [],
+      bant: {
+        budget: "",
+        authority: "",
+        need: "",
+        timeline: ""
+      },
+      challenges: [],
+      keyInsights: [],
+      followUpPlan: {
+        nextMeetingDate: "",
+        documentsToShare: [],
+        internalAlignment: []
+      }
     };
-    const result = safeJSONParse(cleanedContent, fallback, 'generateMeetingMinutes');
+    const result: any = safeJSONParse(cleanedContent, fallback, 'generateMeetingMinutes');
     
     // Use actual meeting start time from session metadata (not current time)
-    const meetingTime = meetingStartTime || new Date();
+    // Safety: Ensure meetingStartTime is a valid Date object
+    const meetingTime = (meetingStartTime && meetingStartTime instanceof Date && !isNaN(meetingStartTime.getTime())) 
+      ? meetingStartTime 
+      : new Date();
     const defaultDate = meetingTime.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
     const defaultTime = meetingTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     
@@ -3196,11 +3272,11 @@ Cover: core platform, enterprise, analytics, automation, integrations, mobile, A
     }
     
     const cleanedContent = cleanJSONResponse(messageContent);
-    const fallback = [];
+    const fallback: any[] = [];
     const result = safeJSONParse(cleanedContent, fallback, 'generateProductReference');
     
     // Handle both array and object with array property
-    const products = Array.isArray(result) ? result : (result.products || result.items || []);
+    const products = Array.isArray(result) ? result : ((result as any).products || (result as any).items || []);
     const finalProducts = products.length > 0 ? products : getDefaultProductReference(domainExpertise);
     
     // Cache for 10 minutes
@@ -3403,6 +3479,39 @@ export interface ShiftGearsTip {
   priority: "high" | "medium" | "low";
 }
 
+// PERFORMANCE: Cache for AI context to avoid repeated expensive operations
+const aiContextCache = new Map<string, { context: any; timestamp: number }>();
+const CACHE_TTL_MS = 10000; // 10 seconds cache for near real-time updates
+const MAX_CACHE_SIZE = 100; // Prevent memory leaks
+
+// Helper function to clean up old cache entries
+function cleanupCache(cache: Map<string, { context: any; timestamp: number }>) {
+  const now = Date.now();
+  const keysToDelete: string[] = [];
+  
+  // Remove expired entries - use forEach to avoid iterator issues
+  cache.forEach((value, key) => {
+    if (now - value.timestamp > CACHE_TTL_MS) {
+      keysToDelete.push(key);
+    }
+  });
+  
+  keysToDelete.forEach(key => cache.delete(key));
+  
+  // If still over limit, remove oldest entries
+  if (cache.size > MAX_CACHE_SIZE) {
+    // Convert entries to array manually to avoid iterator issues
+    const entries: Array<[string, { context: any; timestamp: number }]> = [];
+    cache.forEach((value, key) => {
+      entries.push([key, value]);
+    });
+    
+    entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+    const toRemove = entries.slice(0, cache.size - MAX_CACHE_SIZE);
+    toRemove.forEach(([key]) => cache.delete(key));
+  }
+}
+
 export async function generateShiftGearsTips(
   conversationText: string,
   domainExpertise: string = "Generic Product",
@@ -3415,22 +3524,41 @@ export async function generateShiftGearsTips(
     const lowerText = conversationText.toLowerCase();
     const isPricingQuery = /pric(e|ing|es)|cost|fee|rate|subscription|per\s*(user|seat|month|year)|how\s*much|budget|quote|₹|\$|euro|inr|usd/.test(lowerText);
     
+    // PERFORMANCE OPTIMIZATION: Cache AI context by userId + domain to avoid repeated expensive operations
+    const cacheKey = `${userId || 'anon'}_${domainExpertise}_shift_gears`;
+    const cached = aiContextCache.get(cacheKey);
+    const now = Date.now();
+    
     // PERFORMANCE: Run training context and knowledge imports in parallel
     // CRITICAL FIX: Use AI Context Builder for proper Train Me integration
     const [aiContextResult, knowledgeModule] = await Promise.all([
       (async () => {
+        // Use cache if available and fresh (within 30 seconds)
+        if (cached && (now - cached.timestamp) < CACHE_TTL_MS) {
+          console.log(`⚡ Using cached AI context for ${domainExpertise} (age: ${now - cached.timestamp}ms)`);
+          return cached.context;
+        }
+        
         if (!userId) return null;
         try {
           const { buildEnhancedAIContext } = await import("./ai-context-builder");
-          return await buildEnhancedAIContext({
+          const result = await buildEnhancedAIContext({
             userId,
-            transcript: conversationText,
+            transcript: conversationText.slice(-1500), // PERFORMANCE: Use only recent context for faster processing
             feature: 'shift_gears',
             domainName: domainExpertise,
             includePlaybooks: false, // Speed optimization
             strictIsolation: true, // Strict domain isolation for Shift Gears
             allowUniversalFallback: true
           });
+          
+          // Cache the result
+          aiContextCache.set(cacheKey, { context: result, timestamp: now });
+          
+          // Clean up old cache entries to prevent memory leaks
+          cleanupCache(aiContextCache);
+          
+          return result;
         } catch (error: any) {
           console.error("Error building AI context:", error.message);
           return null;
@@ -3447,25 +3575,33 @@ export async function generateShiftGearsTips(
       console.log(`🎯 Shift Gears using Train Me: "${aiContextResult.domainUsed}" (${aiContextResult.entriesCount || 0} entries, source: ${aiContextResult.source})`);
     }
     
-    // BALANCED: Lightweight knowledge without playbooks for speed, but keep full keyword context
+    // PERFORMANCE: Skip knowledge base entirely if we have AI context (already includes everything)
     const { knowledgeService } = knowledgeModule;
-    const keywords = knowledgeService.extractKeywordsFromTranscript(conversationText);
+    let knowledge;
+    let keywords; // Declare keywords at function scope
     
-    // CRITICAL FIX: Include domain expertise in keyword extraction for better context
-    const enhancedProductKeywords = [
-      ...keywords.productKeywords,
-      ...(domainExpertise ? domainExpertise.toLowerCase().split(/\s+/).filter(w => w.length > 2) : [])
-    ];
-    
-    // Use knowledge from AI Context Builder (already includes Train Me + Universal fallback)
-    const knowledge = aiContextResult 
-      ? { relevantProducts: [], relevantCaseStudies: [], relevantPlaybooks: [] } // Already in context
-      : await knowledgeService.buildKnowledgeContext({
-          problemKeywords: keywords.problemKeywords,
-          productKeywords: enhancedProductKeywords,
-          industries: keywords.industries,
-          includePlaybooks: false // SPEED: Skip playbooks (biggest bottleneck)
-        });
+    if (aiContextResult && aiContextResult.entriesCount > 0) {
+      // Already have domain knowledge from AI Context Builder - skip expensive knowledge base query
+      knowledge = { relevantProducts: [], relevantCaseStudies: [], relevantPlaybooks: [] };
+      keywords = { problemKeywords: [], productKeywords: [], industries: [] }; // Empty keywords when using cache
+      console.log(`⚡ Skipping knowledge base (using cached AI context with ${aiContextResult.entriesCount} entries)`);
+    } else {
+      // No AI context - do minimal knowledge extraction
+      keywords = knowledgeService.extractKeywordsFromTranscript(conversationText.slice(-1000)); // Only recent text
+      
+      // CRITICAL FIX: Include domain expertise in keyword extraction for better context
+      const enhancedProductKeywords = [
+        ...keywords.productKeywords.slice(0, 5), // Limit to top 5 keywords
+        ...(domainExpertise ? domainExpertise.toLowerCase().split(/\s+/).filter(w => w.length > 2) : [])
+      ];
+      
+      knowledge = await knowledgeService.buildKnowledgeContext({
+        problemKeywords: keywords.problemKeywords.slice(0, 5), // Limit keywords
+        productKeywords: enhancedProductKeywords,
+        industries: keywords.industries,
+        includePlaybooks: false // SPEED: Skip playbooks (biggest bottleneck)
+      });
+    }
     
     console.log(`⚡ ShiftGears prep: ${Date.now() - startTime}ms | Domain: ${domainExpertise} | HasTraining: ${hasDomainTraining}`);
     
@@ -3564,7 +3700,7 @@ RESPONSE FORMAT (JSON only):
     // Priority: gpt-4o-mini (fastest) > claude-haiku > gemini-flash > user's model
     const fastModel = model.includes('gpt-4') ? 'gpt-4o-mini' 
                     : model.includes('claude') ? 'claude-3-5-haiku-20241022'
-                    : model.includes('gemini') ? 'gemini-2.0-flash'
+                    : model.includes('gemini') ? 'gemini-2.0-flash-exp'
                     : model; // Keep user's model if not optimizable
     
     const aiStartTime = Date.now();
@@ -3578,9 +3714,8 @@ RESPONSE FORMAT (JSON only):
         { role: "user", content: userPrompt }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.12, // OPTIMIZED: Slightly lower for maximum accuracy and consistency
-      max_tokens: 450, // OPTIMIZED: Slightly increased for richer tips while staying fast
-      timeout: 5000, // 5 second timeout for real-time performance
+      temperature: 0.1, // OPTIMIZED: Lower for faster, more consistent output
+      max_tokens: 300, // REDUCED: Prevent truncation, faster response (3-5 seconds target)
     });
     
     console.log(`⚡ ShiftGears AI call: ${Date.now() - aiStartTime}ms | Model: ${fastModel}`);
@@ -3658,6 +3793,9 @@ export async function generateQueryPitches(
   userId?: string
 ): Promise<QueryPitch[]> {
   try {
+    const startTime = Date.now();
+    console.log(`🎯 generateQueryPitches called: transcript=${conversationText.length} chars, domain="${domainExpertise}", userId=${userId?.slice(0, 8)}...`);
+    
     // CRITICAL FIX: Detect pricing queries and use semantic search with pricing keywords
     const lowerText = conversationText.toLowerCase();
     const isPricingQuery = /pric(e|ing|es)|cost|fee|rate|subscription|per\s*(user|seat|month|year)|how\s*much|budget|quote|₹|\$|euro|inr|usd/.test(lowerText);
@@ -3673,19 +3811,56 @@ export async function generateQueryPitches(
       console.log(' PRICING QUERY DETECTED - Using enhanced semantic search for pricing data');
     }
     
-    // Fetch training context with SEMANTIC SEARCH using the actual query for high accuracy
-    // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
-    const trainingContext = userId ? await getTrainingDocumentContext(userId, 25000, false, semanticQuery, 20, domainExpertise) : "";
+    // PERFORMANCE OPTIMIZATION: Use cache for repeated queries
+    const cacheKey = `${userId || 'anon'}_${domainExpertise}_query_pitches`;
+    const cached = aiContextCache.get(cacheKey);
+    const now = Date.now();
     
-    // Retrieve knowledge base context for enhanced responses (optimized - no playbooks for speed)
-    const { knowledgeService } = await import("./knowledge-service");
-    const keywords = knowledgeService.extractKeywordsFromTranscript(conversationText);
-    const knowledge = await knowledgeService.buildKnowledgeContext({
-      problemKeywords: keywords.problemKeywords,
-      productKeywords: keywords.productKeywords,
-      industries: keywords.industries,
-      includePlaybooks: false // PERFORMANCE: Skip playbooks for faster response (not critical for query pitches)
-    });
+    // PERFORMANCE: Run training context and knowledge in parallel
+    const [trainingContext, knowledgeModule] = await Promise.all([
+      // Use cache if available and fresh
+      (async () => {
+        if (cached && (now - cached.timestamp) < CACHE_TTL_MS) {
+          console.log(`⚡ Using cached training context for ${domainExpertise}`);
+          return cached.context;
+        }
+        
+        // Fetch training context with SEMANTIC SEARCH using the actual query for high accuracy
+        // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
+        const context = userId ? await getTrainingDocumentContext(userId, 20000, false, semanticQuery, 15, domainExpertise) : "";
+        
+        // Cache the result
+        if (userId) {
+          aiContextCache.set(cacheKey, { context, timestamp: now });
+        }
+        
+        return context;
+      })(),
+      import("./knowledge-service")
+    ]);
+    
+    // PERFORMANCE: Skip knowledge base if we have training context
+    const { knowledgeService } = knowledgeModule;
+    let knowledge;
+    let keywords; // Declare keywords at function scope
+    
+    if (trainingContext && trainingContext.length > 100) {
+      // Have training context - skip expensive knowledge base query
+      knowledge = { relevantProducts: [], relevantCaseStudies: [], relevantPlaybooks: [] };
+      keywords = { problemKeywords: [], productKeywords: [], industries: [] }; // Empty keywords when using training context
+      console.log(`⚡ Skipping knowledge base (using training context: ${trainingContext.length} chars)`);
+    } else {
+      // No training context - do minimal knowledge extraction
+      keywords = knowledgeService.extractKeywordsFromTranscript(conversationText.slice(-1000));
+      knowledge = await knowledgeService.buildKnowledgeContext({
+        problemKeywords: keywords.problemKeywords.slice(0, 5),
+        productKeywords: keywords.productKeywords.slice(0, 5),
+        industries: keywords.industries,
+        includePlaybooks: false // PERFORMANCE: Skip playbooks for faster response
+      });
+    }
+    
+    console.log(`⚡ QueryPitches prep: ${Date.now() - startTime}ms | Domain: ${domainExpertise}`);
     
     // STRUCTURED LOGGING: Verify knowledge retrieval and context
     console.log(' Customer Query Pitches Context:', {
@@ -3718,6 +3893,7 @@ export async function generateQueryPitches(
         const aiConfig = await getAIClient(userId);
         client = aiConfig.client;
         model = aiConfig.model;
+        console.log(`🤖 QueryPitches using user AI: engine=${aiConfig.engine}, model=${model}`);
         
         // Use faster models for quick analysis
         if (model.includes('gpt-4')) {
@@ -3727,7 +3903,9 @@ export async function generateQueryPitches(
         } else if (model.includes('gemini-2.5-pro')) {
           model = 'gemini-2.5-flash';
         }
+        console.log(`🤖 QueryPitches optimized model: ${model}`);
       } catch (error) {
+        console.warn(`⚠️ QueryPitches: Failed to get user AI client, falling back to default:`, error);
         if (!deepseek) throw new Error("AI engine not configured");
         client = deepseek;
         model = "deepseek-chat";
@@ -3736,30 +3914,33 @@ export async function generateQueryPitches(
       if (!deepseek) throw new Error("Default AI engine not configured");
       client = deepseek;
       model = "deepseek-chat";
+      console.log(`🤖 QueryPitches using default AI: deepseek-chat`);
     }
 
     const userPrompt = `LIVE TRANSCRIPT:
 ${conversationText.slice(-2000)}
 
-TASK: Identify ALL customer questions/queries and generate pitch responses using the 6-part Sales Script framework.
+TASK: Identify ALL questions and queries in the conversation and generate pitch responses.
 
-CRITICAL PRICING RULE: For ANY pricing/cost question, you MUST use EXACT prices from the TRAINING CONTEXT above. Do NOT make up pricing - use only documented prices, fees, rates, or subscription costs from uploaded training materials. If no pricing is in training context, say "I'll get you the exact pricing details" instead of guessing.
+IMPORTANT: Look for ANY questions in the transcript, including:
+- Direct questions with "?" marks
+- Implied questions or concerns
+- Statements that need clarification
+- Any topic that needs a sales response
 
 For each query:
-1. Address the EXACT question with Solutions
-2. For PRICING queries: Use EXACT prices from training documents (e.g., "$99/month", "₹5,000/user")
-3. Quantify Value Proposition with REAL metrics from knowledge base
-4. Provide Technical Answers with specific implementation details
-5. Reference at least ONE Relevant Case Study
-6. Include Competitor Analysis positioning
+1. Address the question with Solutions
+2. For PRICING queries: Use EXACT prices from training documents if available
+3. Quantify Value Proposition with metrics
+4. Provide Technical Answers with implementation details
+5. Reference case studies when relevant
+6. Include positioning
 
-Keep responses concise but comprehensive (40-80 words per pitch).
-
-CRITICAL: Return ONLY valid JSON format.
+Keep responses concise (40-80 words per pitch).
 
 QUERY TYPES:
 - technical: How does it work? Integration questions, technical specs
-- pricing: Cost, ROI, pricing models, budget questions - USE EXACT PRICES FROM TRAINING DOCS
+- pricing: Cost, ROI, pricing models, budget questions
 - features: What can it do? Feature requests, capabilities
 - integration: Third-party integrations, compatibility
 - support: Training, onboarding, customer success
@@ -3769,24 +3950,23 @@ RESPONSE FORMAT (strict JSON):
 {
   "queries": [
     {
-      "query": "The exact customer question from transcript",
+      "query": "The question or topic from transcript",
       "queryType": "technical|pricing|features|integration|support|general",
-      "pitch": "Solid pitch response covering technical + business value (40-80 words, quick to read)",
+      "pitch": "Pitch response covering technical + business value (40-80 words)",
       "keyPoints": [
-        "Key point 1 (technical or business benefit)",
-        "Key point 2 (value proposition)",
-        "Key point 3 (differentiator or proof point)"
+        "Key point 1",
+        "Key point 2",
+        "Key point 3"
       ]
     }
   ]
 }
 
 CRITICAL RULES:
-- Only include ACTUAL customer questions from the transcript
+- Look for ANY questions or topics that need sales responses
+- If you see "?" marks, those are definitely queries
 - If no queries detected, return empty array: {"queries": []}
-- Each pitch must be 40-80 words (concise but adequate)
-- Cover BOTH technical details AND business value
-- Make it quick to scan and actionable
+- Each pitch must be 40-80 words
 - Focus on ${domainExpertise} expertise
 
 Example:
@@ -3795,16 +3975,17 @@ Example:
     {
       "query": "How does your solution integrate with our existing CRM?",
       "queryType": "integration",
-      "pitch": "We offer native integrations with Salesforce, HubSpot, and 50+ CRMs via our REST API. Setup takes 15 minutes with pre-built connectors. Real-time two-way sync ensures your team always has the latest customer data without manual exports or data entry.",
+      "pitch": "We offer native integrations with Salesforce, HubSpot, and 50+ CRMs via our REST API. Setup takes 15 minutes with pre-built connectors. Real-time two-way sync ensures your team always has the latest customer data.",
       "keyPoints": [
-        "Native connectors for top CRMs + REST API for custom systems",
-        "15-minute setup with automatic two-way sync",
-        "No manual data entry - saves 10+ hours/week per rep"
+        "Native connectors for top CRMs + REST API",
+        "15-minute setup with automatic sync",
+        "Saves 10+ hours/week per rep"
       ]
     }
   ]
 }`;
 
+    const aiStartTime = Date.now();
     const response = await client.chat.completions.create({
       model,
       messages: [
@@ -3815,9 +3996,11 @@ Example:
         { role: "user", content: userPrompt }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.15, // OPTIMIZED: Lower for maximum accuracy and consistency
-      max_tokens: 1200, // OPTIMIZED: Reduced for faster response while keeping quality
+      temperature: 0.1, // OPTIMIZED: Lower for faster, more consistent output
+      max_tokens: 1500, // INCREASED: Prevent JSON truncation (was 500, causing incomplete responses)
     });
+    
+    console.log(`⚡ QueryPitches AI call: ${Date.now() - aiStartTime}ms | Total: ${Date.now() - startTime}ms`);
 
     const messageContent = response.choices?.[0]?.message?.content;
     if (!messageContent) {
@@ -3837,8 +4020,13 @@ Example:
     });
     
     return queries.slice(0, 5); // Max 5 queries to keep it manageable
-  } catch (error) {
-    console.error("Query pitch generation error:", error);
+  } catch (error: any) {
+    console.error("❌ Query pitch generation error:", error);
+    console.error("❌ Error details:", {
+      message: error.message,
+      stack: error.stack?.split('\n').slice(0, 3),
+      name: error.name
+    });
     return [];
   }
 }
@@ -3929,7 +4117,6 @@ JSON:
         response_format: { type: "json_object" },
         temperature: 0.2,
         max_tokens: 500,
-        timeout: 8000, // 8 second timeout for pitch deck
       });
 
       // Track token usage for pitch deck
@@ -3940,8 +4127,8 @@ JSON:
       const content = response.choices?.[0]?.message?.content;
       if (!content) throw new Error("No content in AI response");
       const cleanedContent = cleanJSONResponse(content);
-      const fallback = { slides: [] };
-      const result = safeJSONParse(cleanedContent, fallback, 'generatePresentToWin-pitch-deck');
+      const fallback = { slides: [], _meta: {} };
+      const result: any = safeJSONParse(cleanedContent, fallback, 'generatePresentToWin-pitch-deck');
       
       // Inject intelligence metadata into result
       result._meta = {
@@ -4051,7 +4238,6 @@ JSON format:
         response_format: { type: "json_object" },
         temperature: 0.2,
         max_tokens: 500,
-        timeout: 8000, // 8 second timeout for case study
       });
 
       // Track token usage for case study
@@ -4062,8 +4248,20 @@ JSON format:
       const content = response.choices?.[0]?.message?.content;
       if (!content) throw new Error("No content in AI response");
       const cleanedContent = cleanJSONResponse(content);
-      const fallback = { title: "", customer: "", industry: "", challenge: "", solution: "", outcomes: [] };
-      const result = safeJSONParse(cleanedContent, fallback, 'generatePresentToWin-case-study');
+      const fallback = { 
+        title: "", 
+        customer: "", 
+        industry: "", 
+        challenge: "", 
+        solution: "", 
+        outcomes: [],
+        verificationType: "illustrative",
+        verificationLabel: "",
+        citation: "",
+        storySource: "",
+        _meta: {}
+      };
+      const result: any = safeJSONParse(cleanedContent, fallback, 'generatePresentToWin-case-study');
       
       // Inject intelligence metadata into result - respect AI's determination of verification type
       const isVerified = result.verificationType === 'real' || result.verificationType === 'anonymized';
@@ -4931,7 +5129,6 @@ Generate a detailed, factual battle card that CLEARLY shows ${competitorSet.your
             response_format: { type: "json_object" },
             temperature: 0.2,
             max_tokens: 1500,
-            timeout: 10000, // 10 second timeout for battle cards
           });
 
           const content = response.choices?.[0]?.message?.content;
@@ -5382,8 +5579,8 @@ Keep each point to ONE line (max 15 words). Focus on the most important and acti
     }
     
     const cleanedContent = cleanJSONResponse(messageContent);
-    const fallback = { learnings: [] };
-    const result = safeJSONParse(cleanedContent, fallback, 'generateDocumentSummary');
+    const fallback = { learnings: [], summary: [], points: [] };
+    const result: any = safeJSONParse(cleanedContent, fallback, 'generateDocumentSummary');
     
     // Handle different response formats
     if (Array.isArray(result)) {

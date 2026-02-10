@@ -140,7 +140,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         messages: [initialMessage]
       });
     } catch (error: any) {
+      console.error("❌ Failed to create conversation:", error);
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       res.status(400).json({ message: "Failed to create conversation", error: error.message });
+    }
+  });
+
+  // Mark transcription start (when user clicks Start button)
+  app.post("/api/conversations/:sessionId/start-transcription", async (req, res) => {
+    try {
+      const conversation = await storage.getConversation(req.params.sessionId);
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      // Only set transcriptionStartedAt if it hasn't been set yet (first Start click)
+      if (!conversation.transcriptionStartedAt) {
+        const updated = await storage.updateConversation(req.params.sessionId, {
+          transcriptionStartedAt: new Date()
+        });
+        
+        console.log(`🎤 Transcription started for session ${req.params.sessionId} at ${new Date().toISOString()}`);
+        
+        res.json({
+          success: true,
+          transcriptionStartedAt: updated?.transcriptionStartedAt
+        });
+      } else {
+        // Already started, just return existing timestamp
+        res.json({
+          success: true,
+          transcriptionStartedAt: conversation.transcriptionStartedAt,
+          alreadyStarted: true
+        });
+      }
+    } catch (error: any) {
+      console.error('Error marking transcription start:', error);
+      res.status(500).json({ message: "Failed to mark transcription start", error: error.message });
     }
   });
 
@@ -231,17 +271,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .limit(50); // Limit to last 50 conversations
 
       // Transform to session history format
-      const sessionHistory = userConversations.map(conv => ({
-        sessionId: conv.sessionId,
-        startTime: conv.createdAt?.toISOString() || new Date().toISOString(),
-        endTime: conv.endedAt ? conv.endedAt.toISOString() : new Date().toISOString(),
-        durationMinutes: conv.endedAt && conv.createdAt
-          ? Math.round((conv.endedAt.getTime() - conv.createdAt.getTime()) / (1000 * 60))
-          : conv.createdAt
-          ? Math.round((new Date().getTime() - conv.createdAt.getTime()) / (1000 * 60))
-          : 0,
-        summary: conv.callSummary || null
-      }));
+      // IMPORTANT: Use transcriptionStartedAt for duration calculation (when user clicked Start button)
+      // NOT createdAt (when conversation record was created on page load)
+      // FILTER OUT: Sessions where transcription never started (page loads without Start button click)
+      const sessionHistory = userConversations
+        .map(conv => {
+          // Use transcriptionStartedAt if available, otherwise fall back to createdAt for old sessions
+          const startTime = conv.transcriptionStartedAt || conv.createdAt;
+          const endTime = conv.endedAt || new Date();
+          
+          const durationMinutes = startTime && conv.endedAt
+            ? Math.round((conv.endedAt.getTime() - startTime.getTime()) / (1000 * 60))
+            : startTime
+            ? Math.round((new Date().getTime() - startTime.getTime()) / (1000 * 60))
+            : 0;
+          
+          return {
+            sessionId: conv.sessionId,
+            startTime: startTime?.toISOString() || new Date().toISOString(),
+            endTime: conv.endedAt ? conv.endedAt.toISOString() : new Date().toISOString(),
+            durationMinutes,
+            summary: conv.callSummary || null,
+            transcriptionStarted: !!conv.transcriptionStartedAt,
+          };
+        })
+        .filter(session => {
+          // STRICT FILTER: Only show sessions where transcription actually started
+          // This means user clicked the Start button
+          // Sessions without transcriptionStartedAt are just page loads, not actual usage
+          return session.transcriptionStarted;
+        });
 
       res.json({ conversations: userConversations, sessionHistory });
     } catch (error: any) {
@@ -921,8 +980,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const domainExpertise = req.query.domain as string || "Generic Product";
       const { generateMeetingMinutes } = await import("./services/openai");
       
-      // Calculate actual duration from session start to now
-      const sessionStart = conversation.createdAt ? new Date(conversation.createdAt) : new Date();
+      // Calculate actual duration from transcription start (when user clicked Start) to now
+      // Use transcriptionStartedAt if available, otherwise fall back to createdAt for old sessions
+      const sessionStart = conversation.transcriptionStartedAt 
+        ? new Date(conversation.transcriptionStartedAt)
+        : conversation.createdAt 
+        ? new Date(conversation.createdAt) 
+        : new Date();
       const now = new Date();
       const durationMs = now.getTime() - sessionStart.getTime();
       const durationMinutes = Math.round(durationMs / 60000);
@@ -1077,10 +1141,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { extractTechEnvironment } = await import("./services/mind-map-extraction");
       console.log('🗺️ Map/Flow: Calling AI extraction...');
       
-      // CRITICAL: 25-second timeout for Map/Flow (background feature, can take longer)
+      // CRITICAL: 60-second timeout for Map/Flow (background feature, can take longer due to complex analysis with knowledge base)
       const extractionPromise = extractTechEnvironment(sessionId, transcript, domainExpertise, userId);
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Map/Flow generation timeout after 25 seconds')), 25000)
+        setTimeout(() => reject(new Error('Map/Flow generation timeout after 60 seconds')), 60000)
       );
       
       const mindMapData = await Promise.race([extractionPromise, timeoutPromise]) as any;
@@ -1287,10 +1351,10 @@ JSON only:
 
       const openaiService = await import("./services/openai");
       
-      // CRITICAL: 5 second timeout for one-liners (increased from 3s)
+      // CRITICAL: 15 second timeout for one-liners (increased from 10s - still seeing timeouts)
       const responsePromise = openaiService.generateResponse(onelinerPrompt, []);
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 5000)
+        setTimeout(() => reject(new Error('Timeout')), 15000)
       );
       
       let oneliners;
@@ -2131,27 +2195,46 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
         console.log(`[DEBUG] Found ${userConversations.length} conversations`);
 
         // Convert conversations to session history format
-        sessionHistory = userConversations.map(conv => {
-          const startTime = conv.createdAt || new Date();
-          const endTime = conv.endedAt || conv.createdAt || new Date();
-          const durationMs = endTime.getTime() - startTime.getTime();
-          const durationMinutes = Math.max(1, Math.ceil(durationMs / (1000 * 60)));
+        // IMPORTANT: Use transcriptionStartedAt for accurate duration (when user clicked Start)
+        // FILTER OUT: Sessions where transcription never started (page loads without Start button click)
+        sessionHistory = userConversations
+          .map(conv => {
+            const startTime = conv.transcriptionStartedAt || conv.createdAt || new Date();
+            const endTime = conv.endedAt || conv.createdAt || new Date();
+            const durationMs = endTime.getTime() - startTime.getTime();
+            const durationMinutes = Math.max(1, Math.ceil(durationMs / (1000 * 60)));
 
-          return {
-            sessionId: conv.sessionId,
-            startTime: startTime.toISOString(),
-            endTime: endTime.toISOString(),
-            durationMinutes: durationMinutes,
-            summary: conv.callSummary || null
-          };
-        });
+            return {
+              sessionId: conv.sessionId,
+              startTime: startTime.toISOString(),
+              endTime: endTime.toISOString(),
+              durationMinutes: durationMinutes,
+              summary: conv.callSummary || null,
+              transcriptionStarted: !!conv.transcriptionStartedAt,
+            };
+          })
+          .filter(session => {
+            // STRICT FILTER: Only show sessions where transcription actually started
+            // This means user clicked the Start button
+            // Sessions without transcriptionStartedAt are just page loads, not actual usage
+            return session.transcriptionStarted;
+          });
 
-        console.log(`[DEBUG] Returning ${sessionHistory.length} sessions in history`);
+        console.log(`[DEBUG] Returning ${sessionHistory.length} sessions in history (filtered out non-transcription sessions)`);
       } catch (error) {
         console.error(`[DEBUG] Error fetching conversations:`, error);
         // Fall back to empty array if query fails
         sessionHistory = [];
       }
+      
+      // Calculate actual sessions used from filtered history (not from subscription.sessionsUsed)
+      // This ensures consistency between session count and session list
+      const actualSessionsUsed = sessionHistory.length;
+      
+      // Calculate actual minutes used from filtered history
+      const actualMinutesUsed = sessionHistory.reduce((total, session) => {
+        return total + (session.durationMinutes || 0);
+      }, 0);
       
       res.json({
         id: subscription.id,
@@ -2159,9 +2242,9 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
         status: subscription.status,
         currentPeriodStart: subscription.currentPeriodStart,
         currentPeriodEnd: subscription.currentPeriodEnd,
-        sessionsUsed: subscription.sessionsUsed,
+        sessionsUsed: actualSessionsUsed.toString(), // Use filtered count, not subscription.sessionsUsed
         sessionsLimit: subscription.sessionsLimit,
-        minutesUsed: subscription.minutesUsed,
+        minutesUsed: actualMinutesUsed.toString(), // Use calculated minutes from filtered sessions
         minutesLimit: subscription.minutesLimit,
         sessionHistory: sessionHistory,
         canceledAt: subscription.canceledAt,
@@ -2258,6 +2341,7 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
           clientName: conversations.clientName,
           status: conversations.status,
           createdAt: conversations.createdAt,
+          transcriptionStartedAt: conversations.transcriptionStartedAt,
           endedAt: conversations.endedAt,
         })
         .from(conversations)
@@ -2266,23 +2350,37 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
         .limit(limit);
 
       // Calculate session details with null safety
-      const sessionHistory = userConversations.map(conv => {
-        const startTime = conv.createdAt || new Date();
-        const endTime = conv.endedAt || new Date();
-        const durationMs = Math.max(0, endTime.getTime() - startTime.getTime());
-        const durationMinutes = Math.round(durationMs / (1000 * 60));
-        
-        return {
-          id: conv.id,
-          sessionId: conv.sessionId || 'unknown',
-          clientName: conv.clientName || "Unknown",
-          status: conv.status || 'active',
-          startTime: startTime.toISOString(),
-          endTime: conv.endedAt?.toISOString() || null,
-          durationMinutes,
-          isActive: conv.status === "active",
-        };
-      });
+      // IMPORTANT: Use transcriptionStartedAt for accurate duration (when user clicked Start)
+      // FILTER OUT: Sessions where transcription never started (page loads without Start button click)
+      const sessionHistory = userConversations
+        .map(conv => {
+          const startTime = conv.transcriptionStartedAt || conv.createdAt || new Date();
+          const endTime = conv.endedAt || new Date();
+          const durationMs = Math.max(0, endTime.getTime() - startTime.getTime());
+          const durationMinutes = Math.round(durationMs / (1000 * 60));
+          
+          return {
+            id: conv.id,
+            sessionId: conv.sessionId || 'unknown',
+            clientName: conv.clientName || "Unknown",
+            status: conv.status || 'active',
+            startTime: startTime.toISOString(),
+            endTime: conv.endedAt?.toISOString() || null,
+            durationMinutes,
+            isActive: conv.status === "active",
+            transcriptionStarted: !!conv.transcriptionStartedAt, // Track if transcription actually started
+          };
+        })
+        .filter(session => {
+          // STRICT FILTER: Only show sessions where transcription actually started
+          // This means user clicked the Start button
+          // Sessions without transcriptionStartedAt are just page loads, not actual usage
+          if (!session.transcriptionStarted) {
+            console.log(`[DEBUG] Filtering out non-transcription session: ${session.sessionId}`);
+            return false;
+          }
+          return true;
+        });
 
       // Calculate total usage
       const totalSessions = sessionHistory.length;

@@ -292,14 +292,16 @@ export class TrainMeIntelligence {
         matchType = effectiveStrict ? 'domain_strict' : 'domain';
         console.log(`🎯 Train Me STRICT: Found ${entries.length} entries from domain "${domainUsed}"`);
       } else if (effectiveStrict) {
-        console.log(`🔒 STRICT ISOLATION: No entries in domain "${targetDomain.name}" - NOT falling back to universal`);
-        crossDomainBlocked = true;
+        console.log(`⚠️ Domain "${targetDomain.name}" has no entries - will use conversation context as fallback`);
+        // Don't block cross-domain, allow conversation context to be used
+        crossDomainBlocked = false;
         matchType = 'domain_strict';
       } else if (allowUniversalFallback) {
         console.log(`Domain "${targetDomain.name}" has no matching entries - falling back to universal`);
       }
     }
     
+    // If no entries found and not strict, try universal fallback
     if (entries.length === 0 && !effectiveStrict && allowUniversalFallback) {
       const universalEntries = await db
         .select()

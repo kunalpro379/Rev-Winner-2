@@ -1195,23 +1195,46 @@ export function setupBillingRoutes(app: Router) {
         });
       }
       
-      // Get session minutes balance from database
+      // Get session minutes balance from database (total purchased minutes)
       const balance = await billingStorage.getSessionMinutesBalance(userId);
       
-      // Also get subscription data to get actual usage
-      const subscription = await authStorage.getSubscriptionByUserId(userId);
-      const actualUsedMinutes = subscription?.minutesUsed ? parseInt(subscription.minutesUsed) : 0;
+      // CRITICAL FIX: Calculate actual used minutes from filtered conversations
+      // Only count sessions where transcriptionStartedAt is set (user clicked Start button)
+      let actualUsedMinutes = 0;
+      try {
+        const userConversations = await db
+          .select()
+          .from(conversations)
+          .where(eq(conversations.userId, userId))
+          .orderBy(desc(conversations.createdAt));
+        
+        // Calculate minutes from sessions that actually had transcription
+        actualUsedMinutes = userConversations
+          .filter(conv => !!conv.transcriptionStartedAt) // Only sessions where user clicked Start
+          .reduce((total, conv) => {
+            const startTime = conv.transcriptionStartedAt || conv.createdAt || new Date();
+            const endTime = conv.endedAt || conv.createdAt || new Date();
+            const durationMs = endTime.getTime() - startTime.getTime();
+            const durationMinutes = Math.max(1, Math.ceil(durationMs / (1000 * 60)));
+            return total + durationMinutes;
+          }, 0);
+        
+        console.log(`[Session Minutes Status] User ${userId}: ${actualUsedMinutes} minutes used from ${userConversations.filter(c => !!c.transcriptionStartedAt).length} sessions`);
+      } catch (error) {
+        console.error('[Session Minutes Status] Error calculating used minutes:', error);
+        // Fallback to subscription data if conversation query fails
+        const subscription = await authStorage.getSubscriptionByUserId(userId);
+        actualUsedMinutes = subscription?.minutesUsed ? parseInt(subscription.minutesUsed) : 0;
+      }
       
-      // Use the actual used minutes from subscription if available, otherwise use balance
-      const usedMinutes = actualUsedMinutes > 0 ? actualUsedMinutes : balance.usedMinutes;
       const totalMinutes = balance.totalMinutes;
-      const remainingMinutes = Math.max(0, totalMinutes - usedMinutes);
+      const remainingMinutes = Math.max(0, totalMinutes - actualUsedMinutes);
       
       res.json({
         hasActiveMinutes: remainingMinutes > 0,
         totalMinutesRemaining: remainingMinutes,
         totalMinutes: totalMinutes,
-        usedMinutes: usedMinutes,
+        usedMinutes: actualUsedMinutes,
         nextExpiryDate: balance.expiresAt ? balance.expiresAt.toISOString() : null,
         superUserAccess: false,
       });
@@ -1482,7 +1505,7 @@ export function setupBillingRoutes(app: Router) {
           message: "Payment not yet completed. Please wait and try again.",
           status: paymentStatus.status
         });
-      }      }
+      }
 
       // Check if user already has an active Train Me purchase
       // Due to unique constraint, we need to extend existing purchase instead of creating new one

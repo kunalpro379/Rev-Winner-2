@@ -127,7 +127,8 @@ export function useSalesIntelligence({
           timestamp: new Date()
         };
 
-        setSuggestions(prev => [...prev.slice(-9), newSuggestion]);
+        // FIXED: Keep all suggestions for entire session (was limiting to last 9)
+        setSuggestions(prev => [...prev, newSuggestion]);
         onSuggestion?.(newSuggestion);
       }
     } catch (error) {

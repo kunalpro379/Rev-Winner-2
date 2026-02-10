@@ -36,12 +36,14 @@ export const conversations = pgTable("conversations", {
   discoveryInsights: jsonb("discovery_insights").default({}),
   callSummary: text("call_summary"),
   createdAt: timestamp("created_at").defaultNow(),
+  transcriptionStartedAt: timestamp("transcription_started_at"), // When user clicked Start button (session duration = transcriptionStartedAt to endedAt)
   endedAt: timestamp("ended_at"),
 }, (table) => [
   index("idx_conversations_session").on(table.sessionId),
   index("idx_conversations_user").on(table.userId),
   index("idx_conversations_status").on(table.status),
   index("idx_conversations_created_at").on(table.createdAt),
+  index("idx_conversations_transcription_started").on(table.transcriptionStartedAt),
 ]);
 
 export const audioSources = pgTable("audio_sources", {

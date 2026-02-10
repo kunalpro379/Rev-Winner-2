@@ -1,16 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 
-interface SessionUsage {
-  id: string;
+interface SessionHistoryItem {
   sessionId: string;
   startTime: string;
-  endTime: string | null;
-  durationSeconds: string | null;
-  status: string;
-  createdAt: string;
+  endTime: string;
+  durationMinutes: number;
+  summary?: string | null;
+  transcriptionStarted: boolean;
 }
 
 interface TotalUsageResponse {
@@ -18,105 +16,67 @@ interface TotalUsageResponse {
   totalSeconds: number;
   totalMinutes: number;
   totalHours: number;
-  sessions: SessionUsage[];
 }
 
 export function useSessionTimer() {
   const [isRunning, setIsRunning] = useState(false);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [transcriptionStartTime, setTranscriptionStartTime] = useState<Date | null>(null);
   const [currentSessionTime, setCurrentSessionTime] = useState(0);
-  const { toast } = useToast();
 
-  // Query for total usage
-  const { data: totalUsage } = useQuery<TotalUsageResponse>({
-    queryKey: ["/api/session-usage/total"],
+  // Query for total usage from profile subscription endpoint
+  // This gives us accurate usage based on transcriptionStartedAt
+  const { data: subscriptionData } = useQuery<{
+    sessionHistory?: SessionHistoryItem[];
+    minutesUsed?: string;
+    sessionsUsed?: string;
+  }>({
+    queryKey: ["/api/profile/subscription"],
     refetchInterval: isRunning ? 60000 : false,
   });
 
-  // Start session mutation
-  const startSessionMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/session-usage/start", {});
-      return response.json();
-    },
-    onSuccess: (data) => {
-      setCurrentSessionId(data.sessionUsage.sessionId);
-      setIsRunning(true);
-      setCurrentSessionTime(0);
-    },
-    onError: (error: any) => {
-      console.error("Failed to start session timer:", error);
-    },
-  });
+  // Calculate total usage from filtered session history
+  const totalUsage: TotalUsageResponse | undefined = subscriptionData?.sessionHistory ? {
+    totalSessions: parseInt(subscriptionData.sessionsUsed || '0'),
+    totalMinutes: parseInt(subscriptionData.minutesUsed || '0'),
+    totalSeconds: parseInt(subscriptionData.minutesUsed || '0') * 60,
+    totalHours: Math.floor(parseInt(subscriptionData.minutesUsed || '0') / 60),
+  } : undefined;
 
-  // Stop session mutation
-  const stopSessionMutation = useMutation({
-    mutationFn: async (sessionId: string) => {
-      const response = await apiRequest("PUT", `/api/session-usage/${sessionId}/stop`);
-      return response.json();
-    },
-    onSuccess: () => {
-      setIsRunning(false);
-      setCurrentSessionId(null);
-      setCurrentSessionTime(0);
-      queryClient.invalidateQueries({ queryKey: ["/api/session-usage/total"] });
-      toast({
-        title: "Session Ended",
-        description: "Your session has been tracked successfully",
-      });
-    },
-    onError: (error: any) => {
-      console.error("Failed to stop session timer:", error);
-      toast({
-        title: "Session Tracking Error",
-        description: "Failed to properly end session tracking",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Timer tick effect
+  // Timer tick effect - counts from transcription start
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (isRunning) {
+    if (isRunning && transcriptionStartTime) {
       interval = setInterval(() => {
-        setCurrentSessionTime((prev) => prev + 1);
+        const now = new Date();
+        const elapsedSeconds = Math.floor((now.getTime() - transcriptionStartTime.getTime()) / 1000);
+        setCurrentSessionTime(elapsedSeconds);
       }, 1000);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isRunning]);
+  }, [isRunning, transcriptionStartTime]);
 
   const startTimer = useCallback(() => {
-    if (!isRunning && !currentSessionId) {
-      startSessionMutation.mutate();
+    if (!isRunning) {
+      const now = new Date();
+      setTranscriptionStartTime(now);
+      setIsRunning(true);
+      setCurrentSessionTime(0);
+      console.log('⏱️ Session timer started at:', now.toISOString());
     }
-  }, [isRunning, currentSessionId, startSessionMutation]);
+  }, [isRunning]);
 
   const stopTimer = useCallback(() => {
-    if (isRunning && currentSessionId) {
-      stopSessionMutation.mutate(currentSessionId);
+    if (isRunning) {
+      setIsRunning(false);
+      setTranscriptionStartTime(null);
+      setCurrentSessionTime(0);
+      // Invalidate queries to refresh usage data
+      queryClient.invalidateQueries({ queryKey: ["/api/profile/subscription"] });
+      console.log('⏱️ Session timer stopped');
     }
-  }, [isRunning, currentSessionId, stopSessionMutation]);
-
-  // Auto-stop session on page unload/close
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (isRunning && currentSessionId) {
-        // Use synchronous API call for page unload
-        navigator.sendBeacon(
-          `/api/session-usage/${currentSessionId}/stop`,
-          JSON.stringify({})
-        );
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [isRunning, currentSessionId]);
+  }, [isRunning]);
 
   return {
     isRunning,
@@ -124,6 +84,5 @@ export function useSessionTimer() {
     totalUsage,
     startTimer,
     stopTimer,
-    currentSessionId,
   };
 }

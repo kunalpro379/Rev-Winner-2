@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { RefreshCw, TrendingUp, Loader2 } from "lucide-react";
 
 interface ConversationAreaProps {
@@ -70,9 +71,11 @@ export function ConversationArea({ children, onRegenerate, isRegenerating = fals
             </p>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col min-h-0">
-            {children}
-          </div>
+          <ScrollArea className="flex-1 w-full">
+            <div className="pr-4">
+              {children}
+            </div>
+          </ScrollArea>
         )}
       </CardContent>
     </Card>

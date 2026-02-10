@@ -139,8 +139,8 @@ export class MeetingMinutesBackupService {
         companyName: discoveryInsights.companyName || undefined,
         industry: discoveryInsights.industry || undefined,
         meetingDate: conversation.createdAt || undefined,
-        meetingDuration: conversation.endedAt && conversation.createdAt 
-          ? Math.round((new Date(conversation.endedAt).getTime() - new Date(conversation.createdAt).getTime()) / 60000)
+        meetingDuration: conversation.endedAt && (conversation.transcriptionStartedAt || conversation.createdAt)
+          ? Math.round((new Date(conversation.endedAt).getTime() - new Date(conversation.transcriptionStartedAt || conversation.createdAt).getTime()) / 60000)
           : undefined,
         executiveSummary: conversation.callSummary || undefined,
         keyTopicsDiscussed: discoveryInsights.topics || [],

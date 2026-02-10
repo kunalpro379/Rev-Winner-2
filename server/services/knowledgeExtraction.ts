@@ -696,10 +696,17 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
   }
 
   try {
-    const response = await openaiForEmbeddings.embeddings.create({
+    // CRITICAL FIX: Add 10-second timeout to prevent hanging
+    const embeddingPromise = openaiForEmbeddings.embeddings.create({
       model: EMBEDDING_MODEL,
       input: text.slice(0, 8000),
     });
+    
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Embedding generation timeout after 10s')), 10000);
+    });
+    
+    const response = await Promise.race([embeddingPromise, timeoutPromise]);
     return response.data[0].embedding;
   } catch (error: any) {
     console.error(`❌ Embedding generation failed: ${error.message}`);
@@ -729,6 +736,10 @@ export interface SemanticSearchResult {
   similarity: number;
 }
 
+// PERFORMANCE: Cache query embeddings to avoid repeated API calls (CRITICAL for 3-minute delay fix)
+const queryEmbeddingCache = new Map<string, { embedding: number[]; timestamp: number }>();
+const QUERY_EMBEDDING_CACHE_TTL = 60 * 60 * 1000; // 1 hour cache for query embeddings
+
 export async function semanticSearch(
   query: string,
   entries: KnowledgeEntry[],
@@ -736,7 +747,30 @@ export async function semanticSearch(
 ): Promise<SemanticSearchResult[]> {
   if (entries.length === 0) return [];
   
-  const queryEmbedding = await generateEmbedding(query);
+  // CRITICAL FIX: Check cache first to avoid expensive embedding API call
+  const cacheKey = query.toLowerCase().trim();
+  const cached = queryEmbeddingCache.get(cacheKey);
+  let queryEmbedding: number[] | null = null;
+  
+  if (cached && (Date.now() - cached.timestamp < QUERY_EMBEDDING_CACHE_TTL)) {
+    queryEmbedding = cached.embedding;
+    console.log(`⚡ Using cached query embedding (age: ${Date.now() - cached.timestamp}ms)`);
+  } else {
+    queryEmbedding = await generateEmbedding(query);
+    
+    // Cache the embedding for future use
+    if (queryEmbedding) {
+      queryEmbeddingCache.set(cacheKey, { embedding: queryEmbedding, timestamp: Date.now() });
+      
+      // Clean up old cache entries (keep cache size manageable)
+      if (queryEmbeddingCache.size > 100) {
+        const oldestKey = Array.from(queryEmbeddingCache.entries())
+          .sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
+        queryEmbeddingCache.delete(oldestKey);
+      }
+    }
+  }
+  
   if (!queryEmbedding) {
     console.warn('⚠️ Could not generate query embedding, falling back to enhanced keyword match');
     // ENHANCED: Split query into words and match any of them (essential for pricing queries)

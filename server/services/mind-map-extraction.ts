@@ -195,7 +195,7 @@ export async function extractTechEnvironment(
     // Simplified prompt for faster generation
     const systemPrompt = `Sales intelligence analyst. Extract key elements from conversation. Output JSON only.
 
-${trainMeKnowledge ? 'DOMAIN KNOWLEDGE:\n' + trainMeKnowledge.substring(0, 1000) + '\n\n' : ''}EXTRACT:
+${trainMeKnowledge ? 'DOMAIN KNOWLEDGE:\n' + trainMeKnowledge.substring(0, 500) + '...\n\n' : ''}EXTRACT:
 
 1. TECH STACK: Current systems, tools, infrastructure mentioned
 2. PEOPLE: Decision makers with roles and influence
@@ -249,7 +249,7 @@ Extract: tech stack, decision makers, pain points, processes, follow-up question
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // CRITICAL: 20-second timeout for Map/Flow AI call (increased for complex conversations)
+        // CRITICAL: 45-second timeout for Map/Flow AI call (DeepSeek can be slow with complex conversations)
         const aiCallPromise = client.chat.completions.create({
           model: fastModel,
           messages: [
@@ -258,11 +258,11 @@ Extract: tech stack, decision makers, pain points, processes, follow-up question
           ],
           response_format: { type: "json_object" },
           temperature: 0.1,
-          max_tokens: 3000 // Reduced from 4500 for faster response
+          max_tokens: 1500 // Reduced from 2000 for even faster response
         });
         
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('AI call timeout after 20 seconds')), 20000)
+          setTimeout(() => reject(new Error('AI call timeout after 45 seconds')), 45000)
         );
         
         response = await Promise.race([aiCallPromise, timeoutPromise]) as any;

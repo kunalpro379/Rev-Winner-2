@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import PricingModal from "./pricing-modal";
 import { SessionMinutesModal } from "./session-minutes-modal";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Collapsible,
   CollapsibleContent,
@@ -95,6 +96,7 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
   const [showSessionMinutesModal, setShowSessionMinutesModal] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
+  const [speakerMapping, setSpeakerMapping] = useState<Map<number, string>>(new Map()); // Map Deepgram speaker IDs to our speaker IDs
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
   const prevIsTranscribingRef = useRef<boolean>(false);
   const analyzeOnSpeechRef = useRef<(() => void) | null>(null);
@@ -171,34 +173,46 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
         setInterimTranscript("");
         const finalText = result.transcript.trim();
         if (finalText) {
-          // Check if Deepgram detected MULTIPLE speakers (not just all speaker 0)
-          const hasMultipleSpeakers = result.speakerSegments && 
-            result.speakerSegments.length > 0 &&
-            new Set(result.speakerSegments.map(s => s.speaker)).size > 1;
+          // IMPROVED SPEAKER DETECTION: Use Deepgram diarization when available, fallback to voice fingerprinting
+          const hasDeepgramSpeakers = result.speakerSegments && result.speakerSegments.length > 0;
+          const uniqueSpeakers = hasDeepgramSpeakers 
+            ? new Set(result.speakerSegments!.map(s => s.speaker))
+            : new Set();
+          const hasMultipleSpeakers = uniqueSpeakers.size > 1;
           
-          if (hasMultipleSpeakers) {
-            // Use Deepgram's diarization when it actually detects different speakers
-            console.log(`👥 Deepgram detected multiple speakers - using Deepgram diarization`);
+          if (hasDeepgramSpeakers) {
+            // Use Deepgram's diarization - map Deepgram speaker IDs to our speaker IDs consistently
+            console.log(`🎙️ Deepgram speakers detected: [${Array.from(uniqueSpeakers).join(', ')}]`);
+            
             result.speakerSegments!.forEach(segment => {
-              const speakerId = `speaker${segment.speaker + 1}`;
-              console.log(`👤 Deepgram Speaker ${segment.speaker} -> ${speakerId}: "${segment.text.substring(0, 30)}..."`);
-              const speaker = getSpeakerById(speakerId);
+              // PERSISTENT MAPPING: Map Deepgram speaker ID to our speaker ID
+              let mappedSpeakerId = speakerMapping.get(segment.speaker);
+              
+              if (!mappedSpeakerId) {
+                // First time seeing this Deepgram speaker - assign next available speaker ID
+                const nextSpeakerNum = speakerMapping.size + 1;
+                mappedSpeakerId = `speaker${nextSpeakerNum}`;
+                setSpeakerMapping(prev => new Map(prev).set(segment.speaker, mappedSpeakerId!));
+                console.log(`👤 New speaker mapping: Deepgram ${segment.speaker} -> ${mappedSpeakerId}`);
+              }
+              
+              const speaker = getSpeakerById(mappedSpeakerId);
               
               setFullTranscript(prev => prev + (prev ? " " : "") + segment.text);
               setTranscriptSegments(prev => [...prev, { 
                 text: segment.text,
-                speakerId,
+                speakerId: mappedSpeakerId!,
                 timestamp: new Date()
               }]);
               
-              onSendMessage(segment.text, `Speaker ${segment.speaker + 1}`);
+              onSendMessage(segment.text, speaker.name);
             });
           } else {
-            // Use client-side voice fingerprinting for speaker detection
-            // This works better when Deepgram returns all speaker 0 (mixed meeting audio)
+            // Fallback: Use client-side voice fingerprinting for speaker detection
+            // This works when Deepgram hasn't warmed up yet (first 20-30s) or for single speaker
             const voiceSpeakerId = detectedSpeaker || currentSpeakerId;
             const speaker = getSpeakerById(voiceSpeakerId);
-            console.log(`🎙️ Using voice fingerprinting: ${voiceSpeakerId} (confidence: ${(confidence * 100).toFixed(0)}%)`);
+            console.log(`🎤 Using voice fingerprinting: ${voiceSpeakerId} (confidence: ${(confidence * 100).toFixed(0)}%)`);
             
             setFullTranscript(prev => prev + (prev ? " " : "") + finalText);
             setTranscriptSegments(prev => [...prev, { 
@@ -382,6 +396,18 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
       
       console.log(`🚀 handleStart - About to call startTranscription(true, ${captureMeetingAudio})`);
       console.log(`🖥️ isDesktopBrowser(): ${isDesktopBrowser()}, isMobileDevice(): ${isMobileDevice()}`);
+      
+      // Mark transcription start in database (for accurate session duration tracking)
+      if (sessionId) {
+        try {
+          await apiRequest("POST", `/api/conversations/${sessionId}/start-transcription`, {});
+          console.log(`✅ Transcription start marked for session ${sessionId}`);
+        } catch (error) {
+          console.error('Failed to mark transcription start:', error);
+          // Don't block transcription if this fails - it's just for tracking
+        }
+      }
+      
       await startTranscription(true, captureMeetingAudio);
     } catch (error: any) {
       toast({
@@ -445,13 +471,16 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
       setSelectedSegments(new Set());
       setSpeakers(DEFAULT_SPEAKERS); // Reset to default speakers
       setCurrentSpeakerId("speaker1");
+      setSpeakerMapping(new Map()); // CRITICAL: Clear speaker mapping for new session
       setAutoDetectEnabled(true);
       
       // Step 4: Close modals
       setShowPricingModal(false);
       setShowSessionMinutesModal(false);
+      
+      console.log(`🔄 Enhanced Live Transcript reset complete (version ${resetVersion})`);
     }
-  }, [resetVersion, isTranscribing, isPaused]);
+  }, [resetVersion, isTranscribing, isPaused, stopTranscription, resetVoiceDetection]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(fullTranscript);

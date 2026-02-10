@@ -128,9 +128,9 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
     },
     onSuccess: (data) => {
       const newTips = data.tips || [];
-      const tipsChanged = JSON.stringify(newTips) !== JSON.stringify(tips);
       
-      if (tipsChanged) {
+      if (newTips.length > 0) {
+        // REAL-TIME UPDATE: Replace old tips with fresh ones (no historical piling)
         setTips(newTips);
       }
       
@@ -146,7 +146,7 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
             description: "Review the tips, then click Play to continue monitoring",
           });
         }
-        console.log('⏸️ Shift Gears: Auto-paused after response - review tips before continuing');
+        console.log(`⏸️ Shift Gears: Auto-paused after response - ${newTips.length} fresh tips (replaced old ones)`);
       }
     },
     onError: (error: any) => {
@@ -172,11 +172,12 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
     },
     onSuccess: (data) => {
       const newPitches = data.pitches || [];
-      const pitchesChanged = JSON.stringify(newPitches) !== JSON.stringify(pitches);
       
-      if (pitchesChanged) {
+      if (newPitches.length > 0) {
+        // REAL-TIME UPDATE: Replace old pitches with fresh ones (no historical piling)
         setPitches(newPitches);
-        if (newPitches.length > 0 && !isPitchesOpen) {
+        
+        if (!isPitchesOpen) {
           setIsPitchesOpen(true);
         }
       }
@@ -193,7 +194,7 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
             description: "Review the pitch response, then click Play to continue",
           });
         }
-        console.log('⏸️ Query Pitches: Auto-paused after response - review pitch before continuing');
+        console.log(`⏸️ Query Pitches: Auto-paused after response - ${newPitches.length} fresh pitches (replaced old ones)`);
       }
     },
     onError: (error: any) => {
