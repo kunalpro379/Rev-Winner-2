@@ -1034,7 +1034,7 @@ export class BillingStorage implements IBillingStorage {
         'usage_bundle': 'session_minutes',
         'train_me': 'train_me',
         'dai': 'dai',
-        'service': 'dai', // Map service to dai category
+        'service': 'service', // Keep service as its own category
       };
 
       const itemCategory = categoryMap[item.addonType] || item.addonType;
@@ -1042,9 +1042,22 @@ export class BillingStorage implements IBillingStorage {
       
       if (promoCategory !== itemCategory) {
         console.log(`⚠️ Promo category mismatch: promo.category="${promo.category}" (mapped: "${promoCategory}"), itemCategory="${itemCategory}", addonType="${item.addonType}"`);
+        
+        // Provide user-friendly category names in error message
+        const categoryNames: Record<string, string> = {
+          'train_me': 'Train Me',
+          'dai': 'Domain AI Intelligence',
+          'service': 'Professional Services',
+          'session_minutes': 'Session Minutes',
+          'platform_subscription': 'Platform Access',
+        };
+        
+        const friendlyPromoCategory = categoryNames[promo.category] || promo.category;
+        const friendlyItemCategory = categoryNames[item.addonType] || item.addonType;
+        
         return { 
           success: false, 
-          message: `This promo code is only valid for ${promo.category} purchases` 
+          message: `This promo code is only valid for ${friendlyPromoCategory} purchases, not ${friendlyItemCategory}` 
         };
       }
     }

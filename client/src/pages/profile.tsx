@@ -543,61 +543,86 @@ export default function Profile() {
               </div>
             ) : sessionMinutesStatus ? (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 rounded-lg border border-border/30">
-                    <p className="text-sm text-muted-foreground mb-1">Minutes Remaining</p>
-                    <p className="text-3xl font-bold text-purple-600 dark:text-purple-400" data-testid="text-minutes-remaining">
-                      {sessionMinutesStatus.totalMinutesRemaining}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {subscriptionData?.minutesUsed || sessionMinutesStatus.usedMinutes || 0} used / {sessionMinutesStatus.totalMinutes !== Infinity ? sessionMinutesStatus.totalMinutes : 'Unlimited'} total
-                    </p>
-                  </div>
-                  
-                  <div className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-lg border border-border/30">
-                    <p className="text-sm text-muted-foreground mb-1">Next Expiry</p>
-                    <p className="text-sm font-semibold text-foreground" data-testid="text-minutes-expiry">
-                      {sessionMinutesStatus.nextExpiryDate ? formatDate(sessionMinutesStatus.nextExpiryDate) : "N/A"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Usage Summary - Always show if we have total minutes data */}
-                {(sessionMinutesStatus.totalMinutes !== Infinity || (subscriptionData?.minutesUsed && parseInt(subscriptionData.minutesUsed) > 0)) && (
-                  <div className="p-4 bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-950/30 dark:to-gray-950/30 rounded-lg border border-border/30">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm text-muted-foreground">Usage Summary</p>
-                      <p className="text-xs text-muted-foreground">
-                        {subscriptionData?.minutesUsed || sessionMinutesStatus.usedMinutes || 0} / {sessionMinutesStatus.totalMinutes !== Infinity ? sessionMinutesStatus.totalMinutes : 'Unlimited'} minutes used
-                      </p>
-                    </div>
-                    {sessionMinutesStatus.totalMinutes !== Infinity && (
-                      <>
-                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                          <div 
-                            className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full transition-all duration-300"
-                            style={{ 
-                              width: `${Math.min(100, ((subscriptionData?.minutesUsed ? parseInt(subscriptionData.minutesUsed) : sessionMinutesStatus.usedMinutes) / sessionMinutesStatus.totalMinutes) * 100)}%` 
-                            }}
-                          ></div>
-                        </div>
-                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                          <span>{subscriptionData?.minutesUsed || sessionMinutesStatus.usedMinutes || 0} used</span>
-                          <span>{sessionMinutesStatus.totalMinutesRemaining} remaining</span>
-                        </div>
-                      </>
-                    )}
-                    {sessionMinutesStatus.totalMinutes === Infinity && (
-                      <div className="text-center py-2">
-                        <p className="text-sm text-green-600 dark:text-green-400 font-semibold">
-                          ✨ Unlimited Minutes - {subscriptionData?.minutesUsed || 0} minutes used
+                {/* Show detailed stats ONLY if user has purchased packages */}
+                {sessionMinutesStatus.hasPurchasedPackages ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 bg-gradient-to-br from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 rounded-lg border border-border/30">
+                        <p className="text-sm text-muted-foreground mb-1">Minutes Remaining</p>
+                        <p className="text-3xl font-bold text-purple-600 dark:text-purple-400" data-testid="text-minutes-remaining">
+                          {sessionMinutesStatus.totalMinutesRemaining}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {subscriptionData?.minutesUsed || sessionMinutesStatus.usedMinutes || 0} used / {sessionMinutesStatus.totalMinutes !== Infinity ? sessionMinutesStatus.totalMinutes : 'Unlimited'} total
                         </p>
                       </div>
+                      
+                      <div className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-lg border border-border/30">
+                        <p className="text-sm text-muted-foreground mb-1">Next Expiry</p>
+                        <p className="text-sm font-semibold text-foreground" data-testid="text-minutes-expiry">
+                          {sessionMinutesStatus.nextExpiryDate ? formatDate(sessionMinutesStatus.nextExpiryDate) : "N/A"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Usage Summary - Always show if we have total minutes data */}
+                    {(sessionMinutesStatus.totalMinutes !== Infinity || (subscriptionData?.minutesUsed && parseInt(subscriptionData.minutesUsed) > 0)) && (
+                      <div className="p-4 bg-gradient-to-br from-slate-50 to-gray-50 dark:from-slate-950/30 dark:to-gray-950/30 rounded-lg border border-border/30">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm text-muted-foreground">Usage Summary</p>
+                          <p className="text-xs text-muted-foreground">
+                            {subscriptionData?.minutesUsed || sessionMinutesStatus.usedMinutes || 0} / {sessionMinutesStatus.totalMinutes !== Infinity ? sessionMinutesStatus.totalMinutes : 'Unlimited'} minutes used
+                          </p>
+                        </div>
+                        {sessionMinutesStatus.totalMinutes !== Infinity && (
+                          <>
+                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                              <div 
+                                className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full transition-all duration-300"
+                                style={{ 
+                                  width: `${Math.min(100, ((subscriptionData?.minutesUsed ? parseInt(subscriptionData.minutesUsed) : sessionMinutesStatus.usedMinutes) / sessionMinutesStatus.totalMinutes) * 100)}%` 
+                                }}
+                              ></div>
+                            </div>
+                            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                              <span>{subscriptionData?.minutesUsed || sessionMinutesStatus.usedMinutes || 0} used</span>
+                              <span>{sessionMinutesStatus.totalMinutesRemaining} remaining</span>
+                            </div>
+                          </>
+                        )}
+                        {sessionMinutesStatus.totalMinutes === Infinity && (
+                          <div className="text-center py-2">
+                            <p className="text-sm text-green-600 dark:text-green-400 font-semibold">
+                              ✨ Unlimited Minutes - {subscriptionData?.minutesUsed || 0} minutes used
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  /* Clean UI when no packages purchased - regardless of trial usage */
+                  <div className="p-6 bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 rounded-lg border border-orange-200 dark:border-orange-800 text-center">
+                    <div className="mb-3">
+                      <svg className="w-12 h-12 mx-auto text-orange-500 dark:text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <p className="text-lg font-bold text-orange-900 dark:text-orange-100 mb-2">
+                      No Session Minutes Purchased
+                    </p>
+                    <p className="text-sm text-orange-700 dark:text-orange-300 mb-3">
+                      Purchase Session Minutes packages to continue using the platform.
+                    </p>
+                    {sessionMinutesStatus.usedMinutes > 0 && (
+                      <p className="text-xs text-orange-600 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/50 rounded px-3 py-2 inline-block">
+                        You've used {sessionMinutesStatus.usedMinutes} minutes from your free trial
+                      </p>
                     )}
                   </div>
                 )}
                 
-                {!sessionMinutesStatus.hasActiveMinutes && (
+                {!sessionMinutesStatus.hasActiveMinutes && sessionMinutesStatus.hasPurchasedPackages && (
                   <div className="p-4 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg">
                     <p className="text-sm font-medium text-orange-900 dark:text-orange-100">
                       {sessionMinutesStatus.totalMinutes === 0 && subscriptionData?.planType === 'free_trial' 

@@ -1062,6 +1062,140 @@ export default function Subscribe() {
         </div>
       </div>
       
+      {/* Footer */}
+      <footer className="border-t border-purple-200/50 dark:border-purple-500/20 bg-white/30 dark:bg-slate-950/50 backdrop-blur-sm mt-20">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 py-12">
+          {/* About the Company Section */}
+          <div className="mb-12">
+            <h3 className="text-lg font-bold text-purple-900 dark:text-purple-300 mb-4">About Rev Winner</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
+                  <strong className="text-slate-900 dark:text-white">Rev Winner</strong> is an AI-powered sales assistant platform developed by <strong className="text-slate-900 dark:text-white">Healthcaa Technologies</strong>, a technology company based in Lucknow, India. Since 2024, we've been empowering sales professionals worldwide with real-time conversation intelligence, live transcription, and AI-driven insights to close more deals.
+                </p>
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Our platform supports multi-AI engines (OpenAI, Anthropic Claude, Google Gemini, X.AI Grok, DeepSeek, Kimi K2) and provides enterprise-grade security with encrypted API key storage, single-device access control, and comprehensive audit logging.
+                </p>
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Our Expertise</h4>
+                <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
+                  <li className="flex items-start">
+                    <Check className="h-4 w-4 text-green-600 dark:text-green-400 mr-2 mt-0.5 flex-shrink-0" />
+                    <span>Real-time sales coaching with 3-second AI response times</span>
+                  </li>
+                  <li className="flex items-start">
+                    <Check className="h-4 w-4 text-green-600 dark:text-green-400 mr-2 mt-0.5 flex-shrink-0" />
+                    <span>Live transcription with multi-speaker identification (Deepgram integration)</span>
+                  </li>
+                  <li className="flex items-start">
+                    <Check className="h-4 w-4 text-green-600 dark:text-green-400 mr-2 mt-0.5 flex-shrink-0" />
+                    <span>Automated meeting minutes with BANT qualification</span>
+                  </li>
+                  <li className="flex items-start">
+                    <Check className="h-4 w-4 text-green-600 dark:text-green-400 mr-2 mt-0.5 flex-shrink-0" />
+                    <span>Professional sales materials (pitch decks, case studies, battle cards)</span>
+                  </li>
+                </ul>
+                <p className="text-xs text-slate-500 dark:text-slate-500 mt-4">
+                  📍 Location: Lucknow, Uttar Pradesh, India
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+                  📞 USA/Canada: <a href="tel:+18326328555" className="text-purple-600 dark:text-purple-400 hover:underline">+1 (832) 632-8555</a> • India: <a href="tel:+918130276382" className="text-purple-600 dark:text-purple-400 hover:underline">+91 8130276382</a>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-purple-200/50 dark:border-purple-500/20 pt-8 mb-8"></div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+            {/* Company */}
+            <div>
+              <h3 className="text-sm font-semibold text-purple-900 dark:text-purple-300 uppercase tracking-wider mb-4">Company</h3>
+              <ul className="space-y-2">
+                <li>
+                  <button onClick={() => setLocation('/')} className="text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="footer-link-home">
+                    Home
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => setLocation('/blog')} className="text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="footer-link-blog">
+                    Blog
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => setLocation('/contact')} className="text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="footer-link-contact">
+                    Contact Us
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            {/* Product */}
+            <div>
+              <h3 className="text-sm font-semibold text-purple-900 dark:text-purple-300 uppercase tracking-wider mb-4">Product</h3>
+              <ul className="space-y-2">
+                <li>
+                  <button onClick={() => setLocation('/ai-sales-assistant')} className="text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="footer-link-app">
+                    Rev Winner App
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => setLocation('/packages')} className="text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="footer-link-pricing">
+                    Pricing
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => setLocation('/register')} className="text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="footer-link-trial">
+                    Start Free Trial
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            {/* Legal */}
+            <div>
+              <h3 className="text-sm font-semibold text-purple-900 dark:text-purple-300 uppercase tracking-wider mb-4">Legal</h3>
+              <ul className="space-y-2">
+                <li>
+                  <button onClick={() => setLocation('/terms')} className="text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="footer-link-terms">
+                    Terms & Conditions
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => setLocation('/privacy-policy')} className="text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="footer-link-privacy">
+                    Privacy Policy
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            {/* Resources */}
+            <div>
+              <h3 className="text-sm font-semibold text-purple-900 dark:text-purple-300 uppercase tracking-wider mb-4">Resources</h3>
+              <ul className="space-y-2">
+                <li>
+                  <a href="/sitemap.xml" target="_blank" rel="noopener noreferrer" className="text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="footer-link-sitemap">
+                    Sitemap
+                  </a>
+                </li>
+                <li>
+                  <a href="/robots.txt" target="_blank" rel="noopener noreferrer" className="text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="footer-link-robots">
+                    Robots.txt
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="border-t border-purple-200/50 dark:border-purple-500/20 pt-8 text-center text-slate-600 dark:text-slate-400">
+            <p>© 2025 Rev Winner. All rights reserved.</p>
+            <p className="text-sm mt-2">A Product from Healthcaa Technologies</p>
+          </div>
+        </div>
+      </footer>
+      
       {/* Business Teams Dialog */}
       <BusinessTeamsDialog 
         open={showBusinessTeamsDialog} 

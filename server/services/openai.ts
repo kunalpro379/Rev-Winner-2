@@ -4292,14 +4292,14 @@ JSON format:
     } else if (type === 'battle-card') {
       console.log(`🎯 Generating battle card for domain: ${domainExpertise}`);
       
-      // PRIORITY 1: Fetch Train Me documents (INCREASED for better competitive intel)
+      // OPTIMIZATION: Reduce training context size for faster generation
       // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
-      const trainingContext = await getTrainingDocumentContext(userId, 10000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
+      const trainingContext = await getTrainingDocumentContext(userId, 6000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
       console.log(`Battle Card - Training documents loaded: ${trainingContext ? trainingContext.length : 0} chars`);
       
-      // ENHANCED: Use last 2500 chars for better conversation context
-      const fullContext = conversationContext.length > 2500
-        ? conversationContext.slice(-2500)
+      // OPTIMIZATION: Use last 1500 chars for faster processing while maintaining context
+      const fullContext = conversationContext.length > 1500
+        ? conversationContext.slice(-1500)
         : conversationContext;
       
       // Inject intelligence engine supplement for honest battle cards
@@ -4307,8 +4307,8 @@ JSON format:
       const supplementText = formatPromptSupplement(supplement);
       
       console.log(`📝 Battle Card - Intelligence supplement: ${supplement.domainBadge}`);
-      console.log(`📝 Battle Card - Conversation context length: ${conversationContext.length} chars`);
-      console.log(`📝 Battle Card - Context sample (first 500 chars): ${conversationContext.substring(0, 500)}`);
+      console.log(`📝 Battle Card - Conversation context length: ${fullContext.length} chars (optimized)`);
+      console.log(`📝 Battle Card - Context sample (first 500 chars): ${fullContext.substring(0, 500)}`);
       
       // LIGHTWEIGHT COMPETITOR EXTRACTION - scan conversation for known competitors
       const extractCompetitorsFromConversation = (text: string): string[] => {

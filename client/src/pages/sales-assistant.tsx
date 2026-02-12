@@ -51,6 +51,21 @@ export default function SalesAssistant() {
     enabled: !!authData,
   });
 
+  // Fetch Session Minutes status for display
+  const { data: sessionMinutesStatus } = useQuery<{
+    hasActiveMinutes: boolean;
+    totalMinutesRemaining: number;
+    totalMinutes: number;
+    usedMinutes: number;
+    nextExpiryDate: string | null;
+    superUserAccess?: boolean;
+    hasPurchasedPackages?: boolean;
+  }>({
+    queryKey: ["/api/session-minutes/status"],
+    enabled: !!authData,
+    refetchInterval: 60000, // Refetch every minute
+  });
+
   const [showAISetup, setShowAISetup] = useState(false);
 
   // Redirect to login if not authenticated
@@ -724,6 +739,48 @@ export default function SalesAssistant() {
                       {(aiEngineSettings as any).aiEngine === 'xai' && 'X.AI Grok'}
                       {(aiEngineSettings as any).aiEngine === 'kimi' && 'Kimi K2'}
                       {!['openai', 'anthropic', 'google', 'deepseek', 'xai', 'kimi'].includes((aiEngineSettings as any).aiEngine) && (aiEngineSettings as any).aiEngine}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Session Status Display */}
+              {sessionMinutesStatus && (
+                <div 
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer hover:opacity-80 transition-opacity ${
+                    sessionMinutesStatus.hasActiveMinutes 
+                      ? 'bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700/50' 
+                      : 'bg-orange-100 dark:bg-orange-900/30 border-orange-300 dark:border-orange-700/50'
+                  }`}
+                  onClick={() => setLocation('/profile')}
+                  data-testid="session-status-display"
+                  title="Click to view details in Profile"
+                >
+                  <AlertCircle className={`h-5 w-5 ${
+                    sessionMinutesStatus.hasActiveMinutes 
+                      ? 'text-green-700 dark:text-green-400' 
+                      : 'text-orange-700 dark:text-orange-400'
+                  }`} />
+                  <div>
+                    <p className={`text-xs font-medium ${
+                      sessionMinutesStatus.hasActiveMinutes 
+                        ? 'text-green-600 dark:text-green-400' 
+                        : 'text-orange-600 dark:text-orange-400'
+                    }`}>
+                      {sessionMinutesStatus.superUserAccess 
+                        ? 'Unlimited Access' 
+                        : sessionMinutesStatus.hasActiveMinutes 
+                        ? 'Session Active' 
+                        : 'Session Expired'}
+                    </p>
+                    <p className={`text-sm font-semibold ${
+                      sessionMinutesStatus.hasActiveMinutes 
+                        ? 'text-green-900 dark:text-green-200' 
+                        : 'text-orange-900 dark:text-orange-200'
+                    }`} data-testid="text-session-status">
+                      {sessionMinutesStatus.superUserAccess 
+                        ? '∞ minutes' 
+                        : `${sessionMinutesStatus.totalMinutesRemaining} min left`}
                     </p>
                   </div>
                 </div>

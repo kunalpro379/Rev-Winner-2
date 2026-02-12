@@ -209,6 +209,15 @@ export function useDeepgramTranscription({
         onErrorRef.current?.(errorMsg);
         return;
       }
+      
+      // Detect Safari and provide guidance for better speaker detection
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      const isMac = /Macintosh|MacIntel|MacPPC|Mac68K/i.test(navigator.userAgent);
+      
+      if (includeTab && isSafari && isMac) {
+        console.warn('⚠️ Safari detected on Mac - audio mixing may affect speaker detection quality');
+        console.log('💡 Recommendation: For best speaker detection, use Chrome or Edge on Mac');
+      }
 
       connectWebSocket();
 
@@ -227,8 +236,9 @@ export function useDeepgramTranscription({
         setTimeout(() => reject(new Error('WebSocket connection timeout')), 5000);
       });
 
-      // Use 16kHz sample rate for broad compatibility (Safari/iOS and all browsers)
-      const sampleRate = 16000;
+      // Use 48kHz sample rate for better speaker diarization quality
+      // Higher sample rate preserves more voice characteristics for speaker identification
+      const sampleRate = 48000;
       
       console.log(`🎤 Creating AudioContext with sample rate: ${sampleRate}Hz (iOS: ${isIOS}, Mobile: ${isMobile})`);
       
@@ -301,16 +311,46 @@ export function useDeepgramTranscription({
       }
 
       const destination = audioContext.createMediaStreamDestination();
-      const merger = audioContext.createChannelMerger(sources.length);
-
-      sources.forEach((source, index) => {
-        source.connect(merger, 0, index);
-      });
-      merger.connect(destination);
+      let finalAudioNode: AudioNode = destination; // Track the final node to connect processor to
+      
+      if (sources.length === 1) {
+        // Single source - direct connection for best quality
+        sources[0].connect(destination);
+        finalAudioNode = sources[0]; // Use source as final node
+        console.log('🎵 Single audio source connected directly');
+      } else {
+        // Multiple sources - use proper mixing with gain control for better speaker separation
+        console.log('🎵 Mixing multiple audio sources with gain control for speaker diarization');
+        const merger = audioContext.createChannelMerger(2); // Stereo for better separation
+        
+        sources.forEach((source, index) => {
+          // Add gain node for level control
+          const gainNode = audioContext.createGain();
+          gainNode.gain.value = 1.0; // Unity gain
+          
+          // Connect: source -> gain -> merger (different channels for separation)
+          source.connect(gainNode);
+          gainNode.connect(merger, 0, index % 2); // Alternate L/R channels
+          console.log(`  Source ${index} -> Gain -> Channel ${index % 2}`);
+        });
+        
+        // Convert stereo back to mono for Deepgram (preserves speaker characteristics)
+        const splitter = audioContext.createChannelSplitter(2);
+        const mergerMono = audioContext.createChannelMerger(1);
+        
+        merger.connect(splitter);
+        splitter.connect(mergerMono, 0, 0); // Left channel
+        splitter.connect(mergerMono, 1, 0); // Right channel (mixed)
+        mergerMono.connect(destination);
+        finalAudioNode = mergerMono; // Use mergerMono as final node
+        console.log('🎵 Stereo mixed to mono while preserving speaker characteristics');
+      }
+      
       setAudioStream(destination.stream);
 
-      const processor = audioContext.createScriptProcessor(2048, 1, 1);
-      merger.connect(processor);
+      // Larger buffer size for better audio quality and speaker diarization
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      finalAudioNode.connect(processor); // Connect from the correct final node
       processor.connect(audioContext.destination);
 
       processor.onaudioprocess = (e) => {

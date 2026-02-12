@@ -18,11 +18,12 @@ import {
   purchasePlatformAccessSchema,
   type AddonPurchase,
   addonPurchases,
+  conversations,
 } from "../shared/schema";
 import { z } from "zod";
 import { eventLogger } from './services/event-logger';
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 // Helper function to get Razorpay credentials based on environment
 function getRazorpayKeyId(): string | undefined {
@@ -1192,11 +1193,56 @@ export function setupBillingRoutes(app: Router) {
           usedMinutes: 0,
           nextExpiryDate: null,
           superUserAccess: true,
+          hasPurchasedPackages: true,
         });
       }
       
-      // Get session minutes balance from database (total purchased minutes)
+      // Get session minutes balance from addon purchases (purchased packages)
       const balance = await billingStorage.getSessionMinutesBalance(userId);
+      
+      // Check if user has ever purchased any session minutes packages
+      const purchasedPackages = await db
+        .select()
+        .from(addonPurchases)
+        .where(
+          and(
+            eq(addonPurchases.userId, userId),
+            eq(addonPurchases.addonType, 'session_minutes')
+          )
+        );
+      
+      const hasPurchasedPackages = purchasedPackages.length > 0;
+      
+      // Get subscription data for trial minutes
+      let subscription = await authStorage.getSubscriptionByUserId(userId);
+      
+      // If no subscription exists, create a default free trial subscription
+      if (!subscription) {
+        console.log(`[Session Minutes] No subscription found for user ${userId}, creating free trial`);
+        subscription = await authStorage.createSubscription({
+          userId,
+          planId: 'free_trial',
+          planType: 'free_trial',
+          status: 'trial',
+          sessionsUsed: '0',
+          sessionsLimit: '3',
+          minutesUsed: '0',
+          minutesLimit: '180',
+          sessionHistory: [],
+        });
+      }
+      
+      // Calculate total minutes: purchased + trial
+      let totalMinutes = balance.totalMinutes; // From purchased packages
+      
+      console.log(`[Session Minutes] User ${userId} - Purchased: ${balance.totalMinutes}, Subscription: ${subscription?.minutesLimit}, Has Packages: ${hasPurchasedPackages}`);
+      
+      // Add trial minutes if user is on free trial
+      if (subscription?.planType === 'free_trial' && subscription.minutesLimit) {
+        const trialMinutes = subscription.minutesLimit === 'unlimited' ? 0 : parseInt(subscription.minutesLimit || '0');
+        totalMinutes += trialMinutes;
+        console.log(`[Session Minutes] Added ${trialMinutes} trial minutes, total now: ${totalMinutes}`);
+      }
       
       // CRITICAL FIX: Calculate actual used minutes from filtered conversations
       // Only count sessions where transcriptionStartedAt is set (user clicked Start button)
@@ -1219,15 +1265,13 @@ export function setupBillingRoutes(app: Router) {
             return total + durationMinutes;
           }, 0);
         
-        console.log(`[Session Minutes Status] User ${userId}: ${actualUsedMinutes} minutes used from ${userConversations.filter(c => !!c.transcriptionStartedAt).length} sessions`);
+        console.log(`[Session Minutes Status] User ${userId}: ${actualUsedMinutes} minutes used from ${userConversations.filter(c => !!c.transcriptionStartedAt).length} sessions (Total: ${totalMinutes} minutes available, Purchased packages: ${hasPurchasedPackages})`);
       } catch (error) {
         console.error('[Session Minutes Status] Error calculating used minutes:', error);
         // Fallback to subscription data if conversation query fails
-        const subscription = await authStorage.getSubscriptionByUserId(userId);
         actualUsedMinutes = subscription?.minutesUsed ? parseInt(subscription.minutesUsed) : 0;
       }
       
-      const totalMinutes = balance.totalMinutes;
       const remainingMinutes = Math.max(0, totalMinutes - actualUsedMinutes);
       
       res.json({
@@ -1237,6 +1281,7 @@ export function setupBillingRoutes(app: Router) {
         usedMinutes: actualUsedMinutes,
         nextExpiryDate: balance.expiresAt ? balance.expiresAt.toISOString() : null,
         superUserAccess: false,
+        hasPurchasedPackages: hasPurchasedPackages, // NEW: Flag to indicate if user has ever purchased packages
       });
     } catch (error: any) {
       console.error("Get session minutes status error:", error);

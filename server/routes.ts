@@ -151,6 +151,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Mark transcription start (when user clicks Start button)
+  // UPDATED: This endpoint is now called when ACTUAL transcription begins (first audio received)
+  // NOT when Start button is clicked - this prevents counting sessions that never actually start
   app.post("/api/conversations/:sessionId/start-transcription", async (req, res) => {
     try {
       const conversation = await storage.getConversation(req.params.sessionId);
@@ -158,24 +160,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Conversation not found" });
       }
 
-      // Only set transcriptionStartedAt if it hasn't been set yet (first Start click)
+      // Only set transcriptionStartedAt if it hasn't been set yet (first actual transcription)
       if (!conversation.transcriptionStartedAt) {
         const updated = await storage.updateConversation(req.params.sessionId, {
           transcriptionStartedAt: new Date()
         });
         
-        console.log(`🎤 Transcription started for session ${req.params.sessionId} at ${new Date().toISOString()}`);
+        console.log(`🎤 Transcription ACTUALLY started for session ${req.params.sessionId} at ${new Date().toISOString()}`);
+        
+        // CRITICAL: Increment sessionsUsed ONLY when transcription actually starts
+        // This prevents counting sessions where user just clicked Start but never spoke
+        // Session is only counted when timer is running and audio is being processed
+        if (conversation.userId) {
+          try {
+            const subscription = await authStorage.getSubscriptionByUserId(conversation.userId);
+            if (subscription) {
+              const currentSessionsUsed = parseInt(subscription.sessionsUsed || '0') || 0;
+              await authStorage.updateSubscription(subscription.id, {
+                sessionsUsed: (currentSessionsUsed + 1).toString()
+              });
+              console.log(`📊 Session count incremented: ${currentSessionsUsed} -> ${currentSessionsUsed + 1} for user ${conversation.userId} (actual transcription started)`);
+            }
+          } catch (error) {
+            console.error('Failed to increment session count:', error);
+            // Don't block transcription start if session counting fails
+          }
+        }
         
         res.json({
           success: true,
-          transcriptionStartedAt: updated?.transcriptionStartedAt
+          transcriptionStartedAt: updated?.transcriptionStartedAt,
+          sessionCounted: true
         });
       } else {
         // Already started, just return existing timestamp
+        // IMPORTANT: This is a resume after pause - do NOT increment session count
+        console.log(`🔄 Transcription resumed for session ${req.params.sessionId} (no new session counted)`);
         res.json({
           success: true,
           transcriptionStartedAt: conversation.transcriptionStartedAt,
-          alreadyStarted: true
+          alreadyStarted: true,
+          sessionCounted: false
         });
       }
     } catch (error: any) {

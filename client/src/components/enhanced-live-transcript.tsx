@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useDeepgramTranscription } from "@/hooks/use-deepgram-transcription";
 import { useVoiceFingerprinting } from "@/hooks/use-voice-fingerprinting";
-import { Mic, MicOff, Play, Pause, Square, Copy, Trash2, Volume2, Radio, Zap, Monitor, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
+import { Mic, MicOff, Play, Pause, Square, Copy, Trash2, Volume2, Radio, Zap, Monitor, CheckCircle2, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -96,7 +96,9 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
   const [showSessionMinutesModal, setShowSessionMinutesModal] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
+  const [showDiarizationWarmup, setShowDiarizationWarmup] = useState(false);
   const [speakerMapping, setSpeakerMapping] = useState<Map<number, string>>(new Map()); // Map Deepgram speaker IDs to our speaker IDs
+  const [transcriptionMarkedAsStarted, setTranscriptionMarkedAsStarted] = useState(false); // Track if we've marked transcription start in DB
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
   const prevIsTranscribingRef = useRef<boolean>(false);
   const analyzeOnSpeechRef = useRef<(() => void) | null>(null);
@@ -173,6 +175,25 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
         setInterimTranscript("");
         const finalText = result.transcript.trim();
         if (finalText) {
+          // CRITICAL: Mark transcription start in DB on FIRST final transcript
+          // This ensures we only count sessions where user actually spoke
+          if (!transcriptionMarkedAsStarted && sessionId) {
+            setTranscriptionMarkedAsStarted(true);
+            apiRequest("POST", `/api/conversations/${sessionId}/start-transcription`, {})
+              .then(response => response.json())
+              .then(data => {
+                if (data.sessionCounted) {
+                  console.log(`✅ Session started and counted on first transcript for session ${sessionId}`);
+                } else if (data.alreadyStarted) {
+                  console.log(`🔄 Session already started (resumed) for session ${sessionId}`);
+                }
+              })
+              .catch(error => {
+                console.error('Failed to mark transcription start:', error);
+                // Don't block transcription if this fails - it's just for tracking
+              });
+          }
+          
           // IMPROVED SPEAKER DETECTION: Use Deepgram diarization when available, fallback to voice fingerprinting
           const hasDeepgramSpeakers = result.speakerSegments && result.speakerSegments.length > 0;
           const uniqueSpeakers = hasDeepgramSpeakers 
@@ -182,7 +203,7 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
           
           if (hasDeepgramSpeakers) {
             // Use Deepgram's diarization - map Deepgram speaker IDs to our speaker IDs consistently
-            console.log(`🎙️ Deepgram speakers detected: [${Array.from(uniqueSpeakers).join(', ')}]`);
+            console.log(`🎙️ Deepgram speakers detected: [${Array.from(uniqueSpeakers).join(', ')}], segments: ${result.speakerSegments!.length}`);
             
             result.speakerSegments!.forEach(segment => {
               // PERSISTENT MAPPING: Map Deepgram speaker ID to our speaker ID
@@ -192,11 +213,18 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
                 // First time seeing this Deepgram speaker - assign next available speaker ID
                 const nextSpeakerNum = speakerMapping.size + 1;
                 mappedSpeakerId = `speaker${nextSpeakerNum}`;
-                setSpeakerMapping(prev => new Map(prev).set(segment.speaker, mappedSpeakerId!));
-                console.log(`👤 New speaker mapping: Deepgram ${segment.speaker} -> ${mappedSpeakerId}`);
+                
+                // Update mapping state
+                setSpeakerMapping(prev => {
+                  const newMap = new Map(prev);
+                  newMap.set(segment.speaker, mappedSpeakerId!);
+                  console.log(`👤 New speaker mapping: Deepgram ${segment.speaker} -> ${mappedSpeakerId} (Total speakers: ${newMap.size})`);
+                  return newMap;
+                });
               }
               
               const speaker = getSpeakerById(mappedSpeakerId);
+              console.log(`🗣️ Segment: Deepgram speaker ${segment.speaker} -> ${mappedSpeakerId} (${speaker.name}): "${segment.text.substring(0, 30)}..."`);
               
               setFullTranscript(prev => prev + (prev ? " " : "") + segment.text);
               setTranscriptSegments(prev => [...prev, { 
@@ -397,18 +425,15 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
       console.log(`🚀 handleStart - About to call startTranscription(true, ${captureMeetingAudio})`);
       console.log(`🖥️ isDesktopBrowser(): ${isDesktopBrowser()}, isMobileDevice(): ${isMobileDevice()}`);
       
-      // Mark transcription start in database (for accurate session duration tracking)
-      if (sessionId) {
-        try {
-          await apiRequest("POST", `/api/conversations/${sessionId}/start-transcription`, {});
-          console.log(`✅ Transcription start marked for session ${sessionId}`);
-        } catch (error) {
-          console.error('Failed to mark transcription start:', error);
-          // Don't block transcription if this fails - it's just for tracking
-        }
-      }
+      // IMPORTANT: Do NOT mark transcription start here
+      // We'll mark it when first transcript is actually received
+      // This prevents counting sessions where user clicks Start but never speaks
       
       await startTranscription(true, captureMeetingAudio);
+      
+      // Show diarization warm-up message for 30 seconds
+      setShowDiarizationWarmup(true);
+      setTimeout(() => setShowDiarizationWarmup(false), 30000);
     } catch (error: any) {
       toast({
         title: "Failed to start transcription",
@@ -424,19 +449,24 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
     }
     stopTranscription();
     setIsPaused(false);
+    setTranscriptionMarkedAsStarted(false); // Reset flag when stopping
   };
 
   const handlePause = () => {
     stopTranscription();
     setIsPaused(true);
+    // IMPORTANT: Do NOT stop timer on pause - session continues
+    // Timer will keep running to track total session duration
     toast({
       title: "Transcription paused",
-      description: "Click Resume to continue",
+      description: "Click Resume to continue. Session timer continues running.",
     });
   };
 
   const handleResume = async () => {
     try {
+      // IMPORTANT: Resume uses existing session - does NOT create new conversation
+      // This prevents incrementing session count on pause/resume
       await startTranscription(true, captureMeetingAudio);
       setIsPaused(false);
       toast({
@@ -473,6 +503,8 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
       setCurrentSpeakerId("speaker1");
       setSpeakerMapping(new Map()); // CRITICAL: Clear speaker mapping for new session
       setAutoDetectEnabled(true);
+      setShowDiarizationWarmup(false); // Clear warm-up message
+      setTranscriptionMarkedAsStarted(false); // CRITICAL: Reset transcription start flag for new session
       
       // Step 4: Close modals
       setShowPricingModal(false);
@@ -712,6 +744,24 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
                     <Monitor className="h-3 w-3 mr-1" />
                     Meeting Audio
                   </Badge>
+                </div>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {showDiarizationWarmup && isTranscribing && (
+          <Alert className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-300 dark:border-blue-800">
+            <AlertDescription className="text-sm text-blue-900 dark:text-blue-100">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5">
+                  <div className="h-5 w-5 rounded-full border-2 border-blue-600 dark:border-blue-400 border-t-transparent animate-spin"></div>
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold mb-1">🎙️ Building Speaker Profiles...</p>
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    Speaker detection will improve after 20-30 seconds of conversation. The AI needs to hear both voices to distinguish between speakers accurately.
+                  </p>
                 </div>
               </div>
             </AlertDescription>

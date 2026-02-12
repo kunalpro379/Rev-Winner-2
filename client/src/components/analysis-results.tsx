@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Lightbulb, ShieldAlert, ArrowRight, Swords, Flame, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Target, Users, Clock, DollarSign, MessageSquare, Zap, CheckCircle2, TrendingUp, Brain, Sparkles, Layers, AlertTriangle, Rocket, BookOpen, HelpCircle, Shield, Star, AlertCircle } from "lucide-react";
+import { Lightbulb, ShieldAlert, ArrowRight, Swords, Flame, X, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Target, Users, Clock, DollarSign, MessageSquare, Zap, CheckCircle2, TrendingUp, Brain, Sparkles, Layers, AlertTriangle, Rocket, BookOpen, HelpCircle, Shield, Star, AlertCircle, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -1122,6 +1122,41 @@ function convertLegacyToTabBased(results: AnalysisResults): TabBasedAnalysis {
 
 export function AnalysisResults({ results, onClose }: AnalysisResultsProps) {
   const [isOpen, setIsOpen] = useState(true);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Monitor scroll position to show/hide scroll-to-bottom button
+  useEffect(() => {
+    const handleScroll = () => {
+      if (contentRef.current) {
+        const { scrollTop, scrollHeight, clientHeight } = contentRef.current;
+        // Show button if user has scrolled up more than 200px from bottom
+        setShowScrollButton(scrollHeight - scrollTop - clientHeight > 200);
+      }
+    };
+
+    const contentElement = contentRef.current;
+    if (contentElement) {
+      contentElement.addEventListener('scroll', handleScroll);
+      // Check initial state
+      handleScroll();
+    }
+
+    return () => {
+      if (contentElement) {
+        contentElement.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, [isOpen]);
+
+  const scrollToBottom = () => {
+    if (contentRef.current) {
+      contentRef.current.scrollTo({
+        top: contentRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   if (!results) return null;
   
@@ -1214,6 +1249,18 @@ export function AnalysisResults({ results, onClose }: AnalysisResultsProps) {
             <AnalysisTabs tabData={tabData} />
           )}
         </CollapsibleContent>
+        
+        {/* Scroll to Bottom Button */}
+        {showScrollButton && isOpen && (
+          <Button
+            onClick={scrollToBottom}
+            className="fixed bottom-6 right-6 z-50 rounded-full shadow-lg bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white"
+            size="icon"
+            data-testid="button-scroll-to-bottom"
+          >
+            <ArrowDown className="h-5 w-5" />
+          </Button>
+        )}
       </div>
     </Collapsible>
   );

@@ -190,6 +190,10 @@ export function setupAuthRoutes(app: Router) {
         return res.status(404).json({ message: "User not found" });
       }
       
+      // CRITICAL FIX: Clear any existing sessions/tokens BEFORE updating user
+      // This prevents old session data from being reused on Windows devices
+      await authStorage.deleteUserRefreshTokens(user.id);
+      
       const updatedUser = await authStorage.updateUser(user.id, {
         status: 'active',
         emailVerified: true,
@@ -197,7 +201,7 @@ export function setupAuthRoutes(app: Router) {
       
       // Create trial subscription with session tracking (3 sessions, 180 minutes total)
       await authStorage.createSubscription({
-        userId: user.id,
+        userId: updatedUser.id, // Use updatedUser.id for consistency
         planType: 'free_trial',
         status: 'trial',
         sessionsUsed: '0',
@@ -208,43 +212,47 @@ export function setupAuthRoutes(app: Router) {
       });
       
       // Send welcome email
-      await sendWelcomeEmail(email, user.firstName);
+      await sendWelcomeEmail(email, updatedUser.firstName);
       
-      // Invalidate all existing sessions (single device access)
-      await authStorage.deleteUserRefreshTokens(user.id);
+      // Increment session version for fresh session
+      const sessionVersion = await authStorage.incrementSessionVersion(updatedUser.id);
       
-      // Increment session version for immediate single-device logout
-      const sessionVersion = await authStorage.incrementSessionVersion(user.id);
-      
-      // Generate tokens with sessionVersion
+      // Generate NEW tokens with fresh sessionVersion for THIS user
       const accessToken = generateAccessToken({
-        userId: user.id,
-        email: user.email,
-        role: user.role,
-        username: user.username,
+        userId: updatedUser.id, // Use updatedUser.id to ensure correct user
+        email: updatedUser.email,
+        role: updatedUser.role,
+        username: updatedUser.username,
         sessionVersion,
       });
       
       const refreshToken = generateRefreshToken({
-        userId: user.id,
-        email: user.email,
-        role: user.role,
-        username: user.username,
+        userId: updatedUser.id, // Use updatedUser.id to ensure correct user
+        email: updatedUser.email,
+        role: updatedUser.role,
+        username: updatedUser.username,
         sessionVersion,
       });
       
       const refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-      await authStorage.createRefreshToken(user.id, refreshToken, refreshTokenExpiry);
+      await authStorage.createRefreshToken(updatedUser.id, refreshToken, refreshTokenExpiry);
       
-      // Log audit
+      // Log audit with correct user ID
       await eventLogger.log({
-        actorId: user.id,
+        actorId: updatedUser.id,
         action: 'user.verified',
         targetType: 'user',
-        targetId: user.id,
+        targetId: updatedUser.id,
+        metadata: { 
+          email: updatedUser.email,
+          username: updatedUser.username,
+          note: 'New user registration verified - fresh session created'
+        },
         ipAddress: req.ip,
         userAgent: req.get('user-agent'),
       });
+      
+      console.log(`✅ New user verified and logged in: ${updatedUser.id} (${updatedUser.email})`);
       
       res.json({
         message: "Email verified successfully. You have 3 free trial sessions (max 60 minutes each).",
