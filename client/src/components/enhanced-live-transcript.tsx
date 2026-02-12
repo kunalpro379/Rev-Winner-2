@@ -201,9 +201,16 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
             : new Set();
           const hasMultipleSpeakers = uniqueSpeakers.size > 1;
           
+          // Enhanced logging for debugging speaker detection
+          if (!hasDeepgramSpeakers) {
+            console.log(`⚠️ No speaker segments from Deepgram - using fallback detection`);
+          } else if (!hasMultipleSpeakers) {
+            console.log(`ℹ️ Only one speaker detected so far (${Array.from(uniqueSpeakers)[0]}) - waiting for second speaker...`);
+          }
+          
           if (hasDeepgramSpeakers) {
             // Use Deepgram's diarization - map Deepgram speaker IDs to our speaker IDs consistently
-            console.log(`🎙️ Deepgram speakers detected: [${Array.from(uniqueSpeakers).join(', ')}], segments: ${result.speakerSegments!.length}`);
+            console.log(`🎙️ Deepgram speakers detected: [${Array.from(uniqueSpeakers).join(', ')}], segments: ${result.speakerSegments!.length}, multiple: ${hasMultipleSpeakers}`);
             
             result.speakerSegments!.forEach(segment => {
               // PERSISTENT MAPPING: Map Deepgram speaker ID to our speaker ID

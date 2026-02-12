@@ -46,7 +46,7 @@ export function setupTranscriptionRoutes(server: Server): Router {
         endpointing: 300,               // 300ms pause detection for speaker turns
         vad_events: true,               // Voice Activity Detection events for better flow
         encoding: 'linear16',           // PCM16 encoding
-        sample_rate: 16000,             // Use 16kHz for broader compatibility (Safari/iOS)
+        sample_rate: 48000,             // FIXED: Match client's 48kHz for better speaker detection
         channels: 1,                    // Mono audio (meeting audio is pre-mixed)
         filler_words: false,            // Skip filler words for cleaner output
         utterance_end_ms: 1000,         // 1s for faster turnaround
@@ -59,8 +59,10 @@ export function setupTranscriptionRoutes(server: Server): Router {
       console.log('🎙️ Deepgram configured with nova-2-meeting model for multi-speaker diarization');
 
       dgConnection.on(LiveTranscriptionEvents.Open, () => {
-        console.log('Deepgram connection opened with nova-2-meeting model and diarization');
-        console.log('ℹ️ Note: Diarization needs 20-30 seconds of audio to build speaker profiles');
+        console.log('✅ Deepgram connection opened with nova-2-meeting model');
+        console.log('🎙️ Configuration: 48kHz sample rate, diarization enabled');
+        console.log('ℹ️ Note: Speaker detection needs 20-30 seconds of audio to build profiles');
+        console.log('ℹ️ Both speakers must speak for accurate diarization');
         
         dgConnection.on(LiveTranscriptionEvents.Transcript, (data) => {
           const transcript = data.channel?.alternatives?.[0]?.transcript;
