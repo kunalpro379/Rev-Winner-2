@@ -113,7 +113,24 @@ export function setupAuthRoutes(app: Router) {
       // Check if email or username already exists
       const existingEmail = await authStorage.getUserByEmail(data.email);
       if (existingEmail) {
-        return res.status(400).json({ message: "Email already registered" });
+        // If user exists but email is not verified, resend OTP
+        if (!existingEmail.emailVerified) {
+          // Generate and send new OTP
+          const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+          const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+          
+          await authStorage.createOTP(data.email, otpCode, expiresAt);
+          await sendOTPEmail(data.email, otpCode, existingEmail.firstName);
+          
+          return res.status(200).json({
+            message: "Account already exists but not verified. A new verification code has been sent to your email.",
+            userId: existingEmail.id,
+            email: existingEmail.email,
+            resent: true,
+          });
+        }
+        
+        return res.status(400).json({ message: "Email already registered and verified. Please login instead." });
       }
       
       const existingUsername = await authStorage.getUserByUsername(data.username);
@@ -604,6 +621,47 @@ export function setupAuthRoutes(app: Router) {
     }
   });
   
+  // TEMPORARY: Fix subscription limits for users who purchased platform access
+  app.post("/api/auth/fix-subscription-limits", authenticateToken, async (req: Request, res: Response) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      
+      // Check if user has platform access
+      const entitlements = await billingStorage.getUserEntitlements(userId);
+      if (!entitlements?.hasPlatformAccess) {
+        return res.status(400).json({ message: "No platform access found" });
+      }
+      
+      // Update subscription to remove limits
+      const subscription = await authStorage.getSubscriptionByUserId(userId);
+      if (subscription) {
+        await authStorage.updateSubscription(subscription.id, {
+          status: 'active',
+          planType: 'platform_access',
+          sessionsLimit: null,
+          minutesLimit: null,
+        });
+        
+        console.log(`✅ Fixed subscription limits for user ${userId}`);
+        
+        return res.json({
+          success: true,
+          message: "Subscription limits removed. You now have unlimited access!",
+          subscription: {
+            status: 'active',
+            sessionsLimit: null,
+            minutesLimit: null,
+          }
+        });
+      }
+      
+      res.status(404).json({ message: "Subscription not found" });
+    } catch (error: any) {
+      console.error("Fix subscription error:", error);
+      res.status(500).json({ message: error.message || "Failed to fix subscription" });
+    }
+  });
+
   // Get current user
   app.get("/api/auth/me", authenticateToken, async (req: Request, res: Response) => {
     try {

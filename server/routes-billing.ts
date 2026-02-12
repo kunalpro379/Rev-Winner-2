@@ -2015,6 +2015,18 @@ export function setupBillingRoutes(app: Router) {
       // Mark pending order as completed
       await billingStorage.updatePendingOrderStatus(orderId, userId, 'completed', new Date());
 
+      // Update subscription to remove trial limits (grant unlimited access)
+      const subscription = await authStorage.getSubscriptionByUserId(userId);
+      if (subscription) {
+        await authStorage.updateSubscription(subscription.id, {
+          status: 'active',
+          planType: pkg.billingType, // e.g., 'monthly', '6_months', etc.
+          sessionsLimit: null, // Remove session limit (unlimited)
+          minutesLimit: null, // Remove minutes limit (unlimited)
+        });
+        console.log(`✅ Subscription updated for user ${userId}: Unlimited access granted`);
+      }
+
       // Refresh user entitlements
       await billingStorage.refreshUserEntitlements(userId);
 

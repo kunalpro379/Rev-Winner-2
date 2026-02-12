@@ -51,21 +51,6 @@ export default function SalesAssistant() {
     enabled: !!authData,
   });
 
-  // Fetch Session Minutes status for display
-  const { data: sessionMinutesStatus } = useQuery<{
-    hasActiveMinutes: boolean;
-    totalMinutesRemaining: number;
-    totalMinutes: number;
-    usedMinutes: number;
-    nextExpiryDate: string | null;
-    superUserAccess?: boolean;
-    hasPurchasedPackages?: boolean;
-  }>({
-    queryKey: ["/api/session-minutes/status"],
-    enabled: !!authData,
-    refetchInterval: 60000, // Refetch every minute
-  });
-
   const [showAISetup, setShowAISetup] = useState(false);
 
   // Redirect to login if not authenticated
@@ -81,6 +66,7 @@ export default function SalesAssistant() {
       setShowAISetup(true);
     }
   }, [isLoadingAISettings, aiEngineSettings]);
+  
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [recommendedModules, setRecommendedModules] = useState<string[]>([]);
   const [nextQuestions, setNextQuestions] = useState<string[]>([]);
@@ -144,6 +130,65 @@ export default function SalesAssistant() {
   
   // Session timer hook
   const { isRunning: isTimerRunning, currentSessionTime, totalUsage, startTimer, stopTimer } = useSessionTimer();
+  
+  // Fetch Session Minutes status for display (moved after isTimerRunning is defined)
+  const { data: sessionMinutesStatus } = useQuery<{
+    hasActiveMinutes: boolean;
+    totalMinutesRemaining: number;
+    totalMinutes: number;
+    usedMinutes: number;
+    nextExpiryDate: string | null;
+    superUserAccess?: boolean;
+    hasPurchasedPackages?: boolean;
+  }>({
+    queryKey: ["/api/session-minutes/status"],
+    enabled: !!authData,
+    refetchInterval: isTimerRunning ? 5000 : 60000, // Refetch every 5 seconds when timer running, else every minute
+  });
+  
+  // Auto-fix subscription limits for users with platform access (one-time check)
+  useEffect(() => {
+    const fixSubscription = async () => {
+      if (!authData) return;
+      
+      console.log('🔧 Checking subscription fix for user:', authData.user.id);
+      
+      // Check if already fixed (stored in localStorage)
+      const fixedKey = `subscription-fixed-${authData.user.id}`;
+      if (localStorage.getItem(fixedKey)) {
+        console.log('✅ Subscription already fixed (cached)');
+        return;
+      }
+      
+      try {
+        console.log('🔄 Calling fix-subscription-limits endpoint...');
+        const response = await apiRequest("POST", "/api/auth/fix-subscription-limits", {});
+        const data = await response.json();
+        
+        console.log('📥 Fix response:', response.status, data);
+        
+        if (response.ok) {
+          console.log('✅ Subscription limits fixed:', data);
+          localStorage.setItem(fixedKey, 'true');
+          
+          // Refresh auth data
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/subscriptions/check-limits"] });
+          
+          toast({
+            title: "Subscription Updated",
+            description: "You now have unlimited access!",
+          });
+        } else {
+          console.log('⚠️ Fix not needed or failed:', data.message);
+        }
+      } catch (error) {
+        console.log('❌ Subscription fix error:', error);
+      }
+    };
+    
+    fixSubscription();
+  }, [authData, queryClient, toast]);
   
   // Sales Intelligence Agent (passive layer - doesn't disrupt existing features)
   const { 
@@ -569,6 +614,10 @@ export default function SalesAssistant() {
       // Step 2: Stop timer
       stopTimer();
       
+      // Immediately refetch session minutes status to update UI
+      queryClient.invalidateQueries({ queryKey: ["/api/session-minutes/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      
       // Step 3: Clear all session-specific state
       setSessionId(newSessionId); // Set new session immediately
       setAnalysisResults(null);
@@ -780,7 +829,7 @@ export default function SalesAssistant() {
                     }`} data-testid="text-session-status">
                       {sessionMinutesStatus.superUserAccess 
                         ? '∞ minutes' 
-                        : `${sessionMinutesStatus.totalMinutesRemaining} min left`}
+                        : `${Math.max(0, sessionMinutesStatus.totalMinutesRemaining - (isTimerRunning ? Math.floor(currentSessionTime / 60) : 0))} min left`}
                     </p>
                   </div>
                 </div>
@@ -931,7 +980,17 @@ export default function SalesAssistant() {
                 isAnalyzing={isAnalyzing}
                 shouldStop={shouldStopListening}
                 onStopped={() => setShouldStopListening(false)}
-                onStartTimer={startTimer}
+                onStartTimer={async () => {
+                  try {
+                    await startTimer();
+                  } catch (error: any) {
+                    toast({
+                      title: "Session Limit Reached",
+                      description: error.message || "Please upgrade to continue",
+                      variant: "destructive",
+                    });
+                  }
+                }}
                 onStopTimer={stopTimer}
                 onTranscriptUpdate={setCurrentTranscript}
                 onTranscribingChange={setIsTranscribing}

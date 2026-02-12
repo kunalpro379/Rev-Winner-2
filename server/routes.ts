@@ -2,12 +2,13 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import path from "path";
 import { z } from "zod";
+import { verifyAccessToken } from "./utils/jwt";
 import { storage } from "./storage";
 import { authStorage } from "./storage-auth";
 import { generateSalesResponse, generateCallSummary, generateCoachingSuggestions } from "./services/openai";
-import { insertConversationSchema, insertMessageSchema, insertTeamsMeetingSchema, insertAudioSourceSchema, insertSessionUsageSchema, AUDIO_SOURCE_TYPES, subscriptions, pendingOrders } from "../shared/schema";
+import { insertConversationSchema, insertMessageSchema, insertTeamsMeetingSchema, insertAudioSourceSchema, insertSessionUsageSchema, AUDIO_SOURCE_TYPES, subscriptions, pendingOrders, addonPurchases, sessionUsage, conversations } from "../shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupAuthRoutes } from "./routes-auth";
 import { setupAdminRoutes } from "./routes-admin";
@@ -18,16 +19,21 @@ import { setupBillingRoutes } from "./routes-billing";
 import { setupSupportRoutes } from "./routes-support";
 import { setupGameRoutes } from "./routes-game";
 import { registerBackupRoutes } from "./routes-backup";
+
 import { registerMarketingRoutes } from "./routes-marketing";
 import { setupSalesIntelligenceRoutes } from "./routes-sales-intelligence";
 import { registerBibleRoutes } from "./routes-bible";
 import apiDocsRouter from "./routes-api-docs";
 import recordingsRouter from "./routes-recordings";
 import apiKeysRouter from "./routes-api-keys";
+import { setupPublicApiRoutes } from "./routes-public-api";
 import { authenticateToken } from "./middleware/auth";
 import { checkEntitlement } from "./middleware/entitlement";
 import { logSuperUserAccess } from "./utils/accessControl";
 import crypto from "crypto";
+
+// Performance optimization: Cache for partner services recommendations
+const partnerServicesCache = new Map<string, { data: any; timestamp: number }>();
 
 // Helper: Check if user has active enterprise license
 async function hasActiveEnterpriseLicense(userId: string): Promise<boolean> {
@@ -64,6 +70,9 @@ async function hasActiveEnterpriseLicense(userId: string): Promise<boolean> {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Public API endpoints (require API key authentication) - MUST be first before catch-all routes
+  setupPublicApiRoutes(app);
+  
   // Health check endpoint for deployment
   app.get("/health", (_req, res) => {
     res.status(200).json({ status: "healthy", timestamp: new Date().toISOString() });
@@ -95,9 +104,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/conversations", async (req, res) => {
     try {
       const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Try to get authenticated user ID, but allow anonymous conversations
+      let userId = null;
+      try {
+        const token = req.headers.authorization?.replace('Bearer ', '');
+        if (token) {
+          const decoded = verifyAccessToken(token);
+          userId = decoded.userId;
+          console.log(`✅ Authenticated user creating conversation: ${userId}`);
+        }
+      } catch (error) {
+        // Continue with anonymous conversation if token is invalid
+        console.log("Creating anonymous conversation - no valid token provided");
+      }
+      
       const conversationData = {
         sessionId,
-        userId: null,
+        userId: userId,
         clientName: req.body.clientName || null
       };
       
@@ -116,7 +140,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         messages: [initialMessage]
       });
     } catch (error: any) {
+      console.error("❌ Failed to create conversation:", error);
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       res.status(400).json({ message: "Failed to create conversation", error: error.message });
+    }
+  });
+
+  // Mark transcription start (when user clicks Start button)
+  // UPDATED: This endpoint is now called when ACTUAL transcription begins (first audio received)
+  // NOT when Start button is clicked - this prevents counting sessions that never actually start
+  // NOTE: Session counting is now handled by /api/session-usage/start endpoint
+  app.post("/api/conversations/:sessionId/start-transcription", async (req, res) => {
+    try {
+      const conversation = await storage.getConversation(req.params.sessionId);
+      if (!conversation) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      // Only set transcriptionStartedAt if it hasn't been set yet (first actual transcription)
+      if (!conversation.transcriptionStartedAt) {
+        const updated = await storage.updateConversation(req.params.sessionId, {
+          transcriptionStartedAt: new Date()
+        });
+        
+        console.log(`🎤 Transcription ACTUALLY started for session ${req.params.sessionId} at ${new Date().toISOString()}`);
+        
+        // REMOVED: Session counting now handled by /api/session-usage/start
+        // This endpoint only marks transcription start timestamp
+        
+        res.json({
+          success: true,
+          transcriptionStartedAt: updated?.transcriptionStartedAt,
+          sessionCounted: false,
+          note: 'Session counting handled by /api/session-usage/start'
+        });
+      } else {
+        // Already started, just return existing timestamp
+        // IMPORTANT: This is a resume after pause - do NOT increment session count
+        console.log(`🔄 Transcription resumed for session ${req.params.sessionId} (no new session counted)`);
+        res.json({
+          success: true,
+          transcriptionStartedAt: conversation.transcriptionStartedAt,
+          alreadyStarted: true,
+          sessionCounted: false
+        });
+      }
+    } catch (error: any) {
+      console.error('Error marking transcription start:', error);
+      res.status(500).json({ message: "Failed to mark transcription start", error: error.message });
     }
   });
 
@@ -153,6 +228,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get active terms and conditions (public endpoint)
+  app.get("/api/terms", async (req, res) => {
+    try {
+      const activeTerms = await authStorage.getActiveTermsAndConditions();
+      if (!activeTerms) {
+        return res.status(404).json({ error: "Terms and conditions not found" });
+      }
+      
+      res.json({
+        title: activeTerms.title,
+        content: activeTerms.content,
+        version: activeTerms.version,
+        lastUpdated: activeTerms.updatedAt
+      });
+    } catch (error) {
+      console.error("Get terms error:", error);
+      res.status(500).json({ error: "Failed to get terms and conditions" });
+    }
+  });
+
   // Get conversation and messages
   app.get("/api/conversations/:sessionId", async (req, res) => {
     try {
@@ -169,6 +264,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch conversation", error: error.message });
+    }
+  });
+
+  // Get all conversations for a user (for profile page)
+  app.get("/api/conversations", authenticateToken, async (req, res) => {
+    try {
+      if (!req.jwtUser?.id) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      // Get conversations from database
+      const userConversations = await db.select()
+        .from(conversations)
+        .where(eq(conversations.userId, req.jwtUser.id))
+        .orderBy(desc(conversations.createdAt))
+        .limit(50); // Limit to last 50 conversations
+
+      // Transform to session history format
+      // IMPORTANT: Use transcriptionStartedAt for duration calculation (when user clicked Start button)
+      // NOT createdAt (when conversation record was created on page load)
+      // FILTER OUT: Sessions where transcription never started (page loads without Start button click)
+      const sessionHistory = userConversations
+        .map(conv => {
+          // Use transcriptionStartedAt if available, otherwise fall back to createdAt for old sessions
+          const startTime = conv.transcriptionStartedAt || conv.createdAt;
+          const endTime = conv.endedAt || new Date();
+          
+          const durationMinutes = startTime && conv.endedAt
+            ? Math.round((conv.endedAt.getTime() - startTime.getTime()) / (1000 * 60))
+            : startTime
+            ? Math.round((new Date().getTime() - startTime.getTime()) / (1000 * 60))
+            : 0;
+          
+          return {
+            sessionId: conv.sessionId,
+            startTime: startTime?.toISOString() || new Date().toISOString(),
+            endTime: conv.endedAt ? conv.endedAt.toISOString() : new Date().toISOString(),
+            durationMinutes,
+            summary: conv.callSummary || null,
+            transcriptionStarted: !!conv.transcriptionStartedAt,
+          };
+        })
+        .filter(session => {
+          // STRICT FILTER: Only show sessions where transcription actually started
+          // This means user clicked the Start button
+          // Sessions without transcriptionStartedAt are just page loads, not actual usage
+          return session.transcriptionStarted;
+        });
+
+      res.json({ conversations: userConversations, sessionHistory });
+    } catch (error: any) {
+      console.error("Error fetching user conversations:", error);
+      res.status(500).json({ message: "Failed to get conversations", error: error.message });
     }
   });
 
@@ -229,22 +377,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }));
         
         const summary = await generateCallSummary(conversationHistory, conversation.discoveryInsights, req.jwtUser?.userId);
-        const summaryText = `
-**Key Challenges:**
-${summary.keychallenges.map(c => `• ${c}`).join('\n')}
-
-**Discovery Insights:**
-${summary.discoveryInsights.map(i => `• ${i}`).join('\n')}
-
-**Objections & Responses:**
-${summary.objections.map(o => `• ${o}`).join('\n')}
-
-**Next Steps:**
-${summary.nextSteps.map(s => `• ${s}`).join('\n')}
-
-**Recommended Solutions:**
-${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
-        `.trim();
+        const summarySections = [
+          summary.keychallenges?.length ? `Key challenges: ${summary.keychallenges.join("; ")}.` : null,
+          summary.discoveryInsights?.length ? `Discovery insights: ${summary.discoveryInsights.join("; ")}.` : null,
+          summary.objections?.length ? `Objections & responses: ${summary.objections.join("; ")}.` : null,
+          summary.nextSteps?.length ? `Next steps: ${summary.nextSteps.join("; ")}.` : null,
+          summary.recommendedSolutions?.length ? `Recommended solutions: ${summary.recommendedSolutions.join("; ")}.` : null
+        ].filter(Boolean);
+        const summaryText = summarySections.join(" ");
         
         await storage.endConversation(req.params.sessionId, summaryText);
         
@@ -266,7 +406,9 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
       
       // Generate AI response with sales framework context
       const domainExpertise = req.body.domainExpertise || "Generic Product";
-      const aiResponse = await generateSalesResponse(
+      
+      // CRITICAL: 10-second timeout for messages (increased from 8s for reliability)
+      const responsePromise = generateSalesResponse(
         req.body.content,
         conversationHistory,
         conversation.discoveryInsights,
@@ -274,6 +416,34 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
         req.jwtUser?.userId,
         conversation.id
       );
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('AI response timeout after 10 seconds')), 10000)
+      );
+      
+      let aiResponse;
+      try {
+        aiResponse = await Promise.race([responsePromise, timeoutPromise]) as any;
+      } catch (timeoutError: any) {
+        console.error('⏱️ AI response timeout or error:', timeoutError.message);
+        // Return a fallback response instead of 500 error
+        aiResponse = {
+          response: "I'm processing your message. Could you tell me more about what you're looking for?",
+          discoveryInsights: {
+            painPoints: [],
+            currentEnvironment: "",
+            requirements: [],
+            decisionMakers: []
+          },
+          discoveryQuestions: [
+            "What challenges are you currently facing?",
+            "What are your main priorities?",
+            "Who else is involved in this decision?"
+          ],
+          nextQuestions: [],
+          recommendedModules: [],
+          caseStudies: []
+        };
+      }
       
       // Update conversation learnings in background (don't await to keep response fast)
       if (req.jwtUser?.userId) {
@@ -287,14 +457,14 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
         ).catch(err => console.error('Error updating conversation learnings:', err));
       }
       
-      // Add assistant message WITHOUT auto-generated insights
-      // Insights are now generated on-demand only via the /analyze endpoint
-      const assistantMessage = await storage.addMessage({
-        conversationId: conversation.id,
+      // Do not store AI message or AI analysis data in the database
+      const assistantMessage = {
+        id: crypto.randomUUID(),
         content: aiResponse.response,
         sender: "assistant",
-        speakerLabel: "AI Assistant"
-      });
+        speakerLabel: "AI Assistant",
+        timestamp: new Date().toISOString()
+      };
       
       res.json({
         userMessage,
@@ -481,6 +651,7 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
           priority: "medium"
         }
       ];
+      
       return res.status(200).json({ tips: fallbackTips, _fallback: true, _reason: reason });
     };
     
@@ -640,14 +811,15 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
         return res.status(400).json({ message: "Question is required" });
       }
 
-      // Get recent conversation history for context (last 30 messages)
+      // Get recent conversation history for context (last 15 messages instead of 30 - reduces memory)
       const allMessages = await storage.getMessages(conversation.id);
-      const recentMessages = allMessages.slice(-30);
+      const recentMessages = allMessages.slice(-15);
       const conversationHistory = recentMessages.map(m => ({
         sender: m.sender,
         content: m.content
       }));
 
+      // Use provided context or build from history
       const context = conversationContext || conversationHistory.map(m => `${m.sender}: ${m.content}`).join('\n');
       
       const domain = req.body.domainExpertise || "Generic Product";
@@ -670,6 +842,10 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
       
       console.log(`❓ Ask Question: domain="${domain}", strict=${!isUniversalMode}, question="${question.slice(0, 50)}..."`);
       
+      // Set response headers for faster initial response
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      
       const answer = await answerConversationQuestion(
         question,
         context,
@@ -682,7 +858,10 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
       
     } catch (error: any) {
       console.error('Q&A error:', error);
-      res.status(500).json({ message: "Failed to answer question", error: error.message });
+      // Return error without blocking UI
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to answer question", error: error.message });
+      }
     }
   });
 
@@ -813,8 +992,13 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
       const domainExpertise = req.query.domain as string || "Generic Product";
       const { generateMeetingMinutes } = await import("./services/openai");
       
-      // Calculate actual duration from session start to now
-      const sessionStart = conversation.createdAt ? new Date(conversation.createdAt) : new Date();
+      // Calculate actual duration from transcription start (when user clicked Start) to now
+      // Use transcriptionStartedAt if available, otherwise fall back to createdAt for old sessions
+      const sessionStart = conversation.transcriptionStartedAt 
+        ? new Date(conversation.transcriptionStartedAt)
+        : conversation.createdAt 
+        ? new Date(conversation.createdAt) 
+        : new Date();
       const now = new Date();
       const durationMs = now.getTime() - sessionStart.getTime();
       const durationMinutes = Math.round(durationMs / 60000);
@@ -939,128 +1123,6 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
     }
   });
 
-  // ====== USER FEEDBACK ROUTES ======
-  const feedbackSubmitSchema = z.object({
-    category: z.enum(['bug_report', 'feature_request', 'improvement', 'general', 'performance', 'ui_ux']),
-    subject: z.string().min(1).max(255),
-    message: z.string().min(1),
-    priority: z.enum(['low', 'medium', 'high']).default('medium'),
-    page: z.string().max(255).optional(),
-    userPhone: z.string().max(20).optional(),
-    screenshotUrl: z.string().max(5 * 1024 * 1024).optional(),
-  });
-
-  const feedbackUpdateSchema = z.object({
-    status: z.enum(['open', 'in_progress', 'resolved', 'closed']),
-    adminNotes: z.string().optional(),
-  });
-
-  app.post("/api/feedback", authenticateToken, async (req, res) => {
-    try {
-      const parsed = feedbackSubmitSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ success: false, message: "Invalid feedback data", errors: parsed.error.flatten() });
-      }
-
-      const { category, subject, message, priority, page, userPhone, screenshotUrl } = parsed.data;
-      const userId = req.jwtUser?.userId;
-      const userEmail = req.jwtUser?.email;
-      const userName = req.jwtUser?.firstName ? `${req.jwtUser.firstName} ${req.jwtUser.lastName || ''}`.trim() : undefined;
-
-      const { userFeedback } = await import("../shared/schema");
-      const [feedback] = await db.insert(userFeedback).values({
-        userId: userId || null,
-        userEmail: userEmail || null,
-        userName: userName || null,
-        userPhone: userPhone || null,
-        category,
-        subject,
-        message,
-        priority,
-        screenshotUrl: screenshotUrl || null,
-        page: page || null,
-      }).returning();
-
-      try {
-        const { sendFeedbackNotificationEmail } = await import("./services/email");
-        await sendFeedbackNotificationEmail({
-          id: feedback.id,
-          category,
-          subject,
-          message,
-          priority: priority || 'medium',
-          userName: userName || 'Anonymous',
-          userEmail: userEmail || 'Not provided',
-          userPhone: userPhone || 'Not provided',
-          page: page || 'Not specified',
-          hasScreenshot: !!screenshotUrl,
-        });
-      } catch (emailErr) {
-        console.warn('Failed to send feedback notification email:', emailErr);
-      }
-
-      console.log(`📝 Feedback submitted: [${category}] "${subject}" by ${userEmail || 'anonymous'}`);
-      res.json({ success: true, data: feedback });
-    } catch (error: any) {
-      console.error("Feedback submission error:", error);
-      res.status(500).json({ success: false, message: "Failed to submit feedback" });
-    }
-  });
-
-  app.get("/api/feedback", authenticateToken, async (req, res) => {
-    try {
-      const userId = req.jwtUser?.userId;
-      if (!userId) return res.status(401).json({ success: false, message: "Authentication required" });
-
-      const { userFeedback } = await import("../shared/schema");
-      const feedbackList = await db.select().from(userFeedback).where(eq(userFeedback.userId, userId)).orderBy(desc(userFeedback.createdAt));
-      res.json({ success: true, data: feedbackList });
-    } catch (error: any) {
-      console.error("Feedback fetch error:", error);
-      res.status(500).json({ success: false, message: "Failed to fetch feedback" });
-    }
-  });
-
-  app.get("/api/admin/feedback", authenticateToken, async (req, res) => {
-    try {
-      const role = req.jwtUser?.role;
-      if (role !== 'admin') return res.status(403).json({ success: false, message: "Admin access required" });
-
-      const { userFeedback } = await import("../shared/schema");
-      const feedbackList = await db.select().from(userFeedback).orderBy(desc(userFeedback.createdAt));
-      res.json({ success: true, data: feedbackList });
-    } catch (error: any) {
-      console.error("Admin feedback fetch error:", error);
-      res.status(500).json({ success: false, message: "Failed to fetch feedback" });
-    }
-  });
-
-  app.patch("/api/admin/feedback/:id", authenticateToken, async (req, res) => {
-    try {
-      const role = req.jwtUser?.role;
-      if (role !== 'admin') return res.status(403).json({ success: false, message: "Admin access required" });
-
-      const { id } = req.params;
-      const parsed = feedbackUpdateSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ success: false, message: "Invalid update data", errors: parsed.error.flatten() });
-      }
-
-      const { status, adminNotes } = parsed.data;
-      const { userFeedback } = await import("../shared/schema");
-
-      const [updated] = await db.update(userFeedback)
-        .set({ status, adminNotes, updatedAt: new Date() })
-        .where(eq(userFeedback.id, id))
-        .returning();
-
-      res.json({ success: true, data: updated });
-    } catch (error: any) {
-      console.error("Admin feedback update error:", error);
-      res.status(500).json({ success: false, message: "Failed to update feedback" });
-    }
-  });
-
   // Generate Tech Environment Mind Map from transcript
   app.post("/api/conversations/:sessionId/mind-map", authenticateToken, async (req, res) => {
     try {
@@ -1090,7 +1152,14 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
 
       const { extractTechEnvironment } = await import("./services/mind-map-extraction");
       console.log('🗺️ Map/Flow: Calling AI extraction...');
-      const mindMapData = await extractTechEnvironment(sessionId, transcript, domainExpertise, userId);
+      
+      // CRITICAL: 60-second timeout for Map/Flow (background feature, can take longer due to complex analysis with knowledge base)
+      const extractionPromise = extractTechEnvironment(sessionId, transcript, domainExpertise, userId);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Map/Flow generation timeout after 60 seconds')), 60000)
+      );
+      
+      const mindMapData = await Promise.race([extractionPromise, timeoutPromise]) as any;
       console.log(`🗺️ Map/Flow: Generated ${mindMapData.nodes?.length || 0} nodes, ${mindMapData.edges?.length || 0} edges`);
 
       if (mindMapData.nodes?.length === 0 && transcript.trim().length >= 200) {
@@ -1179,7 +1248,7 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
     return { phase: 'discovery', readinessScore: 15, signals };
   };
 
-  // Relationship Building One-liners endpoint with conversation phase awareness
+  // Relationship Building One-liners endpoint with conversation phase awareness (ULTRA-OPTIMIZED)
   app.get("/api/conversations/:sessionId/one-liners", authenticateToken, checkEntitlement, async (req, res) => {
     try {
       const { sessionId } = req.params;
@@ -1193,35 +1262,10 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
 
       // Fetch actual messages for context
       const messages = await storage.getMessages(conversation.id);
-      const conversationText = messages.length > 0 
-        ? messages.map((m: any) => `${m.sender}: ${m.content}`).join('\n')
-        : '';
       
-      const painPoints = (conversation.discoveryInsights as any)?.painPoints || [];
-      const requirements = (conversation.discoveryInsights as any)?.requirements || [];
-      const clientName = conversation.clientName || "the client";
-
-      // PERFORMANCE: Cache one-liners to avoid repeated AI calls for same conversation state
-      const { aiCache } = await import("./services/ai-cache");
-      const cacheKey = `oneliners:${sessionId}:${messages.length}`;
-      
-      // Skip cache if refresh is requested
-      if (!refresh) {
-        const cachedOneliners = aiCache.get(cacheKey);
-        if (cachedOneliners) {
-          console.log(`✅ One-liners from cache for session ${sessionId} (${messages.length} messages)`);
-          return res.json(cachedOneliners);
-        }
-      } else {
-        console.log(`🔄 Regenerating one-liners for session ${sessionId} (refresh requested)`);
-      }
-      
-      // Detect conversation phase
-      const phaseAnalysis = detectConversationPhase(conversationText, messages.length, conversation.discoveryInsights);
-      console.log(`📊 Conversation phase: ${phaseAnalysis.phase} (readiness: ${phaseAnalysis.readinessScore}%)`);
-      
-      // Provide default phase-aware one-liners for early conversation
-      if (messages.length < 3) {
+      // ULTRA-FAST: Return cached or default for first 5 messages (no AI needed)
+      if (messages.length < 5 && !refresh) {
+        const phaseAnalysis = { phase: 'discovery', readinessScore: 15 };
         const defaultOneliners = [
           {
             id: "opener-1",
@@ -1263,122 +1307,113 @@ ${summary.recommendedSolutions.map(s => `• ${s}`).join('\n')}
         return res.json({ oneliners: defaultOneliners, phase: phaseAnalysis.phase, readinessScore: phaseAnalysis.readinessScore });
       }
 
-      // Phase-specific strategic guidance for the AI prompt
+      const conversationText = messages.length > 0 
+        ? messages.map((m: any) => `${m.sender}: ${m.content}`).join('\n')
+        : '';
+      
+      const painPoints = (conversation.discoveryInsights as any)?.painPoints || [];
+      const requirements = (conversation.discoveryInsights as any)?.requirements || [];
+      const clientName = conversation.clientName || "the client";
+
+      // PERFORMANCE: Cache one-liners to avoid repeated AI calls for same conversation state
+      const { aiCache } = await import("./services/ai-cache");
+      const cacheKey = `oneliners:${sessionId}:${messages.length}`;
+      
+      // Skip cache if refresh is requested
+      if (!refresh) {
+        const cachedOneliners = aiCache.get(cacheKey);
+        if (cachedOneliners) {
+          console.log(`✅ One-liners from cache for session ${sessionId} (${messages.length} messages)`);
+          return res.json(cachedOneliners);
+        }
+      } else {
+        console.log(`🔄 Regenerating one-liners for session ${sessionId} (refresh requested)`);
+      }
+      
+      // Detect conversation phase
+      const phaseAnalysis = detectConversationPhase(conversationText, messages.length, conversation.discoveryInsights);
+      console.log(`📊 Conversation phase: ${phaseAnalysis.phase} (readiness: ${phaseAnalysis.readinessScore}%)`);
+
+      // Phase-specific strategic guidance for the AI prompt (SHORTENED)
       const phaseGuidance: Record<string, string> = {
-        discovery: `PHASE: Discovery - Focus on building rapport, understanding their world, and uncovering deep needs.
-STRATEGIC GOAL: Earn the right to ask qualifying questions by showing genuine interest and expertise.
-RAPPORT APPROACH: Be curious, empathetic, and position yourself as someone who truly wants to understand their situation.`,
-        
-        qualification: `PHASE: Qualification - Focus on understanding decision-making process, budget, and timeline.
-STRATEGIC GOAL: Gently confirm this is a real opportunity while maintaining rapport and trust.
-RAPPORT APPROACH: Be supportive of their process, acknowledge the complexity of decisions, and offer to help navigate.`,
-        
-        presentation: `PHASE: Presentation/Demo - Focus on connecting solutions to their specific needs.
-STRATEGIC GOAL: Create "aha moments" by showing exactly how you solve their stated problems.
-RAPPORT APPROACH: Reference their earlier comments, celebrate their insights, and paint a picture of success.`,
-        
-        objection_handling: `PHASE: Objection Handling - Focus on understanding and addressing concerns.
-STRATEGIC GOAL: Turn objections into opportunities to demonstrate value and build trust.
-RAPPORT APPROACH: Validate their concerns as smart questions, share relevant examples, and offer proof points.`,
-        
-        closing: `PHASE: Closing - Focus on confirming value and facilitating the decision.
-STRATEGIC GOAL: Make it easy to move forward with confidence and clarity.
-RAPPORT APPROACH: Reinforce their smart decision, summarize the value, and express excitement about partnering.`
+        discovery: `PHASE: Discovery - Build rapport, understand needs.`,
+        qualification: `PHASE: Qualification - Understand decision process, budget, timeline.`,
+        presentation: `PHASE: Presentation - Connect solutions to their needs.`,
+        objection_handling: `PHASE: Objection Handling - Address concerns with proof.`,
+        closing: `PHASE: Closing - Confirm value, facilitate decision.`
       };
 
-      // Generate AI-powered phase-aware one-liners
-      const onelinerPrompt = `You are an elite sales coach. Analyze this conversation and generate 4 strategic rapport-building statements.
+      // ULTRA-OPTIMIZED: Minimal prompt, last 800 chars only
+      const onelinerPrompt = `Sales coach. 4 rapport statements for ${phaseAnalysis.phase} phase.
 
-CONVERSATION CONTEXT:
-${conversationText.slice(-3000)}
+CONVERSATION:
+${conversationText.slice(-800)}
 
-DETECTED PHASE: ${phaseAnalysis.phase.toUpperCase()}
-READINESS TO CLOSE: ${phaseAnalysis.readinessScore}%
-SIGNALS DETECTED: ${phaseAnalysis.signals.slice(0, 5).join(', ')}
-
-PAIN POINTS IDENTIFIED: ${painPoints.join(', ') || 'Still discovering'}
-REQUIREMENTS MENTIONED: ${requirements.join(', ') || 'Still gathering'}
-CLIENT: ${clientName}
-
-${phaseGuidance[phaseAnalysis.phase]}
-
-CRITICAL INSTRUCTIONS:
-1. Generate statements that SHOW SUPPORT to the prospect while STRATEGICALLY moving toward closing
-2. Be SMART and IMPRESSIVE - not pushy or salesy
-3. Each statement should feel like something a trusted advisor would say
-4. Include a mix of emotional connection and logical progression
-5. Reference SPECIFIC details from the conversation when possible
-
-Generate 4 rapport statements in these categories:
-- EMPATHY: Acknowledge their situation with genuine understanding (not sympathy)
-- INSIGHT: Share valuable perspective that positions you as an expert
-- CURIOSITY: Ask a question that advances the conversation strategically
-- REASSURANCE: Build confidence in moving forward together
-
-Return JSON format:
+JSON only:
 {
   "phase": "${phaseAnalysis.phase}",
   "readinessScore": ${phaseAnalysis.readinessScore},
   "oneliners": [
-    {
-      "id": "unique-id",
-      "category": "empathy|insight|curiosity|reassurance",
-      "text": "The rapport statement - conversational, supportive, and strategic",
-      "situation": "Specific moment in conversation when to use this",
-      "tone": "supportive|consultative|curious|confident",
-      "strategicIntent": "How this moves the conversation toward closing"
-    }
+    {"id": "1", "category": "empathy", "text": "Statement", "situation": "When", "tone": "tone", "strategicIntent": "Goal"},
+    {"id": "2", "category": "insight", "text": "Statement", "situation": "When", "tone": "tone", "strategicIntent": "Goal"},
+    {"id": "3", "category": "curiosity", "text": "Statement", "situation": "When", "tone": "tone", "strategicIntent": "Goal"},
+    {"id": "4", "category": "reassurance", "text": "Statement", "situation": "When", "tone": "tone", "strategicIntent": "Goal"}
   ]
 }`;
 
       const openaiService = await import("./services/openai");
-      const response = await openaiService.generateResponse(onelinerPrompt, []);
+      
+      // CRITICAL: 15 second timeout for one-liners (increased from 10s - still seeing timeouts)
+      const responsePromise = openaiService.generateResponse(onelinerPrompt, []);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 15000)
+      );
       
       let oneliners;
       try {
+        const response = await Promise.race([responsePromise, timeoutPromise]) as string;
         const cleanedResponse = response
           .replace(/```json\s*/g, '')
           .replace(/```\s*/g, '')
           .trim();
         
         oneliners = JSON.parse(cleanedResponse);
-        // Ensure phase info is included
         oneliners.phase = oneliners.phase || phaseAnalysis.phase;
         oneliners.readinessScore = oneliners.readinessScore || phaseAnalysis.readinessScore;
         console.log(`Generated ${oneliners.oneliners?.length || 0} phase-aware rapport statements for ${phaseAnalysis.phase} phase`);
       } catch (parseError) {
-        console.error('Failed to parse one-liners response:', parseError);
-        // Phase-aware fallback one-liners
+        console.error('One-liners generation failed (using fallback):', parseError);
+        // Phase-aware fallback one-liners (SHORTENED)
         const phaseFallbacks: Record<string, any[]> = {
           discovery: [
-            { id: "discovery-empathy", category: "empathy", text: "I can tell you've been dealing with this challenge for a while. That kind of firsthand experience is invaluable for finding the right solution.", situation: "After they describe a frustrating situation", tone: "supportive", strategicIntent: "Build trust through validation" },
-            { id: "discovery-insight", category: "insight", text: "What you're describing reminds me of several organizations that went on to become our most successful implementations. There's a pattern here.", situation: "When seeing familiar success indicators", tone: "consultative", strategicIntent: "Create optimism and credibility" },
-            { id: "discovery-curiosity", category: "curiosity", text: "If we could wave a magic wand and fix this tomorrow, what would change most for your team?", situation: "To understand their vision of success", tone: "curious", strategicIntent: "Establish value criteria" },
-            { id: "discovery-reassurance", category: "reassurance", text: "You're asking exactly the right questions. That kind of thoroughness is what separates successful projects from the rest.", situation: "After detailed questions from prospect", tone: "confident", strategicIntent: "Encourage engagement and questions" }
+            { id: "d1", category: "empathy", text: "I can tell you've been dealing with this challenge. Your experience is invaluable for finding the right solution.", situation: "After frustration", tone: "supportive", strategicIntent: "Build trust" },
+            { id: "d2", category: "insight", text: "What you're describing reminds me of organizations that became our most successful implementations.", situation: "Seeing success indicators", tone: "consultative", strategicIntent: "Create optimism" },
+            { id: "d3", category: "curiosity", text: "If we could fix this tomorrow, what would change most for your team?", situation: "Understanding vision", tone: "curious", strategicIntent: "Establish value" },
+            { id: "d4", category: "reassurance", text: "You're asking exactly the right questions. That thoroughness separates successful projects.", situation: "After questions", tone: "confident", strategicIntent: "Encourage engagement" }
           ],
           qualification: [
-            { id: "qual-empathy", category: "empathy", text: "I completely understand the need to bring others into this decision. Complex projects deserve that kind of careful consideration.", situation: "When discussing stakeholder involvement", tone: "supportive", strategicIntent: "Support their process while advancing" },
-            { id: "qual-insight", category: "insight", text: "The organizations that see the fastest ROI usually have a champion like you who's done this level of homework upfront.", situation: "Recognizing their preparation", tone: "consultative", strategicIntent: "Position them as the internal champion" },
-            { id: "qual-curiosity", category: "curiosity", text: "What would help you feel confident recommending this to your team? I'd love to help you build that case.", situation: "When sensing they need support for internal buy-in", tone: "curious", strategicIntent: "Offer partnership in the decision process" },
-            { id: "qual-reassurance", category: "reassurance", text: "Based on what you've shared, I'm confident we can put together something that works within your parameters.", situation: "After discussing constraints", tone: "confident", strategicIntent: "Remove doubt about feasibility" }
+            { id: "q1", category: "empathy", text: "I understand the need to bring others in. Complex projects deserve careful consideration.", situation: "Stakeholder discussion", tone: "supportive", strategicIntent: "Support process" },
+            { id: "q2", category: "insight", text: "Organizations with fastest ROI have a champion like you who's done this homework.", situation: "Recognizing prep", tone: "consultative", strategicIntent: "Position as champion" },
+            { id: "q3", category: "curiosity", text: "What would help you feel confident recommending this? I'd love to help build that case.", situation: "Need internal support", tone: "curious", strategicIntent: "Offer partnership" },
+            { id: "q4", category: "reassurance", text: "Based on what you've shared, I'm confident we can work within your parameters.", situation: "After constraints", tone: "confident", strategicIntent: "Remove doubt" }
           ],
           presentation: [
-            { id: "pres-empathy", category: "empathy", text: "I know evaluating solutions takes a lot of mental energy. Let me focus on what matters most to you and skip what doesn't.", situation: "At the start of a demo or walkthrough", tone: "supportive", strategicIntent: "Respect their time and show you listened" },
-            { id: "pres-insight", category: "insight", text: "This is exactly what I was hoping to show you - it maps directly to the challenge you mentioned earlier about [specific pain point].", situation: "When demonstrating relevant features", tone: "consultative", strategicIntent: "Connect solution to their stated needs" },
-            { id: "pres-curiosity", category: "curiosity", text: "How would your team react if they could do this starting next month?", situation: "After showing impressive capability", tone: "curious", strategicIntent: "Create urgency and envision success" },
-            { id: "pres-reassurance", category: "reassurance", text: "Everything you're seeing today is exactly what your team would have access to. No bait and switch here.", situation: "During feature showcase", tone: "confident", strategicIntent: "Build trust in the offering" }
+            { id: "p1", category: "empathy", text: "Evaluating solutions takes energy. Let me focus on what matters most to you.", situation: "Demo start", tone: "supportive", strategicIntent: "Respect time" },
+            { id: "p2", category: "insight", text: "This maps directly to your challenge about [pain point].", situation: "Showing features", tone: "consultative", strategicIntent: "Connect to needs" },
+            { id: "p3", category: "curiosity", text: "How would your team react if they could do this next month?", situation: "After capability", tone: "curious", strategicIntent: "Create urgency" },
+            { id: "p4", category: "reassurance", text: "Everything you're seeing is what your team would have. No bait and switch.", situation: "Feature showcase", tone: "confident", strategicIntent: "Build trust" }
           ],
           objection_handling: [
-            { id: "obj-empathy", category: "empathy", text: "That's a really smart question to ask. I'd be concerned too if I were in your position without more context.", situation: "When they raise a concern", tone: "supportive", strategicIntent: "Validate concern as reasonable" },
-            { id: "obj-insight", category: "insight", text: "Other clients had the same concern initially. Here's what they found after the first few weeks...", situation: "When addressing common objections", tone: "consultative", strategicIntent: "Provide social proof and resolution" },
-            { id: "obj-curiosity", category: "curiosity", text: "If we could address that concern completely, what else would you need to feel good about moving forward?", situation: "After addressing an objection", tone: "curious", strategicIntent: "Uncover all objections at once" },
-            { id: "obj-reassurance", category: "reassurance", text: "I'm glad you brought that up. It tells me you're thinking about this seriously, which is exactly what we want.", situation: "When concern is raised", tone: "confident", strategicIntent: "Frame objection as positive engagement" }
+            { id: "o1", category: "empathy", text: "That's a smart question. I'd be concerned too without more context.", situation: "Concern raised", tone: "supportive", strategicIntent: "Validate concern" },
+            { id: "o2", category: "insight", text: "Other clients had the same concern. Here's what they found after a few weeks...", situation: "Common objection", tone: "consultative", strategicIntent: "Provide proof" },
+            { id: "o3", category: "curiosity", text: "If we addressed that completely, what else would you need to feel good about moving forward?", situation: "After addressing", tone: "curious", strategicIntent: "Uncover all objections" },
+            { id: "o4", category: "reassurance", text: "I'm glad you brought that up. It shows you're thinking seriously.", situation: "Concern raised", tone: "confident", strategicIntent: "Frame as positive" }
           ],
           closing: [
-            { id: "close-empathy", category: "empathy", text: "I can tell you've put a lot of thought into this. It's clear you want to get it right for your team.", situation: "When sensing they're ready to decide", tone: "supportive", strategicIntent: "Acknowledge their careful consideration" },
-            { id: "close-insight", category: "insight", text: "Based on everything we've discussed, I'm genuinely excited about what we can accomplish together.", situation: "Summarizing the partnership potential", tone: "consultative", strategicIntent: "Express authentic enthusiasm" },
-            { id: "close-curiosity", category: "curiosity", text: "What would make the next step easiest for you - should I send over the proposal first, or schedule time with your team?", situation: "When facilitating the close", tone: "curious", strategicIntent: "Make it easy to say yes" },
-            { id: "close-reassurance", category: "reassurance", text: "You're making a smart decision. I'm confident you'll be one of those success stories we reference with future clients.", situation: "After agreement to proceed", tone: "confident", strategicIntent: "Reinforce their decision" }
+            { id: "c1", category: "empathy", text: "You've put a lot of thought into this. It's clear you want to get it right.", situation: "Ready to decide", tone: "supportive", strategicIntent: "Acknowledge consideration" },
+            { id: "c2", category: "insight", text: "Based on everything we've discussed, I'm genuinely excited about what we can accomplish.", situation: "Summarizing", tone: "consultative", strategicIntent: "Express enthusiasm" },
+            { id: "c3", category: "curiosity", text: "What would make the next step easiest - proposal first, or schedule with your team?", situation: "Facilitating close", tone: "curious", strategicIntent: "Make easy to say yes" },
+            { id: "c4", category: "reassurance", text: "You're making a smart decision. You'll be one of those success stories we reference.", situation: "After agreement", tone: "confident", strategicIntent: "Reinforce decision" }
           ]
         };
         
@@ -1389,8 +1424,8 @@ Return JSON format:
         };
       }
 
-      // Cache the result for 2 minutes to avoid repeated calls
-      aiCache.set(cacheKey, oneliners, 120000); // 120000ms = 2 minutes
+      // Cache the result for 2 minutes
+      aiCache.set(cacheKey, oneliners, 120000);
       console.log(`💾 Cached one-liners for session ${sessionId} (${messages.length} messages)`);
 
       res.json(oneliners);
@@ -1400,11 +1435,22 @@ Return JSON format:
     }
   });
 
-  // Partner Services Recommendations endpoint
+  // Partner Services Recommendations endpoint (OPTIMIZED with caching)
   app.get("/api/conversations/:sessionId/partner-services", async (req, res) => {
     try {
       const { sessionId } = req.params;
       const domainExpertise = req.query.domain as string || "Generic Product";
+      
+      // Cache key based on session and domain
+      const cacheKey = `partner-services:${sessionId}:${domainExpertise}`;
+      const CACHE_TTL = 60000; // 1 minute cache
+      
+      // Check cache first
+      const cached = partnerServicesCache.get(cacheKey);
+      if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+        console.log(`✅ Partner services cache HIT for ${sessionId}`);
+        return res.json(cached.data);
+      }
       
       // Get conversation data for analysis
       const conversation = await storage.getConversation(sessionId);
@@ -1479,6 +1525,9 @@ Return JSON format:
             }
           ]
         };
+        
+        // Cache default recommendations
+        partnerServicesCache.set(cacheKey, { data: defaultRecommendations, timestamp: Date.now() });
         return res.json(defaultRecommendations);
       }
 
@@ -1501,7 +1550,8 @@ As a trusted ${domainExpertise} advisor, recommend 3 strategic products or servi
 - Strategic alignment with customer's stated goals
 - Specific ${domainExpertise} products, features, modules, or services
 
-Provide consultant-quality ${domainExpertise} recommendations in JSON format:
+IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after the JSON structure. Do not use markdown code fences.
+
 {
   "recommendations": [
     {
@@ -1527,15 +1577,13 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
       
       let recommendations;
       try {
-        // Clean the response by removing markdown code fences and extra whitespace
-        const cleanedResponse = response
-          .replace(/```json\s*/g, '')
-          .replace(/```\s*/g, '')
-          .trim();
-        
-        console.log(`AI response length: ${response.length}, cleaned length: ${cleanedResponse.length}`);
-        recommendations = JSON.parse(cleanedResponse);
+        // Response is already cleaned by generateResponse
+        console.log(`AI response length: ${response.length}`);
+        recommendations = JSON.parse(response);
         console.log(`Partner services recommendations generated: ${recommendations.recommendations?.length || 0} services`);
+        
+        // Cache successful response
+        partnerServicesCache.set(cacheKey, { data: recommendations, timestamp: Date.now() });
       } catch (parseError) {
         console.error('Failed to parse partner services response:', parseError);
         console.error('Raw AI response:', response.substring(0, 500) + '...');
@@ -1912,17 +1960,19 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
       }
       
       // Check subscription limits before starting session
-      const subscription = await authStorage.getSubscriptionByUserId(userId);
+      let subscription = await authStorage.getSubscriptionByUserId(userId);
       if (!subscription) {
-        return res.status(403).json({ 
-          message: "No active subscription or enterprise license found. Please subscribe or contact your organization to continue.",
-          requiresUpgrade: true
+        // Auto-create trial subscription for new users
+        subscription = await authStorage.createSubscription({
+          userId,
+          status: 'trial',
+          planType: 'free_trial'
         });
       }
       
-      const sessionsUsed = parseInt(subscription.sessionsUsed);
+      const sessionsUsed = parseInt(subscription.sessionsUsed || "0") || 0;
       const sessionsLimit = subscription.sessionsLimit ? parseInt(subscription.sessionsLimit) : null;
-      const minutesUsed = parseInt(subscription.minutesUsed);
+      const minutesUsed = parseInt(subscription.minutesUsed || "0") || 0;
       const minutesLimit = subscription.minutesLimit ? parseInt(subscription.minutesLimit) : null;
       
       // Check if user has exceeded session limit
@@ -1996,7 +2046,9 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
       const endTime = new Date();
       const startTime = new Date(sessionUsage.startTime);
       const durationSeconds = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
-      const durationMinutes = Math.ceil(durationSeconds / 60);
+      // FIXED: Use actual minutes instead of rounding up
+      // If session was 3 minutes, count it as 3 minutes, not 1 minute
+      const durationMinutes = Math.floor(durationSeconds / 60);
 
       const updatedSession = await storage.updateSessionUsage(sessionId, userId, {
         endTime,
@@ -2037,49 +2089,36 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
   app.get("/api/session-usage/total", authenticateToken, async (req, res) => {
     try {
       const userId = req.jwtUser!.userId;
+      const sessions = await db
+        .select()
+        .from(sessionUsage)
+        .where(eq(sessionUsage.userId, userId))
+        .orderBy(desc(sessionUsage.startTime));
 
-      // Use subscription table as source of truth for session usage
-      // This ensures consistency with add-on expiry logic
-      const subscription = await authStorage.getSubscriptionByUserId(userId);
-      
-      const allSessions = await storage.getUserSessionUsage(userId);
-      
-      let totalSessions = 0;
-      let totalMinutes = 0;
-      
-      if (subscription) {
-        // Use subscription table counters (authoritative for add-on expiry)
-        totalSessions = parseInt(subscription.sessionsUsed || '0');
-        totalMinutes = parseInt(subscription.minutesUsed || '0');
-      } else {
-        // Fallback: calculate from session records if no subscription exists
-        let totalSeconds = 0;
-        for (const session of allSessions) {
-          if (session.durationSeconds) {
-            totalSeconds += parseInt(session.durationSeconds);
-          }
+      const now = new Date();
+      let totalSeconds = 0;
+
+      for (const session of sessions) {
+        if (session.durationSeconds) {
+          const parsed = parseInt(session.durationSeconds, 10);
+          if (!Number.isNaN(parsed)) totalSeconds += parsed;
+        } else if (session.startTime && session.status === "active") {
+          const startTime = new Date(session.startTime);
+          const diff = Math.max(0, Math.floor((now.getTime() - startTime.getTime()) / 1000));
+          totalSeconds += diff;
         }
-        totalSessions = allSessions.length;
-        totalMinutes = Math.floor(totalSeconds / 60);
       }
 
-      const totalSeconds = totalMinutes * 60;
-      const totalHours = Math.floor(totalMinutes / 60);
+      const totalSessions = sessions.length;
+      const totalMinutes = Math.floor(totalSeconds / 60);
+      const totalHours = Math.floor(totalSeconds / 3600);
 
-      res.json({
+      return res.json({
         totalSessions,
         totalSeconds,
         totalMinutes,
         totalHours,
-        sessions: allSessions.map(s => ({
-          id: s.id,
-          sessionId: s.sessionId,
-          startTime: s.startTime,
-          endTime: s.endTime,
-          durationSeconds: s.durationSeconds,
-          status: s.status,
-          createdAt: s.createdAt
-        }))
+        sessions
       });
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch usage data", error: error.message });
@@ -2147,6 +2186,69 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
           price: planDetails.price,
         } : 'NULL');
       }
+
+      // FIXED: Get session history from conversations table directly
+      // This is the source of truth for AI feature usage
+      let sessionHistory: Array<{
+        sessionId: string | null;
+        startTime: string;
+        endTime: string;
+        durationMinutes: number;
+        summary: any;
+      }> = [];
+      try {
+        console.log(`[DEBUG] Fetching conversations for user ${userId}`);
+        
+        // Get all conversations for this user
+        const userConversations = await db.select()
+          .from(conversations)
+          .where(eq(conversations.userId, userId))
+          .orderBy(desc(conversations.createdAt))
+          .limit(50);
+        
+        console.log(`[DEBUG] Found ${userConversations.length} conversations`);
+
+        // Convert conversations to session history format
+        // IMPORTANT: Use transcriptionStartedAt for accurate duration (when user clicked Start)
+        // FILTER OUT: Sessions where transcription never started (page loads without Start button click)
+        sessionHistory = userConversations
+          .map(conv => {
+            const startTime = conv.transcriptionStartedAt || conv.createdAt || new Date();
+            const endTime = conv.endedAt || conv.createdAt || new Date();
+            const durationMs = endTime.getTime() - startTime.getTime();
+            const durationMinutes = Math.max(1, Math.ceil(durationMs / (1000 * 60)));
+
+            return {
+              sessionId: conv.sessionId,
+              startTime: startTime.toISOString(),
+              endTime: endTime.toISOString(),
+              durationMinutes: durationMinutes,
+              summary: conv.callSummary || null,
+              transcriptionStarted: !!conv.transcriptionStartedAt,
+            };
+          })
+          .filter(session => {
+            // STRICT FILTER: Only show sessions where transcription actually started
+            // This means user clicked the Start button
+            // Sessions without transcriptionStartedAt are just page loads, not actual usage
+            return session.transcriptionStarted;
+          });
+
+        console.log(`[DEBUG] Returning ${sessionHistory.length} sessions in history (filtered out non-transcription sessions)`);
+      } catch (error) {
+        console.error(`[DEBUG] Error fetching conversations:`, error);
+        // Fall back to empty array if query fails
+        sessionHistory = [];
+      }
+      
+      // Calculate actual sessions used from filtered history (not from subscription.sessionsUsed)
+      // This ensures consistency between session count and session list
+      const actualSessionsUsed = sessionHistory.length;
+      
+      // Calculate actual minutes used from filtered history
+      const actualMinutesUsed = sessionHistory.reduce((total, session) => {
+        return total + (session.durationMinutes || 0);
+      }, 0);
       
       res.json({
         id: subscription.id,
@@ -2154,11 +2256,11 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
         status: subscription.status,
         currentPeriodStart: subscription.currentPeriodStart,
         currentPeriodEnd: subscription.currentPeriodEnd,
-        sessionsUsed: subscription.sessionsUsed,
+        sessionsUsed: actualSessionsUsed.toString(), // Use filtered count, not subscription.sessionsUsed
         sessionsLimit: subscription.sessionsLimit,
-        minutesUsed: subscription.minutesUsed,
+        minutesUsed: actualMinutesUsed.toString(), // Use calculated minutes from filtered sessions
         minutesLimit: subscription.minutesLimit,
-        sessionHistory: subscription.sessionHistory || [],
+        sessionHistory: sessionHistory,
         canceledAt: subscription.canceledAt,
         createdAt: subscription.createdAt,
         plan: planDetails ? {
@@ -2171,6 +2273,158 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
     } catch (error: any) {
       console.error(`[DEBUG] Error fetching subscription:`, error);
       res.status(500).json({ message: "Failed to fetch subscription", error: error.message });
+    }
+  });
+  
+  // Debug endpoint to check subscription and payment status
+  app.get("/api/debug/subscription-status", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      
+      // Get user info
+      const user = await authStorage.getUserById(userId);
+      
+      // Get all subscriptions for this user (not just the latest)
+      const allSubscriptions = await db.select().from(subscriptions)
+        .where(eq(subscriptions.userId, userId))
+        .orderBy(desc(subscriptions.createdAt));
+      
+      // Get all payments for this user
+      const payments = await authStorage.getPaymentsByUserId(userId);
+      
+      // Get all pending orders
+      const orders = await db.select().from(pendingOrders)
+        .where(eq(pendingOrders.userId, userId))
+        .orderBy(desc(pendingOrders.createdAt));
+      
+      res.json({
+        userId,
+        userEmail: user?.email,
+        userName: `${user?.firstName} ${user?.lastName}`,
+        subscriptionsCount: allSubscriptions.length,
+        subscriptions: allSubscriptions.map(sub => ({
+          id: sub.id,
+          planType: sub.planType,
+          status: sub.status,
+          planId: sub.planId,
+          createdAt: sub.createdAt,
+          currentPeriodEnd: sub.currentPeriodEnd,
+        })),
+        paymentsCount: payments.length,
+        payments: payments.map((p: any) => ({
+          id: p.id,
+          amount: p.amount,
+          status: p.status,
+          subscriptionId: p.subscriptionId,
+          createdAt: p.createdAt,
+          razorpayOrderId: p.razorpayOrderId,
+        })),
+        ordersCount: orders.length,
+        orders: orders.map(order => ({
+          id: order.id,
+          status: order.status,
+          amount: order.amount,
+          gatewayOrderId: order.gatewayOrderId,
+          createdAt: order.createdAt,
+          completedAt: order.completedAt,
+        })),
+      });
+    } catch (error: any) {
+      console.error("[DEBUG] Error fetching debug info:", error);
+      res.status(500).json({ message: "Failed to fetch debug info", error: error.message });
+    }
+  });
+
+  // Get user session history
+  app.get("/api/profile/session-history", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const limit = parseInt(req.query.limit as string) || 50;
+      
+      console.log(`[DEBUG] Fetching session history for userId: ${userId}`);
+      
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+      
+      // Fetch conversations for this user
+      const userConversations = await db
+        .select({
+          id: conversations.id,
+          sessionId: conversations.sessionId,
+          clientName: conversations.clientName,
+          status: conversations.status,
+          createdAt: conversations.createdAt,
+          transcriptionStartedAt: conversations.transcriptionStartedAt,
+          endedAt: conversations.endedAt,
+        })
+        .from(conversations)
+        .where(eq(conversations.userId, userId))
+        .orderBy(sql`${conversations.createdAt} DESC`)
+        .limit(limit);
+
+      // Calculate session details with null safety
+      // IMPORTANT: Use transcriptionStartedAt for accurate duration (when user clicked Start)
+      // FILTER OUT: Sessions where transcription never started (page loads without Start button click)
+      const sessionHistory = userConversations
+        .map(conv => {
+          const startTime = conv.transcriptionStartedAt || conv.createdAt || new Date();
+          const endTime = conv.endedAt || new Date();
+          const durationMs = Math.max(0, endTime.getTime() - startTime.getTime());
+          const durationMinutes = Math.round(durationMs / (1000 * 60));
+          
+          return {
+            id: conv.id,
+            sessionId: conv.sessionId || 'unknown',
+            clientName: conv.clientName || "Unknown",
+            status: conv.status || 'active',
+            startTime: startTime.toISOString(),
+            endTime: conv.endedAt?.toISOString() || null,
+            durationMinutes,
+            isActive: conv.status === "active",
+            transcriptionStarted: !!conv.transcriptionStartedAt, // Track if transcription actually started
+          };
+        })
+        .filter(session => {
+          // STRICT FILTER: Only show sessions where transcription actually started
+          // This means user clicked the Start button
+          // Sessions without transcriptionStartedAt are just page loads, not actual usage
+          if (!session.transcriptionStarted) {
+            console.log(`[DEBUG] Filtering out non-transcription session: ${session.sessionId}`);
+            return false;
+          }
+          return true;
+        });
+
+      // Calculate total usage
+      const totalSessions = sessionHistory.length;
+      const completedSessions = sessionHistory.filter(s => s.status === "ended").length;
+      const totalMinutes = sessionHistory.reduce((sum, s) => sum + (s.durationMinutes || 0), 0);
+
+      console.log(`[DEBUG] Session history loaded: ${totalSessions} total sessions, ${completedSessions} completed`);
+
+      res.json({
+        sessions: sessionHistory,
+        summary: {
+          totalSessions,
+          completedSessions,
+          activeSessions: totalSessions - completedSessions,
+          totalMinutesUsed: totalMinutes,
+        }
+      });
+    } catch (error: any) {
+      console.error(`[ERROR] Failed to fetch session history for user:`, error);
+      res.status(500).json({ 
+        message: "Failed to fetch session history", 
+        error: error.message || 'Unknown error',
+        sessions: [],
+        summary: {
+          totalSessions: 0,
+          completedSessions: 0,
+          activeSessions: 0,
+          totalMinutesUsed: 0,
+        }
+      });
     }
   });
   
@@ -2257,12 +2511,21 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
             const amount = parseFloat(historyItem.amount || '0');
             const currency = historyItem.currency || 'USD';
             
-            // Keep original currency - no conversion
             let displayAmount = amount;
             let displayCurrency = currency;
+            let baseAmount: number;
+            let gstAmount: number;
             
-            const baseAmount = displayAmount / 1.18;
-            const gstAmount = displayAmount - baseAmount;
+            // Proper GST calculation based on currency
+            if (currency === 'INR') {
+              // For INR, the amount includes GST, so calculate base amount
+              baseAmount = displayAmount / 1.18;
+              gstAmount = displayAmount - baseAmount;
+            } else {
+              // For USD and other currencies, no GST
+              baseAmount = displayAmount;
+              gstAmount = 0;
+            }
             
             invoices.push({
               id: historyItem.orderId || historyItem.paymentId,
@@ -2296,21 +2559,33 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
             });
           });
         } else if (metadata.cartOrderId) {
-          // Cart purchase - create invoice from cart order
+          // Cart purchase - use the stored amount which should include proper GST
           const totalWithGst = parseFloat(purchase.purchaseAmount || '0');
-          const baseAmount = totalWithGst / 1.18;
-          const gstAmount = totalWithGst - baseAmount;
+          const currency = purchase.currency || 'INR';
+          let baseAmount: number;
+          let gstAmount: number;
+          
+          // Proper GST calculation based on currency
+          if (currency === 'INR') {
+            // For INR, the amount includes GST, so calculate base amount
+            baseAmount = totalWithGst / 1.18;
+            gstAmount = totalWithGst - baseAmount;
+          } else {
+            // For USD and other currencies, no GST
+            baseAmount = totalWithGst;
+            gstAmount = 0;
+          }
           
           invoices.push({
             id: metadata.cartOrderId,
             orderId: metadata.cartOrderId,
             amount: totalWithGst.toFixed(2),
-            currency: purchase.currency || 'INR',
+            currency: currency,
             status: 'succeeded',
             paymentMethod: 'online',
             razorpayOrderId: metadata.gatewayOrderId || metadata.cartOrderId,
             razorpayPaymentId: metadata.paymentId,
-            receiptUrl: null,
+            receiptUrl: `/api/billing/invoice?orderId=${metadata.cartOrderId}`,
             createdAt: purchase.createdAt,
             metadata: {
               itemCount: 1,
@@ -2323,14 +2598,26 @@ Provide consultant-quality ${domainExpertise} recommendations in JSON format:
         } else {
           // Standalone purchase (old format or other addon types)
           const totalWithGst = parseFloat(purchase.purchaseAmount || '0');
-          const baseAmount = totalWithGst / 1.18;
-          const gstAmount = totalWithGst - baseAmount;
+          const currency = purchase.currency || 'INR';
+          let baseAmount: number;
+          let gstAmount: number;
+          
+          // Proper GST calculation based on currency
+          if (currency === 'INR') {
+            // For INR, the amount includes GST, so calculate base amount
+            baseAmount = totalWithGst / 1.18;
+            gstAmount = totalWithGst - baseAmount;
+          } else {
+            // For USD and other currencies, no GST
+            baseAmount = totalWithGst;
+            gstAmount = 0;
+          }
           
           invoices.push({
             id: purchase.id,
             orderId: purchase.id,
             amount: totalWithGst.toFixed(2),
-            currency: purchase.currency || 'INR',
+            currency: currency,
             status: 'succeeded',
             paymentMethod: 'online',
             razorpayOrderId: metadata.gatewayOrderId || purchase.id,
@@ -3831,6 +4118,7 @@ Crawl-delay: 1`;
   // API Keys management routes
   app.use("/api/api-keys", apiKeysRouter);
   console.log("🔑 API Keys routes registered");
+  
   setupSalesIntelligenceRoutes(app); // Sales Intelligence Agent for real-time suggestions
   registerBibleRoutes(app); // Rev Winner Bible PDF download
   app.use("/api/download", apiDocsRouter); // API Documentation PDF download

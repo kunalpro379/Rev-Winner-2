@@ -50,6 +50,28 @@ export default function Register() {
       const data = await response.json();
 
       if (!response.ok) {
+        // If user exists but not verified, show OTP screen
+        if (response.status === 200 && data.resent) {
+          setEmail(values.email);
+          setShowOTP(true);
+          toast({
+            title: "Verification Code Resent",
+            description: "We've sent a new verification code to your email.",
+          });
+          return;
+        }
+        
+        // If user already verified, redirect to login
+        if (data.message?.includes("already registered and verified")) {
+          toast({
+            title: "Account Already Exists",
+            description: "Please login with your credentials.",
+            variant: "destructive",
+          });
+          setTimeout(() => setLocation("/login"), 2000);
+          return;
+        }
+        
         throw new Error(data.message || "Registration failed");
       }
 
@@ -201,8 +223,47 @@ export default function Register() {
             <Button
               data-testid="button-skip-trial"
               onClick={async () => {
-                await handleVerifyOTP();
-                setTimeout(() => setLocation("/subscribe"), 1000);
+                if (!otpCode || otpCode.length !== 6) {
+                  toast({
+                    title: "Invalid Code",
+                    description: "Please enter a 6-digit verification code.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+
+                setIsVerifying(true);
+                try {
+                  const response = await apiRequest("POST", "/api/auth/verify-otp", {
+                    email,
+                    code: otpCode,
+                  });
+                  const data = await response.json();
+
+                  if (!response.ok) {
+                    throw new Error(data.message || "Verification failed");
+                  }
+
+                  // Store tokens
+                  localStorage.setItem("accessToken", data.accessToken);
+                  localStorage.setItem("refreshToken", data.refreshToken);
+
+                  toast({
+                    title: "Account Verified!",
+                    description: "Redirecting to pricing...",
+                  });
+
+                  // Redirect to pricing page
+                  setTimeout(() => setLocation("/subscribe"), 500);
+                } catch (error: any) {
+                  toast({
+                    title: "Verification Failed",
+                    description: error.message || "Invalid or expired code.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setIsVerifying(false);
+                }
               }}
               variant="outline"
               disabled={isVerifying || otpCode.length !== 6}
