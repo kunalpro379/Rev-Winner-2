@@ -10,17 +10,19 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ShiftGearsTip {
-  type: "rebuttal" | "objection" | "next_step" | "technical" | "psychological" | "closure" | "competitive" | "discovery";
+  type: "rebuttal" | "objection" | "next_step" | "technical" | "psychological" | "closure" | "competitive" | "discovery" | "qualification" | "trust_building" | "risk_alert";
   title: string;
   action: string;
   priority: "high" | "medium" | "low";
+  expected_reaction?: string;
 }
 
 interface QueryPitch {
   query: string;
-  queryType: "technical" | "pricing" | "features" | "integration" | "support" | "general";
+  queryType: "technical" | "pricing" | "features" | "integration" | "support" | "general" | "comparison" | "challenge";
   pitch: string;
   keyPoints: string[];
+  followUpQuestion?: string;
 }
 
 interface ShiftGearsProps {
@@ -31,7 +33,7 @@ interface ShiftGearsProps {
   resetVersion?: number;
 }
 
-const typeIcons = {
+const typeIcons: Record<string, any> = {
   rebuttal: Target,
   objection: Wrench,
   next_step: TrendingUp,
@@ -40,9 +42,12 @@ const typeIcons = {
   closure: Trophy,
   competitive: Target,
   discovery: MessageSquare,
+  qualification: Target,
+  trust_building: Brain,
+  risk_alert: Zap,
 };
 
-const typeColors = {
+const typeColors: Record<string, string> = {
   rebuttal: "bg-blue-100 dark:bg-blue-950 border-blue-300 dark:border-blue-800 text-blue-900 dark:text-blue-100",
   objection: "bg-orange-100 dark:bg-orange-950 border-orange-300 dark:border-orange-800 text-orange-900 dark:text-orange-100",
   next_step: "bg-green-100 dark:bg-green-950 border-green-300 dark:border-green-800 text-green-900 dark:text-green-100",
@@ -51,6 +56,9 @@ const typeColors = {
   closure: "bg-amber-100 dark:bg-amber-950 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-100",
   competitive: "bg-red-100 dark:bg-red-950 border-red-300 dark:border-red-800 text-red-900 dark:text-red-100",
   discovery: "bg-cyan-100 dark:bg-cyan-950 border-cyan-300 dark:border-cyan-800 text-cyan-900 dark:text-cyan-100",
+  qualification: "bg-indigo-100 dark:bg-indigo-950 border-indigo-300 dark:border-indigo-800 text-indigo-900 dark:text-indigo-100",
+  trust_building: "bg-teal-100 dark:bg-teal-950 border-teal-300 dark:border-teal-800 text-teal-900 dark:text-teal-100",
+  risk_alert: "bg-rose-100 dark:bg-rose-950 border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-100",
 };
 
 const priorityBadgeColors = {
@@ -59,13 +67,15 @@ const priorityBadgeColors = {
   low: "bg-gray-600 text-white hover:bg-gray-700",
 };
 
-const queryTypeColors = {
+const queryTypeColors: Record<string, string> = {
   technical: "bg-purple-100 dark:bg-purple-900/30 text-purple-900 dark:text-purple-100 border-purple-300 dark:border-purple-700",
   pricing: "bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-100 border-green-300 dark:border-green-700",
   features: "bg-blue-100 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100 border-blue-300 dark:border-blue-700",
   integration: "bg-orange-100 dark:bg-orange-900/30 text-orange-900 dark:text-orange-100 border-orange-300 dark:border-orange-700",
   support: "bg-pink-100 dark:bg-pink-900/30 text-pink-900 dark:text-pink-100 border-pink-300 dark:border-pink-700",
   general: "bg-gray-100 dark:bg-gray-900/30 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-700",
+  comparison: "bg-red-100 dark:bg-red-900/30 text-red-900 dark:text-red-100 border-red-300 dark:border-red-700",
+  challenge: "bg-amber-100 dark:bg-amber-900/30 text-amber-900 dark:text-amber-100 border-amber-300 dark:border-amber-700",
 };
 
 export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTranscribing, resetVersion = 0 }: ShiftGearsProps) {
@@ -76,6 +86,7 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(0);
   const [lastPitchUpdateTime, setLastPitchUpdateTime] = useState<number>(0);
   const [isPitchesOpen, setIsPitchesOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [isAutoPaused, setIsAutoPaused] = useState(false);
   const [isPitchesAutoPaused, setIsPitchesAutoPaused] = useState(false);
   const [hasReceivedFirstTip, setHasReceivedFirstTip] = useState(false);
@@ -99,6 +110,7 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
       setLastPitchTranscript("");
       setLastUpdateTime(0);
       setLastPitchUpdateTime(0);
+      setIsOpen(true);
       setIsPitchesOpen(false);
       setIsAutoPaused(false);
       setIsPitchesAutoPaused(false);
@@ -128,9 +140,9 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
     },
     onSuccess: (data) => {
       const newTips = data.tips || [];
+      const tipsChanged = JSON.stringify(newTips) !== JSON.stringify(tips);
       
-      if (newTips.length > 0) {
-        // REAL-TIME UPDATE: Replace old tips with fresh ones (no historical piling)
+      if (tipsChanged) {
         setTips(newTips);
       }
       
@@ -146,7 +158,7 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
             description: "Review the tips, then click Play to continue monitoring",
           });
         }
-        console.log(`⏸️ Shift Gears: Auto-paused after response - ${newTips.length} fresh tips (replaced old ones)`);
+        console.log('⏸️ Shift Gears: Auto-paused after response - review tips before continuing');
       }
     },
     onError: (error: any) => {
@@ -172,12 +184,11 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
     },
     onSuccess: (data) => {
       const newPitches = data.pitches || [];
+      const pitchesChanged = JSON.stringify(newPitches) !== JSON.stringify(pitches);
       
-      if (newPitches.length > 0) {
-        // REAL-TIME UPDATE: Replace old pitches with fresh ones (no historical piling)
+      if (pitchesChanged) {
         setPitches(newPitches);
-        
-        if (!isPitchesOpen) {
+        if (newPitches.length > 0 && !isPitchesOpen) {
           setIsPitchesOpen(true);
         }
       }
@@ -194,7 +205,7 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
             description: "Review the pitch response, then click Play to continue",
           });
         }
-        console.log(`⏸️ Query Pitches: Auto-paused after response - ${newPitches.length} fresh pitches (replaced old ones)`);
+        console.log('⏸️ Query Pitches: Auto-paused after response - review pitch before continuing');
       }
     },
     onError: (error: any) => {
@@ -203,47 +214,6 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
       setLastPitchUpdateTime(Date.now());
     }
   });
-
-  const formatTextWithMarkdown = (text: string): JSX.Element | string => {
-    if (!text) return text;
-    
-    // Convert markdown-style formatting to React elements
-    const parts: (string | JSX.Element)[] = [];
-    let currentIndex = 0;
-    
-    // Pattern to match **bold** text
-    const boldPattern = /\*\*(.*?)\*\*/g;
-    let match;
-    let keyCounter = 0;
-    
-    while ((match = boldPattern.exec(text)) !== null) {
-      // Add text before bold
-      if (match.index > currentIndex) {
-        parts.push(text.substring(currentIndex, match.index));
-      }
-      // Add bold text
-      parts.push(<strong key={`bold-${keyCounter++}`} className="font-bold text-current">{match[1]}</strong>);
-      currentIndex = boldPattern.lastIndex;
-    }
-    
-    // Add remaining text
-    if (currentIndex < text.length) {
-      parts.push(text.substring(currentIndex));
-    }
-    
-    return parts.length > 1 ? <>{parts}</> : text;
-  };
-
-  const formatPitchText = (text: string) => {
-    if (!text) return { formatted: null, hasSections: false };
-    
-    const formatted = formatTextWithMarkdown(text);
-    
-    // Detect if text has structured sections
-    const hasSections = /\[(SOLUTION|VALUE|TECHNICAL|CASE STUDY|COMPETITOR|WHY BETTER)\]|SOLUTION:|VALUE:|TECHNICAL:|CASE STUDY:|COMPETITOR:|WHY BETTER:/i.test(text);
-    
-    return { formatted: formatted !== text ? formatted : null, hasSections };
-  };
 
   // Auto-update logic for tips: trigger when transcript changes significantly
   // OPTIMIZED: Near real-time updates (3s throttle + 1s debounce = ~4s response time)
@@ -337,7 +307,7 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
       
       if (hasMeaningfulSignal && transcriptText.trim().length > 30) {
         hasFetchedFirstTipRef.current = true;
-        console.log('Shift Gears: Initial fetch triggered - detected meaningful content');
+        console.log('🚀 Shift Gears: Initial fetch triggered - detected meaningful content');
         fetchTipsMutation.mutate();
       }
     }
@@ -350,7 +320,7 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
       
       if ((hasQuestion || hasEnoughContent) && transcriptText.trim().length > 30) {
         hasFetchedFirstPitchRef.current = true;
-        console.log('Query Pitches: Initial fetch triggered - detected question or content');
+        console.log('🚀 Query Pitches: Initial fetch triggered - detected question or content');
         fetchPitchesMutation.mutate();
       }
     }
@@ -405,20 +375,22 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
   }, [pitches.length]);
 
   const handleManualRefresh = () => {
-    if (!fetchTipsMutation.isPending && !isAutoPaused) {
+    if (!fetchTipsMutation.isPending) {
+      if (isAutoPaused) setIsAutoPaused(false);
       fetchTipsMutation.mutate();
     }
   };
 
   const handleManualPitchesRefresh = () => {
-    if (!fetchPitchesMutation.isPending && !isPitchesAutoPaused) {
+    if (!fetchPitchesMutation.isPending) {
+      if (isPitchesAutoPaused) setIsPitchesAutoPaused(false);
       fetchPitchesMutation.mutate();
     }
   };
 
   if (!transcriptText.trim()) {
     return (
-      <Card className="shadow-lg border-2 border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-indigo-950/30 dark:to-purple-950/20 h-full flex flex-col">
+      <Card className="shadow-lg border-2 border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-indigo-950/30 dark:to-purple-950/20">
         <CardHeader className="pb-4 border-b border-indigo-200/50 dark:border-indigo-800/50">
           <CardTitle className="text-xl flex items-center gap-2.5 font-bold text-indigo-900 dark:text-indigo-100">
             <div className="p-2 bg-indigo-600 dark:bg-indigo-500 rounded-lg shadow-md">
@@ -430,44 +402,48 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
             Real-time tips to close deals faster
           </p>
         </CardHeader>
-        <CardContent className="pt-6 flex-1">
-          <div className="flex items-center justify-center h-full min-h-[200px]">
-            <p className="text-center text-muted-foreground text-sm">
-              Start your conversation to get smart, actionable tips
-            </p>
-          </div>
+        <CardContent className="pt-6">
+          <p className="text-center text-muted-foreground text-sm py-6">
+            Start your conversation to get smart, actionable tips
+          </p>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="shadow-lg border-2 border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-indigo-950/30 dark:to-purple-950/20 h-full flex flex-col min-h-[500px]">
-      <CardHeader className="pb-4 border-b border-indigo-200/50 dark:border-indigo-800/50">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex-1 flex items-start gap-3 text-left">
-            <div className="p-2 bg-indigo-600 dark:bg-indigo-500 rounded-lg shadow-md">
-              <Zap className="h-5 w-5 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <CardTitle className="text-xl font-bold text-indigo-900 dark:text-indigo-100">
-                  Shift Gears
-                </CardTitle>
-                {isAutoPaused && tips.length > 0 && (
-                  <Badge className="bg-yellow-500 text-white text-xs animate-pulse">PAUSED</Badge>
-                )}
+    <Card className="shadow-lg border-2 border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-indigo-950/30 dark:to-purple-950/20">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CardHeader className="pb-4 border-b border-indigo-200/50 dark:border-indigo-800/50">
+          <div className="flex items-center justify-between gap-3">
+            <CollapsibleTrigger className="flex-1 flex items-start gap-3 text-left group" data-testid="toggle-shift-gears">
+              <div className="p-2 bg-indigo-600 dark:bg-indigo-500 rounded-lg shadow-md group-hover:scale-105 transition-transform">
+                <Zap className="h-5 w-5 text-white" />
               </div>
-              <p className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">
-                {fetchTipsMutation.isPending 
-                  ? "Analyzing conversation..." 
-                  : isAutoPaused && tips.length > 0
-                    ? "Click Play to detect next conversation shift"
-                    : "Smart tips to move the deal forward"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <CardTitle className="text-xl font-bold text-indigo-900 dark:text-indigo-100">
+                    Shift Gears
+                  </CardTitle>
+                  {isAutoPaused && tips.length > 0 && (
+                    <Badge className="bg-yellow-500 text-white text-xs animate-pulse">PAUSED</Badge>
+                  )}
+                </div>
+                <p className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">
+                  {fetchTipsMutation.isPending 
+                    ? "Analyzing conversation..." 
+                    : isAutoPaused && tips.length > 0
+                      ? "Click Play to detect next conversation shift"
+                      : "Smart tips to move the deal forward"}
+                </p>
+              </div>
+              {isOpen ? (
+                <ChevronUp className="h-5 w-5 text-indigo-600 dark:text-indigo-400 mt-2 flex-shrink-0" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-indigo-600 dark:text-indigo-400 mt-2 flex-shrink-0" />
+              )}
+            </CollapsibleTrigger>
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -486,23 +462,22 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
                 variant="outline"
                 size="sm"
                 onClick={handleManualRefresh}
-                disabled={fetchTipsMutation.isPending || isAutoPaused}
+                disabled={fetchTipsMutation.isPending}
                 data-testid="button-refresh-shift-gears"
                 className="h-9 border-indigo-300 dark:border-indigo-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300"
-                title={isAutoPaused ? "Click Play first to refresh" : "Refresh tips"}
+                title="Refresh tips"
               >
                 <RefreshCw className={`h-4 w-4 ${fetchTipsMutation.isPending ? 'animate-spin' : ''}`} />
               </Button>
+            </div>
           </div>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-6 flex-1">
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent className="pt-6">
         {tips.length === 0 && !fetchTipsMutation.isPending ? (
-          <div className="flex items-center justify-center h-full min-h-[200px]">
-            <p className="text-center text-muted-foreground text-sm">
-              Continue the conversation to get smart tips
-            </p>
-          </div>
+          <p className="text-center text-muted-foreground text-sm py-8">
+            Continue the conversation to get smart tips
+          </p>
         ) : (
           <div className="space-y-3">
             {tips.map((tip, index) => {
@@ -532,6 +507,11 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
                       <p className="text-sm leading-relaxed" data-testid={`tip-action-${index}`}>
                         {tip.action}
                       </p>
+                      {tip.expected_reaction && (
+                        <p className="text-xs italic opacity-75 mt-1">
+                          Expected: {tip.expected_reaction}
+                        </p>
+                      )}
                       <Badge variant="outline" className="text-xs">
                         {tip.type.replace('_', ' ').toUpperCase()}
                       </Badge>
@@ -595,10 +575,10 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
                     variant="outline"
                     size="sm"
                     onClick={handleManualPitchesRefresh}
-                    disabled={fetchPitchesMutation.isPending || isPitchesAutoPaused}
+                    disabled={fetchPitchesMutation.isPending}
                     data-testid="button-refresh-query-pitches"
                     className="h-8 border-fuchsia-300 dark:border-fuchsia-700 hover:bg-fuchsia-100 dark:hover:bg-fuchsia-900/50 text-fuchsia-700 dark:text-fuchsia-300"
-                    title={isPitchesAutoPaused ? "Click Play first to refresh" : "Refresh pitches"}
+                    title="Refresh pitches"
                   >
                     <RefreshCw className={`h-4 w-4 ${fetchPitchesMutation.isPending ? 'animate-spin' : ''}`} />
                   </Button>
@@ -652,17 +632,9 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
 
                                 {/* Pitch Response */}
                                 <div className="bg-white/50 dark:bg-black/20 p-3 rounded-md">
-                                  {(() => {
-                                    const { formatted, hasSections } = formatPitchText(pitch.pitch);
-                                    return (
-                                      <div
-                                        className={`text-sm leading-relaxed ${hasSections ? "space-y-2" : ""}`}
-                                        data-testid={`pitch-response-${index}`}
-                                      >
-                                        {formatted ? formatted : pitch.pitch}
-                                      </div>
-                                    );
-                                  })()}
+                                  <p className="text-sm leading-relaxed" data-testid={`pitch-response-${index}`}>
+                                    {pitch.pitch}
+                                  </p>
                                 </div>
 
                                 {/* Key Points */}
@@ -671,11 +643,19 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
                                     {pitch.keyPoints.map((point, pIndex) => (
                                       <div key={pIndex} className="flex items-start gap-2">
                                         <div className="w-1.5 h-1.5 rounded-full bg-current mt-1.5 flex-shrink-0"></div>
-                                        <div className="text-xs leading-relaxed" data-testid={`pitch-point-${index}-${pIndex}`}>
-                                          {formatTextWithMarkdown(point)}
-                                        </div>
+                                        <p className="text-xs leading-relaxed" data-testid={`pitch-point-${index}-${pIndex}`}>
+                                          {point}
+                                        </p>
                                       </div>
                                     ))}
+                                  </div>
+                                )}
+
+                                {pitch.followUpQuestion && (
+                                  <div className="mt-2 p-2 bg-fuchsia-50 dark:bg-fuchsia-950/30 rounded-md border border-fuchsia-200 dark:border-fuchsia-800">
+                                    <p className="text-xs font-medium text-fuchsia-700 dark:text-fuchsia-300">
+                                      Ask: "{pitch.followUpQuestion}"
+                                    </p>
                                   </div>
                                 )}
                               </div>
@@ -691,7 +671,9 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
             </Collapsible>
           </div>
         )}
-      </CardContent>
+        </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 }

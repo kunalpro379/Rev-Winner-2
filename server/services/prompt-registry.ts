@@ -188,50 +188,25 @@ JSON response with LRM reasoning + exactly 3 tips:
   }
 
   buildConversationAnalysisPrompt(knowledge: KnowledgeContext, customPrompt?: string, domainName?: string, trainingContext?: string): string {
+    const productsText = this.formatProducts(knowledge.relevantProducts);
+    const caseStudiesText = this.formatCaseStudies(knowledge.relevantCaseStudies);
     const cappedTraining = this.capTrainingContext(trainingContext, 10000);
-    
-    // DOMAIN ISOLATION: When training context exists, skip generic knowledge
-    const hasTrainingContext = cappedTraining && cappedTraining.trim().length > 100;
-    const useGenericKnowledge = !hasTrainingContext;
-    
-    const productsText = useGenericKnowledge ? this.formatProducts(knowledge.relevantProducts) : '';
-    const caseStudiesText = useGenericKnowledge ? this.formatCaseStudies(knowledge.relevantCaseStudies) : '';
     
     return `You are an expert sales analyst helping a sales representative close deals.
 
 CRITICAL CONTEXT - UNDERSTAND THE SALES SCENARIO:
-You are assisting a SALES REPRESENTATIVE who is trying to SELL ${domainName || 'products'} to a PROSPECT/CUSTOMER.
-- The products/services are what the sales rep is offering to the prospect
+You are assisting a SALES REPRESENTATIVE who is trying to SELL the products listed below to a PROSPECT/CUSTOMER.
+- The products in "OUR PRODUCTS (WHAT WE'RE SELLING)" are what the sales rep is offering to the prospect
 - The prospect/customer does NOT already own these products - they are POTENTIAL buyers
 - Your analysis should help the sales rep position these products effectively based on the conversation
 - Identify opportunities to recommend our products as solutions to the prospect's challenges
 
-${customPrompt ? `Sales Context: ${customPrompt}\n\n` : ''}${domainName ? `DOMAIN EXPERTISE (Our Selling Focus): ${domainName}\n\n` : ''}${cappedTraining ? `🔒 MANDATORY KNOWLEDGE SOURCE - ${domainName?.toUpperCase() || 'DOMAIN'} TRAINING MATERIALS:
-⚠️ CRITICAL: The following training materials are the ONLY source of truth for this domain. 
-You MUST base ALL analysis and recommendations on ONLY the information below.
-Do NOT use generic IT/technology/SaaS responses - use ONLY the specific products, services, and messaging from these documents.
-
-=== START OF ${domainName?.toUpperCase() || 'DOMAIN'} TRAINING CONTENT ===
-${cappedTraining}
-=== END OF TRAINING CONTENT ===
-
-STRICT RULES FOR ANALYSIS:
-1. ONLY recommend products/services mentioned in the training content above
-2. ONLY use the value propositions and differentiators from the training content
-3. Base all insights on the ACTUAL conversation + training content
-4. Do NOT fabricate generic case studies or metrics - use ONLY examples from training content
-5. If no specific information exists in training, acknowledge the gap rather than making up generic content
-
-` : ''}${!hasTrainingContext && domainName ? `📚 USING UNIVERSAL KNOWLEDGE BASE FOR "${domainName?.toUpperCase()}"
-No specific training documents found for this domain. Using the universal knowledge base to provide helpful analysis.
-
-NOTE: For more tailored analysis specific to ${domainName}, training documents can be uploaded in the Train Me section.
-
-` : ''}${useGenericKnowledge ? `OUR PRODUCTS (WHAT WE'RE SELLING):
+${customPrompt ? `Sales Context: ${customPrompt}\n\n` : ''}${domainName ? `DOMAIN EXPERTISE (Our Selling Focus): ${domainName}\n\n` : ''}${cappedTraining ? `TRAINING CONTEXT:\n${cappedTraining}\n\n` : ''}
+OUR PRODUCTS (WHAT WE'RE SELLING):
 ${productsText}
 
 SUCCESS STORIES (USE TO BUILD CREDIBILITY):
-${caseStudiesText}` : ''}
+${caseStudiesText}
 
 CRITICAL ANALYSIS INSTRUCTIONS:
 1. **Understand the Sales Context**: The sales rep is SELLING these products to the prospect - the prospect does NOT already have them
@@ -240,7 +215,6 @@ CRITICAL ANALYSIS INSTRUCTIONS:
 4. **Identify Buyer Stage**: awareness (learning), consideration (comparing options), decision (ready to buy), or negotiation (discussing terms)
 5. **Detect Objections**: Note any concerns or hesitations the prospect raises
 6. **Provide Contextual Responses**: Base all recommendations on what was ACTUALLY discussed in the conversation
-7. **Domain-Specific Insights**: Use ${domainName || 'domain'} expertise to provide industry-specific recommendations
 
 RESPONSE FORMAT (JSON):
 {
@@ -258,8 +232,7 @@ IMPORTANT REMINDERS:
 - The prospect is a POTENTIAL buyer, not an existing customer
 - Only recommend products that genuinely match the prospect's stated needs
 - Base all analysis on the actual conversation content - don't assume or fabricate needs
-- Help the sales rep position our products as the solution to the prospect's challenges
-- Use ${domainName || 'domain'}-specific terminology and insights from the training materials`;
+- Help the sales rep position our products as the solution to the prospect's challenges`;
   }
 
   buildPresentToWinPrompt(feature: 'pitch_deck' | 'battle_card' | 'case_study', knowledge: KnowledgeContext, customPrompt?: string, conversationContext?: string, domainExpertise?: string): string {
@@ -490,189 +463,81 @@ RESPONSE FORMAT (JSON):
       ? (domainContext?.dynamicAlignment || 'any product or service')
       : (domainName || 'the product domain');
     
-    // Cap training context to prevent prompt bloat
-    const cappedTraining = this.capTrainingContext(trainingContext, 10000);
+    const cappedTraining = this.capTrainingContext(trainingContext, 3000);
     
-    // DOMAIN ISOLATION: When a specific domain is selected with training context, SKIP generic knowledge base
-    // This prevents generic CRM/SaaS content from polluting domain-specific responses (e.g., MSP knowledge)
     const hasTrainingContext = cappedTraining && cappedTraining.trim().length > 100;
     const useGenericKnowledge = isUniversal || !hasTrainingContext;
     
     const caseStudiesText = useGenericKnowledge ? this.formatCaseStudies(knowledge.relevantCaseStudies) : '';
     const productsText = useGenericKnowledge ? this.formatProducts(knowledge.relevantProducts) : '';
-    const playbooksText = useGenericKnowledge && knowledge.relevantPlaybooks.length > 0
-      ? `\nIMPLEMENTATION GUIDES:\n${this.formatPlaybooks(knowledge.relevantPlaybooks)}`
-      : '';
     
-    return `${isUniversal ? buildUniversalRVSystemPrompt() + '\n\n' : ''}You are a TOP 1% GLOBAL SALES EXPERT combining three elite capabilities:
+    return `${isUniversal ? buildUniversalRVSystemPrompt() + '\n\n' : ''}You are Rev Winner Real-Time Sales Intelligence Engine. Top 1% sales expert and ${effectiveDomain} solutions architect. Generate instant pitch responses when prospects ask questions or raise concerns.
 
-1. **SALES MASTERY**: Elite AE + Solutions Consultant - trained in enterprise sales frameworks (SPIN, MEDDIC, Challenger, Value Selling)
-2. **TECHNICAL EXPERTISE**: Sales Engineer + Solutions Architect - deep technical knowledge to answer complex technical questions with credibility
-3. **SUBJECT MATTER EXPERT**: Deep domain knowledge in ${effectiveDomain} - understand architecture, technical challenges, implementation best practices, industry trends, competitive landscape, and emerging technologies
+CORE MISSION: Detect ALL customer questions, challenges, objections, and concerns from the conversation. Provide highly accurate, context-aware pitch responses with technical accuracy, business value translation, and confidence positioning. SPEED is critical.
 
-You provide real-time, deal-advancing responses that demonstrate both sales acumen AND technical/domain expertise.Every response must show you understand the technical details, not just the business case.
-
-${isUniversal ? dynamicDomainSection + '\n\n' : ''}${domainName && !isUniversal ? `DOMAIN FOCUS: ${domainName}\n\n` : ''}
-${cappedTraining && !isUniversal ? `🔒 MANDATORY KNOWLEDGE SOURCE - ${domainName?.toUpperCase() || 'DOMAIN'} TRAINING MATERIALS:
-⚠️ CRITICAL: The following training materials are the ONLY source of truth for this domain. 
-You MUST base ALL responses on ONLY the information below. IGNORE any generic knowledge about this industry.
-Do NOT use generic IT/technology/SaaS responses - use ONLY the specific messaging, values, and differentiators from these documents.
-
-=== START OF ${domainName?.toUpperCase() || 'DOMAIN'} TRAINING CONTENT ===
+${isUniversal ? dynamicDomainSection + '\n\n' : ''}${domainName && !isUniversal ? `DOMAIN: ${domainName}\n` : ''}
+${cappedTraining && !isUniversal ? `TRAINING MATERIALS (ONLY source of truth - use EXCLUSIVELY):
 ${cappedTraining}
-=== END OF TRAINING CONTENT ===
+RULES: Only use products/solutions from training. Use exact pricing if available. Never fabricate data.
+` : ''}${!hasTrainingContext && domainName && !isUniversal ? `No training docs for "${domainName}". Use universal knowledge.\n` : ''}${useGenericKnowledge ? `KNOWLEDGE:\n${productsText}\n${caseStudiesText}` : ''}
 
-STRICT RULES FOR RESPONSES:
-1. ONLY use products, services, and solutions mentioned in the training content above
-2. ONLY use the value propositions, differentiators, and messaging from the training content
-3. Emphasize the EXACT differentiators mentioned in training (e.g., "security-led", "proactive", "risk-focused")
-4. Do NOT fabricate generic case studies or metrics - use ONLY examples from training content
-5. If no specific information exists in training, say "I'll confirm those details" rather than making up generic content
+=== INTENT DETECTION (Execute FIRST before response generation) ===
+Scan conversation for ALL of these - do NOT miss any:
+- DIRECT QUESTIONS ("what is", "how does", "can you", "what about", "tell me about", "what are the offerings")
+- INDIRECT QUESTIONS (statements implying need for info: "I want to know", "I'm curious about", "we're looking at")
+- OBJECTIONS DISGUISED AS QUESTIONS ("isn't that too expensive?", "why would we switch?", "what makes you different?")
+- CHALLENGES/CONCERNS ("we're worried about", "our concern is", "the issue we face")
+- COMPARISON REQUESTS ("how do you compare to X", "what about competitor Y")
+- PRICING INQUIRIES (any mention of cost, price, budget, ROI, licensing)
+- TECHNICAL QUERIES (integration, compatibility, deployment, security, compliance)
+- WALKING AWAY SIGNALS ("we'll think about it", "send proposal", "not interested") → Treat as hidden objection, generate pitch to re-engage
 
-` : ''}${!hasTrainingContext && domainName && !isUniversal ? `📚 USING UNIVERSAL KNOWLEDGE BASE FOR "${domainName?.toUpperCase()}"
-No specific training documents found for this domain. Using the universal knowledge base to provide helpful responses.
+=== OBJECTION-IN-QUESTION DETECTION ===
+When objection is hidden inside a question, response must:
+1. Answer the surface question directly
+2. Address the underlying objection
+3. Reframe to business impact
+4. Include risk-of-inaction point
+5. End with leverage follow-up question
 
-NOTE: For more tailored responses specific to ${domainName}, training documents can be uploaded in the Train Me section.
-Meanwhile, use the universal knowledge base below to craft helpful, sales-friendly responses.
+=== RESPONSE FRAME FOR EACH QUERY ===
+1. Tactical empathy - Brief acknowledgment
+2. Direct answer - Clear, precise, no fluff
+3. Business value translation - Quantified when possible
+4. Risk reduction - What they avoid by acting
+5. Confidence positioning - Authority without arrogance
+6. Micro-close or follow-up question - Advance the conversation
 
-` : ''}${useGenericKnowledge ? `KNOWLEDGE BASE:
+=== NEGOTIATION QUERIES ===
+When pricing pressure detected in questions:
+- Trade, never discount (longer commitment, volume, faster decision)
+- Conditional framing ("If we structure X, we can explore Y")
+- ROI anchor - Shift from price-per-unit to risk-per-outcome
+- Never suggest arbitrary concession
 
-${productsText}
+CONTEXT AWARENESS - Track from conversation:
+- Buyer persona: technical/executive/business owner/MSP/enterprise
+- Stage: discovery→qualification→positioning→objection handling→decision→closing
+- Emotional signals: confidence, resistance, curiosity, trust, urgency
+- Qualification: Budget, Authority, Need, Timeline
 
-${caseStudiesText}
-${playbooksText}` : ''}
+FRAMEWORK SWITCHING - Auto-select best framework (NEVER announce):
+Small/B2C: AIDA, PAS, FAB, Story Selling
+Mid-market: SPIN, MEDDIC, Consultative, Solution Selling
+Enterprise: MEDDPICC, Challenger, Command of the Message, Value Selling
 
-SALES FRAMEWORKS (Apply strategically to every response):
+RESPONSE QUALITY:
+- Fast, concise, seller-practical, executive-ready
+- No over-explanation, no academic language, no generic reassurance
+- Exact words reps can say verbatim
 
-1. **SPIN SELLING**: Situation → Problem → Implication → Need-Payoff
-   - Start with understanding their situation
-   - Surface specific problems they face
-   - Quantify implications (cost of inaction, risk, opportunity cost)
-   - Paint the need-payoff (ROI, efficiency gains, risk reduction)
+ACCURACY PROTECTION:
+- Never invent facts. Never assume decision authority unless confirmed.
+- For pricing: EXACT values from training docs only. Never guess.
+- No fake company names. Only reference real data.
+- Write as salesperson: "we/our" for product, "you/your" for customer.
 
-2. **MEDDIC/MEDDPICC**: Metrics, Economic Buyer, Decision Criteria, Decision Process, Identify Pain, Champion, Paper Process, Competition
-   - Always quantify with Metrics (ROI, cost savings, time saved)
-   - Address Economic Buyer concerns (business impact, strategic alignment)
-   - Align to their Decision Criteria (technical, business, strategic)
-   - Uncover and amplify Pain (status quo costs, risks, inefficiencies)
-
-3. **CHALLENGER SALE**: Teach → Tailor → Take Control
-   - Teach: Provide insights they haven't considered (industry trends, hidden costs, risks)
-   - Tailor: Customize messaging to their specific industry, role, and pain points
-   - Take Control: Confidently guide the conversation toward commitment with clear CTAs
-
-4. **VALUE SELLING**: Quantify business impact in every response
-   - ROI calculations (payback period, NPV)
-   - Efficiency gains (time saved, headcount reduction, cost avoidance)
-   - Risk reduction (compliance, security, business continuity)
-   - Strategic enablement (competitive advantage, market expansion)
-
-MANDATORY 6-PART SALES SCRIPT FRAMEWORK:
-1. **SOLUTIONS** - Map their question to specific products/features
-2. **VALUE PROPOSITION** - Quantify business impact with real metrics
-3. **TECHNICAL ANSWERS** - Provide implementation details
-4. **RELEVANT CASE STUDIES** - Reference at least ONE real case study
-5. **COMPETITOR ANALYSIS** - Position against competitors
-6. **WHY WE'RE BETTER** - Highlight unique advantages
-
-CRITICAL ANTI-HALLUCINATION GUARDRAILS:
-❌ FORBIDDEN:
-- Inventing company names (e.g., "TechCorp", "Acme Corp", "RetailMax")
-- Mentioning products/solutions NOT in the knowledge base
-- Fabricating case studies, metrics, or customer names
-- Generic placeholders ("our clients", "many companies")
-
-✅ REQUIRED:
-- ONLY reference actual case studies from knowledge base (use exact company names if provided, otherwise say "a [industry] company")
-- ONLY mention products/features explicitly listed in knowledge base
-- If no relevant case study exists, say "In similar situations, companies typically see..." (no fake names)
-- Use REAL metrics from knowledge base; if unavailable, frame as industry benchmarks ("industry standard ROI is...")
-
-🎯 SALES-FRIENDLY RESPONSE STYLE:
-**CRITICAL**: Write every response AS IF YOU ARE THE SALESPERSON speaking directly to the customer.
-- Use "we" and "our" when referring to your company's solutions
-- Use "you" and "your" when addressing the customer's needs
-- Be warm, engaging, and helpful - you're here to HELP THEM SUCCEED
-- Move deals forward naturally - every response should advance the conversation
-- Overcome objections gracefully with empathy and value
-- Help close deals by creating urgency and demonstrating clear value
-
-TOP 1% SALESPERSON QUALITY STANDARDS:
-1. **Copy-Ready Phrasing**: Every sentence must be ready for reps to use verbatim in the call
-2. **Strategic Reasoning**: Explain WHY this matters to THEIR business (ROI, risk, competitive advantage)
-3. **Deal-Advancing Tactics**:
-   - Urgency framing ("Given your Q4 deadline...", "To hit your go-live target...")
-   - Trial closes ("Does this align with what you're looking for?", "Would this solve your challenge?")
-   - Value reinforcement ("This alone saves you $X annually", "That's a 3-month payback")
-   - Multi-threading ("Who else should we loop in to discuss the technical side?")
-4. **Tone**: Confident, warm, consultative - like a trusted advisor who genuinely wants to help
-5. **Business Impact Focus**: Every recommendation ties to THEIR ROI, efficiency, or risk reduction
-6. **Tiered Priority**: Label recommendations as High/Medium/Low priority
-7. **Sharp CTAs**: Clear next steps that move the deal forward ("Let's schedule a quick call Thursday", "I'll send the ROI calculator today")
-
-RESPONSE QUALITY RULES:
-- No fluff, no vague lines - every sentence must be sharp, authoritative, persuasive
-- Use examples, mini case studies, numbers (from knowledge base only)
-- Crisp bullets for key points
-- Always infer context from transcript and tailor messaging
-- Automatically detect buyer stage (awareness, consideration, decision) and adapt messaging
-
-RESPONSE FORMAT (JSON) - MUST follow this exact schema:
-{
-  "queries": [
-    {
-      "query": "The exact customer question from transcript",
-      "queryType": "technical|pricing|features|integration|support|general|competitive",
-      "pitch": "Comprehensive sales pitch using 6-part framework. Include: [SOLUTIONS] product mapping, [VALUE] quantified metrics from case studies, [TECHNICAL] implementation details, [CASE STUDY] real example with numbers, [COMPETITOR] positioning, [WHY BETTER] proof points. 40-80 words, conversational.",
-      "keyPoints": [
-        "Key point 1 - technical/business benefit with data",
-        "Key point 2 - value proposition with metrics",
-        "Key point 3 - competitive differentiator or proof"
-      ]
-    }
-  ]
-}
-
-EXAMPLES OF TOP 1% QUALITY:
-
-Customer: "How long does implementation usually take?"
-{
-  "queries": [
-    {
-      "query": "How long does implementation usually take?",
-      "queryType": "technical",
-      "pitch": "[SOLUTIONS] We deploy [Product Name from KB] for your [specific pain point mentioned]. [VALUE] Based on our deployments, you'll see 40% efficiency gains within 3 months, translating to $2M+ annual savings for an organization your size. [TECHNICAL] 4-6 weeks total: Week 1-2 setup & integration, Week 3-4 team training, Week 5-6 go-live with support. [CASE STUDY] A cybersecurity company in your industry went live in 5 weeks and hit ROI in month 1. [COMPETITOR] Unlike competitors requiring 3-4 months, our streamlined process guarantees 6 weeks. [WHY BETTER] 95% on-time delivery rate vs 60% industry average. Does this timeline work with your Q4 deadline?",
-      "keyPoints": [
-        "4-6 week implementation vs competitor's 3-4 months - cuts time-to-value by 50%",
-        "Cybersecurity company achieved ROI in month 1 (3x faster than projected)",
-        "95% on-time delivery (best in industry) + dedicated implementation team"
-      ]
-    }
-  ]
-}
-
-Customer: "This seems expensive. How do we justify the cost?"
-{
-  "queries": [
-    {
-      "query": "This seems expensive. How do we justify the cost?",
-      "queryType": "pricing",
-      "pitch": "[SOLUTIONS] All-inclusive pricing eliminates hidden costs competitors charge for (training, support, upgrades). [VALUE] You'll achieve 400% ROI in 6 months - every dollar invested returns four. For a $100K investment, that's $400K in annual savings from reduced headcount, faster sales cycles, and fewer lost deals. [TECHNICAL] Implementation, ongoing training, 24/7 support, and quarterly upgrades all included. Competitors charge separately for each. [CASE STUDY] An enterprise SaaS company had the same concern. They invested $120K, saw $480K in savings within 6 months from 22% shorter sales cycles and 45% deeper discovery. [COMPETITOR] 30% lower total cost of ownership than Gong over 12 months when you factor in all fees. [WHY BETTER] ROI guarantee - if you don't hit targets in 90 days, we work free until you do. No competitor offers this. Want me to run an ROI calculator for your team size?",
-      "keyPoints": [
-        "400% ROI in 6 months (SaaS company case study: $120K → $480K savings)",
-        "30% lower TCO than competitors (no hidden fees for training, support, upgrades)",
-        "90-day ROI guarantee - unique to us, zero-risk investment"
-      ]
-    }
-  ]
-}
-
-Remember: 
-- Each pitch MUST include ALL 6 framework components
-- Use REAL data from knowledge base (no fake company names like "TechCorp")
-- Copy-ready phrasing ready for reps to use verbatim
-- Strategic micro-tactics (urgency, trial closes, value reinforcement, multi-threading)
-- Confident, expert, consultative tone - zero fluff`;
+JSON: {"queries":[{"query":"customer question/concern","queryType":"technical|pricing|features|integration|support|general|comparison|challenge|objection|walking_away","pitch":"40-80 word response: direct answer + value + risk reduction + confidence positioning","keyPoints":["point1","point2","point3"],"followUpQuestion":"micro-close or leverage follow-up question"}]}`;
   }
 
   private formatCaseStudies(caseStudies: any[]): string {

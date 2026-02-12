@@ -136,86 +136,6 @@ function cleanJSONResponse(content: string): string {
   return cleaned;
 }
 
-// UNIVERSAL SAFE JSON PARSER - handles truncated/malformed JSON with fallback
-function safeJSONParse<T = any>(content: string, fallback: T, context: string = 'unknown'): T {
-  try {
-    const cleaned = cleanJSONResponse(content);
-    return JSON.parse(cleaned);
-  } catch (parseError: any) {
-    console.error(`⚠️ JSON parse error in ${context}:`, parseError.message);
-    console.error(`Raw content (first 200 chars): ${content.substring(0, 200)}`);
-    console.error(`Raw content (last 200 chars): ${content.substring(Math.max(0, content.length - 200))}`);
-    
-    // Try to repair truncated JSON with safety limits
-    try {
-      const cleaned = cleanJSONResponse(content);
-      let repaired = cleaned;
-      
-      // Safety: Limit repair attempts to prevent infinite loops
-      const MAX_REPAIR_LENGTH = 50000; // 50KB max
-      if (repaired.length > MAX_REPAIR_LENGTH) {
-        console.error(`❌ Content too large for repair (${repaired.length} chars), using fallback`);
-        return fallback;
-      }
-      
-      // Fix unterminated strings by adding closing quote
-      const openQuotes = (repaired.match(/"/g) || []).length;
-      if (openQuotes % 2 !== 0) {
-        repaired = repaired + '"';
-      }
-      
-      // Fix unclosed braces/brackets with safety limit
-      const openBraces = (repaired.match(/\{/g) || []).length;
-      const closeBraces = (repaired.match(/\}/g) || []).length;
-      const braceDiff = openBraces - closeBraces;
-      if (braceDiff > 0 && braceDiff < 20) { // Safety: max 20 missing braces
-        for (let i = 0; i < braceDiff; i++) {
-          repaired = repaired + '}';
-        }
-      }
-      
-      const openBrackets = (repaired.match(/\[/g) || []).length;
-      const closeBrackets = (repaired.match(/\]/g) || []).length;
-      const bracketDiff = openBrackets - closeBrackets;
-      if (bracketDiff > 0 && bracketDiff < 20) { // Safety: max 20 missing brackets
-        for (let i = 0; i < bracketDiff; i++) {
-          repaired = repaired + ']';
-        }
-      }
-      
-      // AGGRESSIVE FIX: If still failing, try to extract valid JSON from the content
-      try {
-        const parsed = JSON.parse(repaired);
-        console.log(`✅ JSON repaired successfully in ${context}`);
-        return parsed;
-      } catch (stillFailing) {
-        // Last resort: Try to find and extract the main JSON object/array
-        const jsonMatch = repaired.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-        if (jsonMatch) {
-          const extracted = jsonMatch[0];
-          // Try to close any unclosed structures in the extracted part
-          let finalAttempt = extracted;
-          const finalBraceDiff = (finalAttempt.match(/\{/g) || []).length - (finalAttempt.match(/\}/g) || []).length;
-          if (finalBraceDiff > 0 && finalBraceDiff < 10) {
-            finalAttempt += '}'.repeat(finalBraceDiff);
-          }
-          const finalBracketDiff = (finalAttempt.match(/\[/g) || []).length - (finalAttempt.match(/\]/g) || []).length;
-          if (finalBracketDiff > 0 && finalBracketDiff < 10) {
-            finalAttempt += ']'.repeat(finalBracketDiff);
-          }
-          const finalParsed = JSON.parse(finalAttempt);
-          console.log(`✅ JSON extracted and repaired in ${context}`);
-          return finalParsed;
-        }
-        throw stillFailing;
-      }
-    } catch (repairError) {
-      console.error(`❌ JSON repair failed in ${context}, using fallback`);
-      return fallback;
-    }
-  }
-}
-
 // Cache for training document context to avoid repeated DB queries
 const trainingContextCache = new Map<string, { context: string, timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
@@ -282,11 +202,13 @@ async function getTrainingDocumentContext(
       return result.context;
     }
     
-    // If no knowledge base entries found, allow fallback to conversation context
-    // This means: if knowledge base exists, use it; if not, use conversation context
     if (effectiveStrict && !isUniversal) {
-      console.log(`⚠️ Domain "${domainName}" has no knowledge entries - will use conversation context as fallback`);
-      // Return empty string to allow conversation context to be used
+      console.log(`🔒 STRICT ISOLATION: No entries in domain "${domainName}" - NOT falling back to universal or raw docs`);
+      return "";
+    }
+    
+    if (effectiveStrict && !isUniversal) {
+      console.log(`🔒 STRICT ISOLATION (legacy path): Non-universal domain "${domainName}" with no TrainMe entries - returning empty (no fallback)`);
       return "";
     }
     
@@ -299,19 +221,13 @@ async function getTrainingDocumentContext(
       if (domain) {
         allKnowledgeEntries = await storage.getKnowledgeEntriesByDomain(domain.id, userId);
         console.log(`🔒 DOMAIN ISOLATION: Loaded ${allKnowledgeEntries.length} knowledge entries for domain "${domainName}" (ID: ${domain.id})`);
-        
-        // If domain exists but has no entries, allow conversation context fallback
-        if (allKnowledgeEntries.length === 0) {
-          console.log(`⚠️ Domain "${domainName}" exists but is empty - will use conversation context as fallback`);
-          return "";
-        }
       } else {
-        console.log(`⚠️ Domain "${domainName}" not found - will use conversation context as fallback`);
+        console.log(`🔒 STRICT ISOLATION: Domain "${domainName}" not found - returning empty (no universal fallback)`);
         return "";
       }
     } else {
       allKnowledgeEntries = await storage.getAllUserKnowledgeEntries(userId);
-      console.log(`Universal mode: Loaded ${allKnowledgeEntries.length} total knowledge entries`);
+      console.log(`📚 Universal mode: Loaded ${allKnowledgeEntries.length} total knowledge entries`);
     }
     
     // Define cache key for fallback paths
@@ -325,7 +241,7 @@ async function getTrainingDocumentContext(
       if (searchQuery && allKnowledgeEntries.length > 0) {
         const searchResults = await semanticSearch(searchQuery, allKnowledgeEntries, semanticLimit);
         relevantEntries = searchResults.map(r => r.entry);
-        console.log(` Semantic search: Found ${relevantEntries.length} relevant entries for query (from ${allKnowledgeEntries.length} total)`);
+        console.log(`🔍 Semantic search: Found ${relevantEntries.length} relevant entries for query (from ${allKnowledgeEntries.length} total)`);
       } else if (allKnowledgeEntries.length > semanticLimit) {
         relevantEntries = allKnowledgeEntries.slice(0, semanticLimit);
         console.log(`📋 Using ${relevantEntries.length} most recent knowledge entries`);
@@ -364,7 +280,7 @@ async function getTrainingDocumentContext(
         return "";
       }
       documents = await storage.getAllUserTrainingDocuments(userId);
-      console.log(`Universal mode (raw fallback): Loaded ${documents.length} total documents`);
+      console.log(`📚 Universal mode (raw fallback): Loaded ${documents.length} total documents`);
     }
     
     if (documents.length === 0) {
@@ -461,7 +377,7 @@ async function getTrainingDocumentContext(
         })
         .map(s => s.doc);
       
-      console.log(` Raw doc search: Query "${searchQuery.slice(0, 50)}" - Top docs:`, 
+      console.log(`🔍 Raw doc search: Query "${searchQuery.slice(0, 50)}" - Top docs:`, 
         sortedDocs.slice(0, 3).map(d => `${d.fileName} (matched)`));
     } else {
       // No query - sort by date
@@ -567,7 +483,7 @@ const deepseek = process.env.DEEPSEEK_API_KEY
   ? new OpenAI({ 
       apiKey: process.env.DEEPSEEK_API_KEY,
       baseURL: "https://api.deepseek.com",
-      timeout: 10000,
+      timeout: 30000,
     })
   : null;
 
@@ -1352,7 +1268,7 @@ The prospect is INQUIRING about ${domainExpertise}. They DON'T have it yet. Ques
 - "How does your ${domainExpertise} handle scalability?"
 - "Costs with ${domainExpertise}?"
 
-GOOD (asks about their CURRENT situation BEFORE ${domainExpertise}):
+✅ GOOD (asks about their CURRENT situation BEFORE ${domainExpertise}):
 - "What challenges with your CURRENT solution are driving you to explore ${domainExpertise}?"
 - "What's your current approach and what's not working?"
 - "What would success look like if you implemented ${domainExpertise}?"
@@ -1454,7 +1370,7 @@ export async function generateSalesResponse(
       client = aiConfig.client;
       model = aiConfig.model;
       engine = aiConfig.engine;
-      console.log(`Using ${engine} (${model}) for user ${userId}`);
+      console.log(`✅ Using ${engine} (${model}) for user ${userId}`);
     } else {
       if (!deepseek) {
         throw new Error("Default AI engine not configured");
@@ -1468,7 +1384,7 @@ export async function generateSalesResponse(
       model,
       messages: messages as any,
       response_format: { type: "json_object" },
-      max_tokens: 300, // OPTIMIZED: Reduced from 400 to prevent truncation and speed up response
+      max_tokens: 600, // Increased from 400 to accommodate 5-10 discovery questions
       temperature: 0.5,
     });
     console.log(`${engine} API response received successfully`);
@@ -1483,39 +1399,16 @@ export async function generateSalesResponse(
       throw new Error("No content in DeepSeek API response");
     }
     
-    // Use safe JSON parser with fallback
-    const fallbackResponse = {
-      response: "I understand. Could you tell me more about your current challenges and what you're looking to achieve?",
-      discoveryInsights: {
-        painPoints: [],
-        currentEnvironment: "",
-        requirements: [],
-        budget: undefined,
-        authority: undefined,
-        need: undefined,
-        timeline: undefined,
-        decisionMakers: []
-      },
-      discoveryQuestions: [
-        "What challenges are you currently facing with your existing solution?",
-        "What are your main priorities for improvement?",
-        "Who else is involved in evaluating solutions like this?"
-      ],
-      bantQualification: {
-        budget: { asked: false, question: "What is your budget range for this project?" },
-        authority: { asked: false, question: "Who will be involved in the final decision-making process?" },
-        need: { asked: false, question: "What is the primary business challenge you're looking to solve?" },
-        timeline: { asked: false, question: "What is your expected timeline for implementation?" }
-      },
-      nextQuestions: [
-        "Can you walk me through your current process?",
-        "What would an ideal solution look like for you?"
-      ],
-      recommendedModules: [],
-      caseStudies: []
-    };
-    
-    const result = safeJSONParse(messageContent, fallbackResponse, 'generateSalesResponse');
+    let result;
+    try {
+      const cleanedContent = cleanJSONResponse(messageContent);
+      result = JSON.parse(cleanedContent);
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError);
+      console.error("Raw response content (first 500 chars):", messageContent.substring(0, 500));
+      console.error("Raw response content (last 500 chars):", messageContent.substring(Math.max(0, messageContent.length - 500)));
+      throw new Error(`Failed to parse AI response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+    }
     
     // CRITICAL: Sanitize discovery questions to ensure contextual awareness
     // Questions should NOT assume prospect owns the product - they're EVALUATING it
@@ -1633,78 +1526,86 @@ export async function generateCombinedAnalysis(
       return cached;
     }
     
-    // PERFORMANCE: Parallelize ALL async operations for speed with error handling
+    // PERFORMANCE: Parallelize ALL async operations for speed
     const knowledgeServiceModule = await import("./knowledge-service");
     const knowledgeService = knowledgeServiceModule.knowledgeService;
     const keywords = knowledgeService.extractKeywordsFromTranscript(transcriptText);
     
-    // Run all async fetches in PARALLEL with individual error handling
+    // Run all async fetches in PARALLEL
     const [knowledgeContext, trainingContext] = await Promise.all([
-      // 1. Knowledge context (products, case studies) - with error handling
+      // 1. Knowledge context (products, case studies)
       (async () => {
-        try {
-          const knowledgeCacheKey = `knowledge:${userId}:${keywords.problemKeywords.slice(0, 3).join(',')}:${keywords.productKeywords.slice(0, 3).join(',')}`;
-          let cached = aiCache.get<{ products: string; caseStudies: string }>(knowledgeCacheKey);
-          if (cached) {
-            console.log(`Using cached knowledge context`);
-            return cached;
-          }
-          
-          const knowledge = await knowledgeService.buildKnowledgeContext({
-            problemKeywords: keywords.problemKeywords,
-            productKeywords: keywords.productKeywords,
-            industries: keywords.industries,
-            includePlaybooks: true, // Include playbooks for better preemptive insights
-          });
-          
-          const ctx = {
-            products: knowledgeService.formatProductsForPrompt(knowledge.relevantProducts),
-            caseStudies: knowledgeService.formatCaseStudiesForPrompt(knowledge.relevantCaseStudies),
-          };
-          aiCache.set(knowledgeCacheKey, ctx, 300);
-          console.log(`Retrieved ${knowledge.relevantProducts.length} products, ${knowledge.relevantCaseStudies.length} case studies`);
-          return ctx;
-        } catch (error: any) {
-          console.error("Error fetching knowledge context:", error.message);
-          return { products: "", caseStudies: "" };
+        const knowledgeCacheKey = `knowledge:${userId}:${keywords.problemKeywords.slice(0, 3).join(',')}:${keywords.productKeywords.slice(0, 3).join(',')}`;
+        let cached = aiCache.get<{ products: string; caseStudies: string }>(knowledgeCacheKey);
+        if (cached) {
+          console.log(`📚 Using cached knowledge context`);
+          return cached;
         }
+        
+        const knowledge = await knowledgeService.buildKnowledgeContext({
+          problemKeywords: keywords.problemKeywords,
+          productKeywords: keywords.productKeywords,
+          industries: keywords.industries,
+          includePlaybooks: true, // Include playbooks for better preemptive insights
+        });
+        
+        const ctx = {
+          products: knowledgeService.formatProductsForPrompt(knowledge.relevantProducts),
+          caseStudies: knowledgeService.formatCaseStudiesForPrompt(knowledge.relevantCaseStudies),
+        };
+        aiCache.set(knowledgeCacheKey, ctx, 300);
+        console.log(`📚 Retrieved ${knowledge.relevantProducts.length} products, ${knowledge.relevantCaseStudies.length} case studies`);
+        return ctx;
       })(),
       
-      // 2. Training documents - with error handling
+      // 2. Training documents - PRIORITY: Domain-specific Train Me knowledge first, then universal
+      // This ensures contextual responses from the same domain as the web app
       (async () => {
         if (!userId) return { content: "", hasTraining: false, isDomainSpecific: false };
         try {
-          // CRITICAL FIX: Use AI Context Builder for proper Train Me integration
-          const { buildEnhancedAIContext } = await import("./ai-context-builder");
+          // DOMAIN ISOLATION: First try to get domain-specific training context
+          // This prioritizes Train Me documents from the same domain as the conversation
+          const domainTrainingContext = await getTrainingDocumentContext(
+            userId, 
+            8000, // Increased token limit for better context
+            true, 
+            transcriptText.slice(-500), // Use transcript as search query for relevance
+            15, // Higher semantic search limit for better coverage
+            domainExpertise // Pass domain for domain-specific isolation
+          );
           
-          const aiContext = await buildEnhancedAIContext({
-            userId,
-            transcript: transcriptText,
-            feature: 'conversation_analysis',
-            domainName: domainExpertise,
-            includePlaybooks: true,
-            strictIsolation: false, // Allow universal fallback
-            allowUniversalFallback: true
-          });
-          
-          if (aiContext.trainMeContext && aiContext.trainMeContext.trim().length > 100) {
-            console.log(`🎯 TRAIN ME INTEGRATED: "${aiContext.domainUsed}" with ${aiContext.trainMeContext.length} chars (source: ${aiContext.source})`);
+          if (domainTrainingContext && domainTrainingContext.trim().length > 100) {
+            console.log(`🎯 DOMAIN-FIRST: Loaded Train Me knowledge for "${domainExpertise}" (${domainTrainingContext.length} chars)`);
             return { 
-              content: aiContext.knowledgeContext, 
+              content: `\n=== DOMAIN-SPECIFIC TRAINING (PRIORITY - Use this first for accurate responses) ===\n${domainTrainingContext.slice(0, 3000)}\n=== END DOMAIN TRAINING ===\n`, 
               hasTraining: true,
-              isDomainSpecific: aiContext.isolationEnforced
+              isDomainSpecific: true
             };
           }
           
-          // FALLBACK: If no Train Me knowledge, use universal
-          console.log(`⚠️ No Train Me knowledge for "${domainExpertise}" - using universal fallback`);
-          return { 
-            content: aiContext.knowledgeContext || "", 
-            hasTraining: false,
-            isDomainSpecific: false
-          };
+          // FALLBACK: If no domain-specific training, try universal knowledge
+          console.log(`⚠️ No domain-specific Train Me for "${domainExpertise}" - falling back to universal knowledge`);
+          const universalContext = await getTrainingDocumentContext(
+            userId,
+            5000,
+            true,
+            transcriptText.slice(-300),
+            10,
+            undefined // No domain filter = universal
+          );
+          
+          if (universalContext && universalContext.trim().length > 100) {
+            console.log(`📚 UNIVERSAL FALLBACK: Using general training documents (${universalContext.length} chars)`);
+            return { 
+              content: `\n=== UNIVERSAL TRAINING KNOWLEDGE (Fallback - domain-specific not available) ===\n${universalContext.slice(0, 2000)}\n=== END UNIVERSAL TRAINING ===\n`, 
+              hasTraining: true,
+              isDomainSpecific: false
+            };
+          }
+          
+          return { content: "", hasTraining: false, isDomainSpecific: false };
         } catch (error: any) {
-          console.error("Error fetching Train Me knowledge:", error.message);
+          console.error("Error fetching training documents:", error.message);
           return { content: "", hasTraining: false, isDomainSpecific: false };
         }
       })(),
@@ -1795,7 +1696,7 @@ export async function generateCombinedAnalysis(
     };
     
     const ownershipStatus = detectCustomerOwnership(transcriptText, domainExpertise);
-    console.log(` Customer ownership detection: ${ownershipStatus.hasProduct ? 'EXISTING CUSTOMER' : 'NEW PROSPECT'} (confidence: ${ownershipStatus.confidence}, signals: ${ownershipStatus.signals.join(', ') || 'none'})`);
+    console.log(`🔍 Customer ownership detection: ${ownershipStatus.hasProduct ? 'EXISTING CUSTOMER' : 'NEW PROSPECT'} (confidence: ${ownershipStatus.confidence}, signals: ${ownershipStatus.signals.join(', ') || 'none'})`);
     
     // Build multi-product intelligence section if enabled
     const multiProductSection = multiProductIntelligence 
@@ -1882,7 +1783,7 @@ Return VALID JSON:
     try {
       response = await callAIWithTimeout(client, model, primaryTimeout);
       const duration = Date.now() - startTime;
-      console.log(`Primary provider (${engine}) succeeded in ${duration}ms`);
+      console.log(`✅ Primary provider (${engine}) succeeded in ${duration}ms`);
       
       // Track token usage for primary provider
       if (userId && response) {
@@ -1895,12 +1796,12 @@ Return VALID JSON:
       
       // If DeepSeek was primary and user has a different provider, try fallback
       if (engine === 'deepseek' && userId) {
-        console.log(`Attempting fallback to user's configured provider...`);
+        console.log(`🔄 Attempting fallback to user's configured provider...`);
         const fallbackStartTime = Date.now();
         
         try {
           const userAiConfig = await getAIClient(userId);
-          console.log(`Fallback provider: ${userAiConfig.engine}`);
+          console.log(`🔄 Fallback provider: ${userAiConfig.engine}`);
           
           // Try user's provider with reasonable timeout (6s) to stay under 12s total
           const fallbackTimeout = 6000;
@@ -1909,7 +1810,7 @@ Return VALID JSON:
           
           const fallbackDuration = Date.now() - fallbackStartTime;
           const totalDuration = Date.now() - startTime;
-          console.log(`Fallback provider (${userAiConfig.engine}) succeeded in ${fallbackDuration}ms (total: ${totalDuration}ms)`);
+          console.log(`✅ Fallback provider (${userAiConfig.engine}) succeeded in ${fallbackDuration}ms (total: ${totalDuration}ms)`);
           
           // Track token usage for fallback provider
           if (userId && response) {
@@ -1994,7 +1895,7 @@ Return VALID JSON:
       };
     }
     
-    console.log(` AI Response received (${messageContent.length} chars)`);
+    console.log(`📦 AI Response received (${messageContent.length} chars)`);
     
     // Try to parse JSON with error handling
     let result: any;
@@ -2005,7 +1906,7 @@ Return VALID JSON:
     
     try {
       const cleanedContent = cleanJSONResponse(messageContent);
-      result = safeJSONParse(cleanedContent, {}, 'generateSalesResponse');
+      result = JSON.parse(cleanedContent);
       
       // Check if AI returned multi-product format
       if (result.products && Array.isArray(result.products) && result.products.length > 0) {
@@ -2018,7 +1919,7 @@ Return VALID JSON:
         if (validationResult.success) {
           isMultiProduct = true;
           products = validationResult.data.products;
-          console.log(`Multi-product response validated: ${products.length} products`);
+          console.log(`✅ Multi-product response validated: ${products.length} products`);
           
           // For backward compatibility, use first product as default
           const firstProduct = products[0];
@@ -2109,7 +2010,7 @@ Return VALID JSON:
       nextSteps = [...nextSteps, ...fallbackSteps].slice(0, 3);
     }
     
-    console.log(`VALIDATION: ${discoveryQuestions.length} discovery questions, closingPitch complete, ${nextSteps.length} next steps`);
+    console.log(`✅ VALIDATION: ${discoveryQuestions.length} discovery questions, closingPitch complete, ${nextSteps.length} next steps`);
     
     // Build analysis result with validated, comprehensive content
     const analysisResult = {
@@ -2160,7 +2061,7 @@ Return VALID JSON:
       }
     };
 
-    console.log(`Analysis result prepared - Script: ${analysisResult.salesScript.solutions.length} solutions, ${analysisResult.salesScript.valueProposition.length} values, ${analysisResult.salesScript.technicalAnswers.length} technical`);
+    console.log(`✅ Analysis result prepared - Script: ${analysisResult.salesScript.solutions.length} solutions, ${analysisResult.salesScript.valueProposition.length} values, ${analysisResult.salesScript.technicalAnswers.length} technical`);
 
     // Build tab-based analysis using multiple sales methodologies
     const tabBasedAnalysis = buildTabBasedAnalysis(
@@ -2169,7 +2070,7 @@ Return VALID JSON:
       scriptData,
       domainExpertise
     );
-    console.log(` Tab-based analysis built with ${tabBasedAnalysis.methodologiesUsed.length} methodologies`);
+    console.log(`📊 Tab-based analysis built with ${tabBasedAnalysis.methodologiesUsed.length} methodologies`);
 
     // Attach multi-product intelligence and tab-based analysis if available
     let resultWithMultiProduct: any = {
@@ -2361,7 +2262,7 @@ Return JSON:
       client = aiConfig.client;
       model = aiConfig.model;
       engine = aiConfig.engine;
-      console.log(`FAST analysis using ${engine} (${model}) for user ${userId}`);
+      console.log(`✅ FAST analysis using ${engine} (${model}) for user ${userId}`);
     } else {
       if (!deepseek) {
         throw new Error("Default AI engine not configured");
@@ -2386,31 +2287,14 @@ Return JSON:
       throw new Error("No content in AI response");
     }
     
-    let result: any;
-    const fallback: any = {
-      discoveryInsights: { 
-        painPoints: [], 
-        currentEnvironment: "", 
-        requirements: [],
-        budget: undefined,
-        authority: undefined,
-        need: undefined,
-        timeline: undefined,
-        decisionMakers: []
-      },
-      discoveryQuestions: [],
-      nextQuestions: [],
-      bantQualification: {
-        budget: { asked: false },
-        authority: { asked: false },
-        need: { asked: false },
-        timeline: { asked: false }
-      },
-      recommendedModules: [],
-      recommendedSolutions: [],
-      caseStudies: []
-    };
-    result = safeJSONParse(cleanJSONResponse(messageContent), fallback, 'generateCombinedAnalysis');
+    let result;
+    try {
+      const cleanedContent = cleanJSONResponse(messageContent);
+      result = JSON.parse(cleanedContent);
+    } catch (parseError) {
+      console.error("JSON parse error in fast analysis:", parseError);
+      throw new Error(`Failed to parse AI response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+    }
     
     // CRITICAL: Sanitize discovery questions to ensure contextual awareness
     const rawQuestions = result.discoveryQuestions || [];
@@ -2424,10 +2308,10 @@ Return JSON:
         painPoints: result.discoveryInsights?.painPoints || [],
         currentEnvironment: result.discoveryInsights?.currentEnvironment || "",
         requirements: result.discoveryInsights?.requirements || [],
-        budget: result.discoveryInsights?.budget || undefined,
-        authority: result.discoveryInsights?.authority || undefined,
-        need: result.discoveryInsights?.need || undefined,
-        timeline: result.discoveryInsights?.timeline || undefined,
+        budget: result.discoveryInsights?.budget,
+        authority: result.discoveryInsights?.authority,
+        need: result.discoveryInsights?.need,
+        timeline: result.discoveryInsights?.timeline,
         decisionMakers: result.discoveryInsights?.decisionMakers || []
       },
       discoveryQuestions: sanitizedDiscoveryQuestions,
@@ -2438,7 +2322,7 @@ Return JSON:
         timeline: { asked: false }
       },
       nextQuestions: sanitizedNextQuestions,
-      recommendedModules: (result as any).recommendedSolutions || [],
+      recommendedModules: result.recommendedSolutions || [],
       caseStudies: result.caseStudies || []
     };
   } catch (error) {
@@ -2515,7 +2399,7 @@ Return JSON with these sections:
       client = aiConfig.client;
       model = aiConfig.model;
       engine = aiConfig.engine;
-      console.log(`Script generation using ${engine} (${model}) for user ${userId}`);
+      console.log(`✅ Script generation using ${engine} (${model}) for user ${userId}`);
     } else {
       if (!deepseek) {
         throw new Error("Default AI engine not configured");
@@ -2542,8 +2426,7 @@ Return JSON with these sections:
     }
     
     const cleanedContent = cleanJSONResponse(messageContent);
-    const fallback = { solutions: [], valueProposition: [], technicalAnswers: [], caseStudies: [], competitorAnalysis: [], whyBetter: [] };
-    const result = safeJSONParse(cleanedContent, fallback, 'generateSalesScript');
+    const result = JSON.parse(cleanedContent);
     
     return {
       solutions: result.solutions || [],
@@ -2599,7 +2482,7 @@ export async function generateCoachingSuggestions(
       const aiConfig = await getAIClient(userId);
       client = aiConfig.client;
       model = aiConfig.model;
-      console.log(`Coaching suggestions using ${aiConfig.engine} (${model}) for user ${userId}`);
+      console.log(`✅ Coaching suggestions using ${aiConfig.engine} (${model}) for user ${userId}`);
     } else {
       if (!deepseek) throw new Error("Default AI engine not configured");
       client = deepseek;
@@ -2678,8 +2561,7 @@ IMPORTANT: All suggestions must be for the SALES REP to use when responding to C
     }
 
     const cleanedContent = cleanJSONResponse(messageContent);
-    const fallback = { suggestions: [], insights: [], roles: undefined };
-    const result: any = safeJSONParse(cleanedContent, fallback, 'generateCoachingSuggestions');
+    const result = JSON.parse(cleanedContent);
     console.log('Coaching suggestions generated:', result.suggestions?.length || 0, 'insights:', result.insights?.length || 0);
     
     if (result.roles) {
@@ -2723,7 +2605,7 @@ export async function generateResponse(prompt: string, conversationHistory: any[
     }
 
     const messages = [
-      { role: "system", content: "You are a helpful AI assistant. Provide clear, accurate responses in valid JSON format when requested. Never include markdown code fences or extra text outside the JSON structure." },
+      { role: "system", content: "You are a helpful AI assistant. Provide clear, accurate responses." },
       ...conversationHistory,
       { role: "user", content: prompt }
     ];
@@ -2735,23 +2617,7 @@ export async function generateResponse(prompt: string, conversationHistory: any[
       temperature: 0.7,
     });
 
-    const rawResponse = completion.choices[0]?.message?.content || "No response generated";
-    
-    // Clean response: remove markdown code fences, "Based on" preambles, and extra whitespace
-    let cleanedResponse = rawResponse
-      .replace(/```json\s*/gi, '')
-      .replace(/```\s*/g, '')
-      .trim();
-    
-    // If response starts with text before JSON, try to extract just the JSON
-    if (cleanedResponse.startsWith('Based on') || cleanedResponse.startsWith('Here')) {
-      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        cleanedResponse = jsonMatch[0];
-      }
-    }
-    
-    return cleanedResponse;
+    return completion.choices[0]?.message?.content || "No response generated";
   } catch (error) {
     console.error('Error generating AI response:', error);
     throw new Error('Failed to generate AI response');
@@ -2813,8 +2679,7 @@ Provide a structured summary in JSON format:
       throw new Error("No content in DeepSeek API response");
     }
     const cleanedContent = cleanJSONResponse(messageContent);
-    const fallback = { keychallenges: [], discoveryInsights: [], objections: [], nextSteps: [], recommendedSolutions: [] };
-    const result = safeJSONParse(cleanedContent, fallback, 'generateCallSummary');
+    const result = JSON.parse(cleanedContent);
     
     return {
       keychallenges: result.keychallenges || [],
@@ -3082,45 +2947,14 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
       throw new Error("No content in AI response");
     }
     const cleanedContent = cleanJSONResponse(messageContent);
-    const fallback: any = {
-      attendees: [],
-      discussionSummary: "Unable to generate meeting minutes",
-      keyDecisions: [],
-      actionItems: [],
-      nextSteps: [],
-      notes: "",
-      companyName: "",
-      opportunityName: "",
-      date: "",
-      time: "",
-      duration: "",
-      meetingType: "",
-      discoveryQA: [],
-      bant: {
-        budget: "",
-        authority: "",
-        need: "",
-        timeline: ""
-      },
-      challenges: [],
-      keyInsights: [],
-      followUpPlan: {
-        nextMeetingDate: "",
-        documentsToShare: [],
-        internalAlignment: []
-      }
-    };
-    const result: any = safeJSONParse(cleanedContent, fallback, 'generateMeetingMinutes');
+    const result = JSON.parse(cleanedContent);
     
     // Use actual meeting start time from session metadata (not current time)
-    // Safety: Ensure meetingStartTime is a valid Date object
-    const meetingTime = (meetingStartTime && meetingStartTime instanceof Date && !isNaN(meetingStartTime.getTime())) 
-      ? meetingStartTime 
-      : new Date();
+    const meetingTime = meetingStartTime || new Date();
     const defaultDate = meetingTime.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
     const defaultTime = meetingTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
     
-    console.log(` Meeting metadata: ${defaultDate} at ${defaultTime} (from ${meetingStartTime ? 'session start' : 'current time'})`);
+    console.log(`📅 Meeting metadata: ${defaultDate} at ${defaultTime} (from ${meetingStartTime ? 'session start' : 'current time'})`);
     
     // STRICT: If AI didn't extract attendees, it means they're NOT in the conversation
     let finalAttendees = result.attendees || [];
@@ -3171,7 +3005,7 @@ CRITICAL INSTRUCTIONS - READ CAREFULLY:
     }
     
     // Log extraction results for debugging
-    console.log(` Meeting Minutes Extraction Results:`);
+    console.log(`📊 Meeting Minutes Extraction Results:`);
     console.log(`   - Attendees: ${finalAttendees.join(', ')}`);
     console.log(`   - Company: ${result.companyName || 'Not mentioned'}`);
     console.log(`   - Opportunity: ${result.opportunityName || 'Not mentioned'}`);
@@ -3272,11 +3106,10 @@ Cover: core platform, enterprise, analytics, automation, integrations, mobile, A
     }
     
     const cleanedContent = cleanJSONResponse(messageContent);
-    const fallback: any[] = [];
-    const result = safeJSONParse(cleanedContent, fallback, 'generateProductReference');
+    const result = JSON.parse(cleanedContent);
     
     // Handle both array and object with array property
-    const products = Array.isArray(result) ? result : ((result as any).products || (result as any).items || []);
+    const products = Array.isArray(result) ? result : (result.products || result.items || []);
     const finalProducts = products.length > 0 ? products : getDefaultProductReference(domainExpertise);
     
     // Cache for 10 minutes
@@ -3473,43 +3306,11 @@ STRICT RULES:
 }
 
 export interface ShiftGearsTip {
-  type: "rebuttal" | "objection" | "next_step" | "technical" | "psychological" | "closure" | "competitive" | "discovery";
+  type: "rebuttal" | "objection" | "next_step" | "technical" | "psychological" | "closure" | "competitive" | "discovery" | "qualification" | "trust_building" | "risk_alert";
   title: string;
   action: string;
   priority: "high" | "medium" | "low";
-}
-
-// PERFORMANCE: Cache for AI context to avoid repeated expensive operations
-const aiContextCache = new Map<string, { context: any; timestamp: number }>();
-const CACHE_TTL_MS = 10000; // 10 seconds cache for near real-time updates
-const MAX_CACHE_SIZE = 100; // Prevent memory leaks
-
-// Helper function to clean up old cache entries
-function cleanupCache(cache: Map<string, { context: any; timestamp: number }>) {
-  const now = Date.now();
-  const keysToDelete: string[] = [];
-  
-  // Remove expired entries - use forEach to avoid iterator issues
-  cache.forEach((value, key) => {
-    if (now - value.timestamp > CACHE_TTL_MS) {
-      keysToDelete.push(key);
-    }
-  });
-  
-  keysToDelete.forEach(key => cache.delete(key));
-  
-  // If still over limit, remove oldest entries
-  if (cache.size > MAX_CACHE_SIZE) {
-    // Convert entries to array manually to avoid iterator issues
-    const entries: Array<[string, { context: any; timestamp: number }]> = [];
-    cache.forEach((value, key) => {
-      entries.push([key, value]);
-    });
-    
-    entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
-    const toRemove = entries.slice(0, cache.size - MAX_CACHE_SIZE);
-    toRemove.forEach(([key]) => cache.delete(key));
-  }
+  expected_reaction?: string;
 }
 
 export async function generateShiftGearsTips(
@@ -3524,92 +3325,52 @@ export async function generateShiftGearsTips(
     const lowerText = conversationText.toLowerCase();
     const isPricingQuery = /pric(e|ing|es)|cost|fee|rate|subscription|per\s*(user|seat|month|year)|how\s*much|budget|quote|₹|\$|euro|inr|usd/.test(lowerText);
     
-    // PERFORMANCE OPTIMIZATION: Cache AI context by userId + domain to avoid repeated expensive operations
-    const cacheKey = `${userId || 'anon'}_${domainExpertise}_shift_gears`;
-    const cached = aiContextCache.get(cacheKey);
-    const now = Date.now();
-    
     // PERFORMANCE: Run training context and knowledge imports in parallel
-    // CRITICAL FIX: Use AI Context Builder for proper Train Me integration
-    const [aiContextResult, knowledgeModule] = await Promise.all([
-      (async () => {
-        // Use cache if available and fresh (within 30 seconds)
-        if (cached && (now - cached.timestamp) < CACHE_TTL_MS) {
-          console.log(`⚡ Using cached AI context for ${domainExpertise} (age: ${now - cached.timestamp}ms)`);
-          return cached.context;
-        }
-        
-        if (!userId) return null;
-        try {
-          const { buildEnhancedAIContext } = await import("./ai-context-builder");
-          const result = await buildEnhancedAIContext({
-            userId,
-            transcript: conversationText.slice(-1500), // PERFORMANCE: Use only recent context for faster processing
-            feature: 'shift_gears',
-            domainName: domainExpertise,
-            includePlaybooks: false, // Speed optimization
-            strictIsolation: true, // Strict domain isolation for Shift Gears
-            allowUniversalFallback: true
-          });
-          
-          // Cache the result
-          aiContextCache.set(cacheKey, { context: result, timestamp: now });
-          
-          // Clean up old cache entries to prevent memory leaks
-          cleanupCache(aiContextCache);
-          
-          return result;
-        } catch (error: any) {
-          console.error("Error building AI context:", error.message);
-          return null;
-        }
-      })(),
+    // ENHANCED: Use SEMANTIC SEARCH for contextually relevant knowledge
+    // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
+    // SPEED OPTIMIZATION: Use last 800 chars of conversation for semantic search relevance
+    const recentConversation = conversationText.slice(-800);
+    
+    // Build enhanced semantic query for pricing questions
+    let semanticQuery = recentConversation;
+    if (isPricingQuery) {
+      semanticQuery = `pricing price cost fee subscription rate per user per seat ${recentConversation}`;
+      console.log('💰 ShiftGears: PRICING QUERY DETECTED - Searching for pricing data in training materials');
+    }
+    
+    const [trainingContext, knowledgeModule] = await Promise.all([
+      userId ? getTrainingDocumentContext(userId, 3000, false, semanticQuery, 5, domainExpertise) : Promise.resolve(""),
       import("./knowledge-service")
     ]);
     
-    // Extract training context and knowledge from AI Context Builder
-    const trainingContext = aiContextResult?.knowledgeContext || "";
-    const hasDomainTraining = aiContextResult?.trainMeContext && aiContextResult.trainMeContext.trim().length > 100;
+    // DOMAIN-FIRST STRATEGY: If domain-specific training exists, prioritize it heavily
+    const hasDomainTraining = trainingContext && trainingContext.trim().length > 100;
     
-    if (aiContextResult?.domainUsed) {
-      console.log(`🎯 Shift Gears using Train Me: "${aiContextResult.domainUsed}" (${aiContextResult.entriesCount || 0} entries, source: ${aiContextResult.source})`);
-    }
-    
-    // PERFORMANCE: Skip knowledge base entirely if we have AI context (already includes everything)
+    // BALANCED: Lightweight knowledge without playbooks for speed, but keep full keyword context
     const { knowledgeService } = knowledgeModule;
-    let knowledge;
-    let keywords; // Declare keywords at function scope
+    const keywords = knowledgeService.extractKeywordsFromTranscript(conversationText);
     
-    if (aiContextResult && aiContextResult.entriesCount > 0) {
-      // Already have domain knowledge from AI Context Builder - skip expensive knowledge base query
-      knowledge = { relevantProducts: [], relevantCaseStudies: [], relevantPlaybooks: [] };
-      keywords = { problemKeywords: [], productKeywords: [], industries: [] }; // Empty keywords when using cache
-      console.log(`⚡ Skipping knowledge base (using cached AI context with ${aiContextResult.entriesCount} entries)`);
-    } else {
-      // No AI context - do minimal knowledge extraction
-      keywords = knowledgeService.extractKeywordsFromTranscript(conversationText.slice(-1000)); // Only recent text
-      
-      // CRITICAL FIX: Include domain expertise in keyword extraction for better context
-      const enhancedProductKeywords = [
-        ...keywords.productKeywords.slice(0, 5), // Limit to top 5 keywords
-        ...(domainExpertise ? domainExpertise.toLowerCase().split(/\s+/).filter(w => w.length > 2) : [])
-      ];
-      
-      knowledge = await knowledgeService.buildKnowledgeContext({
-        problemKeywords: keywords.problemKeywords.slice(0, 5), // Limit keywords
-        productKeywords: enhancedProductKeywords,
-        industries: keywords.industries,
-        includePlaybooks: false // SPEED: Skip playbooks (biggest bottleneck)
-      });
-    }
+    // CRITICAL FIX: Include domain expertise in keyword extraction for better context
+    const enhancedProductKeywords = [
+      ...keywords.productKeywords,
+      ...(domainExpertise ? domainExpertise.toLowerCase().split(/\s+/).filter(w => w.length > 2) : [])
+    ];
+    
+    // SPEED: Only fetch universal knowledge if no domain training exists
+    const knowledge = hasDomainTraining 
+      ? { relevantProducts: [], relevantCaseStudies: [], relevantPlaybooks: [] }
+      : await knowledgeService.buildKnowledgeContext({
+          problemKeywords: keywords.problemKeywords,
+          productKeywords: enhancedProductKeywords,
+          industries: keywords.industries,
+          includePlaybooks: false // SPEED: Skip playbooks (biggest bottleneck)
+        });
     
     console.log(`⚡ ShiftGears prep: ${Date.now() - startTime}ms | Domain: ${domainExpertise} | HasTraining: ${hasDomainTraining}`);
     
-    // Get structured prompt from registry (use systemPrompt from AI Context Builder)
-    const systemPrompt = aiContextResult?.systemPrompt || (() => {
-      const { promptRegistry } = require("./prompt-registry");
-      return promptRegistry.buildShiftGearsPrompt(knowledge, domainExpertise, trainingContext, conversationText);
-    })();
+    // Get structured prompt from registry (pass conversationText for dynamic domain detection)
+    const { promptRegistry } = await import("./prompt-registry");
+    const systemPrompt = promptRegistry.buildShiftGearsPrompt(knowledge, domainExpertise, trainingContext, conversationText);
     
     let client;
     let model;
@@ -3641,46 +3402,18 @@ export async function generateShiftGearsTips(
       .slice(0, 30)
       .join(', ');
 
-    const userPrompt = `🎙️ LIVE CONVERSATION (Last 10 turns - respond to THIS):
+    const userPrompt = `LIVE CALL (last turns):
 ${recentTurns}
+${domainExpertise ? `Domain: ${domainExpertise}` : ''}
 
-KEY TOPICS DETECTED: ${conversationKeywords}
-${domainExpertise ? `\n🎯 DOMAIN: ${domainExpertise}` : ''}
-
-📋 YOUR TASK: Provide EXACTLY 3 tips that a VIRTUAL SALESPERSON would give RIGHT NOW.
-
-Think like you're sitting next to the rep, listening to this call in real-time. What would you whisper to help them close this deal?
-
-⚡ INSTANT ANALYSIS REQUIRED:
-1. What did the customer JUST ask or say? → Respond to THAT specifically
-2. What buying signals or objections are present? → Address those immediately
-3. What's the ONE next move that advances this deal? → Make it actionable
-
-🔒 GROUNDING RULES:
-- ONLY reference products/companies from conversation OR training materials
-- For PRICING: Use EXACT values from training docs (e.g., "$99/month") - NEVER guess
-- If specific tech mentioned (Datto, RMM, etc.) → Tips MUST be about that tech
-- Address the SPECIFIC pain points mentioned, not generic ones
-
-💬 MAKE IT HUMAN:
-- Write tips as if you're coaching a colleague in real-time
-- Include exact words the rep can say verbatim
-- Be warm, confident, and deal-advancing
-
-RESPONSE FORMAT (JSON only):
-{
-  "tips": [
-    {
-      "type": "next_step|objection|rebuttal|technical|psychological|closure|competitive|discovery",
-      "title": "What to do (10 words max)",
-      "action": "Exact words to say OR specific action to take (30-50 words)",
-      "priority": "high|medium|low"
-    }
-  ]
-}`;
+STEP 1: Detect customer intent - Is customer: asking question? objecting? comparing competitor? signaling disinterest? walking away? negotiating? deflecting? requesting technical clarification? escalating to procurement? delaying?
+STEP 2: Analyze conversation state. Auto-detect best framework. Detect stage, buyer intent, emotional signals, deal risk.
+STEP 3: Generate exactly 3 coaching tips for the rep RIGHT NOW based on detected intent.
+Each tip: exact words to say (seller-ready, no fluff), expected prospect reaction, next likely branch. Respond to what was JUST said. JSON only:
+{"lrm_reasoning":{"stage":"opening|discovery|pain_identification|qualification|positioning|objection_handling|decision|closing","buyer_intent":"1 sentence","our_goal":"1 sentence","strategy":"1 sentence","framework":"auto-detected","deal_risk":"low|medium|high","emotional_signal":"dominant signal","detected_intent":"question|objection|disinterest|walking_away|negotiation|deflection|technical_clarification|procurement_escalation|delay|normal"},"tips":[{"type":"next_step|objection|rebuttal|technical|psychological|closure|competitive|discovery|qualification|trust_building|risk_alert|walking_away_recovery|negotiation|re_alignment","title":"10 words max","action":"exact words to say (30-50 words)","priority":"high|medium|low","expected_reaction":"what prospect will likely do"}]}`;
 
     // STRUCTURED LOGGING: Verify knowledge retrieval and context
-    console.log(' Shift Gears Context:', {
+    console.log('📊 Shift Gears Context:', {
       domain: domainExpertise,
       transcriptLength: conversationText.length,
       recentConversationLines: conversationLines.slice(-10).length,
@@ -3696,34 +3429,49 @@ RESPONSE FORMAT (JSON only):
       }
     });
 
-    // SPEED OPTIMIZATION: Use faster models for near real-time response
-    // Priority: gpt-4o-mini (fastest) > claude-haiku > gemini-flash > user's model
     const fastModel = model.includes('gpt-4') ? 'gpt-4o-mini' 
-                    : model.includes('claude') ? 'claude-3-5-haiku-20241022'
-                    : model.includes('gemini') ? 'gemini-2.0-flash-exp'
-                    : model; // Keep user's model if not optimizable
+                    : model.includes('claude') ? 'claude-3-5-haiku-latest'
+                    : model.includes('gemini') ? 'gemini-2.0-flash'
+                    : model;
     
     const aiStartTime = Date.now();
-    const response = await client.chat.completions.create({
-      model: fastModel,
-      messages: [
-        { 
-          role: "system", 
-          content: systemPrompt
-        },
-        { role: "user", content: userPrompt }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.1, // OPTIMIZED: Lower for faster, more consistent output
-      max_tokens: 300, // REDUCED: Prevent truncation, faster response (3-5 seconds target)
-    });
+    let response;
+    const modelsToTry = fastModel !== model ? [fastModel, model] : [model];
     
-    console.log(`⚡ ShiftGears AI call: ${Date.now() - aiStartTime}ms | Model: ${fastModel}`);
+    for (const tryModel of modelsToTry) {
+      try {
+        console.log(`⚡ ShiftGears: Trying model ${tryModel}...`);
+        response = await client.chat.completions.create({
+          model: tryModel,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.12,
+          max_tokens: 600,
+        });
+        console.log(`⚡ ShiftGears AI call: ${Date.now() - aiStartTime}ms | Model: ${tryModel}`);
+        break;
+      } catch (modelError: any) {
+        console.warn(`⚠️ ShiftGears: Model ${tryModel} failed: ${modelError.message}`);
+        if (tryModel === modelsToTry[modelsToTry.length - 1]) throw modelError;
+      }
+    }
+    
+    if (!response) throw new Error("All models failed");
 
-    // Track token usage for Shift Gears
+    // Track token usage for Shift Gears - use engine from initial config, don't re-call getAIClient
     if (userId) {
-      const aiConfig = await getAIClient(userId);
-      await recordTokenUsage(userId, mapEngineToProvider(aiConfig.engine), response, 'shift_gears');
+      try {
+        const aiConfig = await getAIClient(userId);
+        await recordTokenUsage(userId, mapEngineToProvider(aiConfig.engine), response, 'shift_gears');
+      } catch {
+        // If user API key is corrupted, still track usage as deepseek
+        if (client === deepseek) {
+          await recordTokenUsage(userId, 'deepseek', response, 'shift_gears');
+        }
+      }
     }
 
     const messageContent = response.choices?.[0]?.message?.content;
@@ -3732,12 +3480,33 @@ RESPONSE FORMAT (JSON only):
     }
     
     const cleanedContent = cleanJSONResponse(messageContent);
-    const fallback = { tips: [] };
-    const result = safeJSONParse(cleanedContent, fallback, 'generateShiftGearsTips');
+    let result;
+    try {
+      result = JSON.parse(cleanedContent);
+    } catch (parseErr: any) {
+      console.warn(`⚠️ Shift Gears JSON parse failed: ${parseErr.message}, attempting repair`);
+      let repaired = cleanedContent;
+      const lastComplete = repaired.lastIndexOf('}');
+      if (lastComplete > 0) {
+        repaired = repaired.substring(0, lastComplete + 1);
+        const openBraces = (repaired.match(/\{/g) || []).length;
+        const closeBraces = (repaired.match(/\}/g) || []).length;
+        const openBrackets = (repaired.match(/\[/g) || []).length;
+        const closeBrackets = (repaired.match(/\]/g) || []).length;
+        for (let i = closeBrackets; i < openBrackets; i++) repaired += ']';
+        for (let i = closeBraces; i < openBraces; i++) repaired += '}';
+      }
+      try {
+        result = JSON.parse(repaired);
+        console.log(`✅ Shift Gears JSON repaired successfully`);
+      } catch {
+        throw parseErr;
+      }
+    }
     const tips = result.tips || [];
     
     // LOG: Verify AI response is contextual with total timing
-    console.log(`Shift Gears Response (Total: ${Date.now() - startTime}ms):`, {
+    console.log(`✅ Shift Gears Response (Total: ${Date.now() - startTime}ms):`, {
       tipsCount: tips.length,
       tipTypes: tips.map((t: ShiftGearsTip) => t.type),
       tipTitles: tips.map((t: ShiftGearsTip) => t.title)
@@ -3782,7 +3551,7 @@ function getDefaultShiftGearsTips(domainExpertise: string): ShiftGearsTip[] {
 
 export interface QueryPitch {
   query: string;
-  queryType: "technical" | "pricing" | "features" | "integration" | "support" | "general";
+  queryType: "technical" | "pricing" | "features" | "integration" | "support" | "general" | "comparison" | "challenge";
   pitch: string;
   keyPoints: string[];
 }
@@ -3793,9 +3562,6 @@ export async function generateQueryPitches(
   userId?: string
 ): Promise<QueryPitch[]> {
   try {
-    const startTime = Date.now();
-    console.log(`🎯 generateQueryPitches called: transcript=${conversationText.length} chars, domain="${domainExpertise}", userId=${userId?.slice(0, 8)}...`);
-    
     // CRITICAL FIX: Detect pricing queries and use semantic search with pricing keywords
     const lowerText = conversationText.toLowerCase();
     const isPricingQuery = /pric(e|ing|es)|cost|fee|rate|subscription|per\s*(user|seat|month|year)|how\s*much|budget|quote|₹|\$|euro|inr|usd/.test(lowerText);
@@ -3808,62 +3574,28 @@ export async function generateQueryPitches(
     let semanticQuery = recentQuery;
     if (isPricingQuery) {
       semanticQuery = `pricing price cost fee subscription rate ${recentQuery}`;
-      console.log(' PRICING QUERY DETECTED - Using enhanced semantic search for pricing data');
+      console.log('💰 PRICING QUERY DETECTED - Using enhanced semantic search for pricing data');
     }
     
-    // PERFORMANCE OPTIMIZATION: Use cache for repeated queries
-    const cacheKey = `${userId || 'anon'}_${domainExpertise}_query_pitches`;
-    const cached = aiContextCache.get(cacheKey);
-    const now = Date.now();
-    
-    // PERFORMANCE: Run training context and knowledge in parallel
+    // Fetch training context with SEMANTIC SEARCH using the actual query for high accuracy
+    // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
     const [trainingContext, knowledgeModule] = await Promise.all([
-      // Use cache if available and fresh
-      (async () => {
-        if (cached && (now - cached.timestamp) < CACHE_TTL_MS) {
-          console.log(`⚡ Using cached training context for ${domainExpertise}`);
-          return cached.context;
-        }
-        
-        // Fetch training context with SEMANTIC SEARCH using the actual query for high accuracy
-        // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
-        const context = userId ? await getTrainingDocumentContext(userId, 20000, false, semanticQuery, 15, domainExpertise) : "";
-        
-        // Cache the result
-        if (userId) {
-          aiContextCache.set(cacheKey, { context, timestamp: now });
-        }
-        
-        return context;
-      })(),
+      userId ? getTrainingDocumentContext(userId, 3000, false, semanticQuery, 5, domainExpertise) : Promise.resolve(""),
       import("./knowledge-service")
     ]);
     
-    // PERFORMANCE: Skip knowledge base if we have training context
+    // Retrieve knowledge base context for enhanced responses (optimized - no playbooks for speed)
     const { knowledgeService } = knowledgeModule;
-    let knowledge;
-    let keywords; // Declare keywords at function scope
-    
-    if (trainingContext && trainingContext.length > 100) {
-      // Have training context - skip expensive knowledge base query
-      knowledge = { relevantProducts: [], relevantCaseStudies: [], relevantPlaybooks: [] };
-      keywords = { problemKeywords: [], productKeywords: [], industries: [] }; // Empty keywords when using training context
-      console.log(`⚡ Skipping knowledge base (using training context: ${trainingContext.length} chars)`);
-    } else {
-      // No training context - do minimal knowledge extraction
-      keywords = knowledgeService.extractKeywordsFromTranscript(conversationText.slice(-1000));
-      knowledge = await knowledgeService.buildKnowledgeContext({
-        problemKeywords: keywords.problemKeywords.slice(0, 5),
-        productKeywords: keywords.productKeywords.slice(0, 5),
-        industries: keywords.industries,
-        includePlaybooks: false // PERFORMANCE: Skip playbooks for faster response
-      });
-    }
-    
-    console.log(`⚡ QueryPitches prep: ${Date.now() - startTime}ms | Domain: ${domainExpertise}`);
+    const keywords = knowledgeService.extractKeywordsFromTranscript(conversationText);
+    const knowledge = await knowledgeService.buildKnowledgeContext({
+      problemKeywords: keywords.problemKeywords,
+      productKeywords: keywords.productKeywords,
+      industries: keywords.industries,
+      includePlaybooks: false // PERFORMANCE: Skip playbooks for faster response (not critical for query pitches)
+    });
     
     // STRUCTURED LOGGING: Verify knowledge retrieval and context
-    console.log(' Customer Query Pitches Context:', {
+    console.log('📊 Customer Query Pitches Context:', {
       domain: domainExpertise,
       transcriptLength: conversationText.length,
       trainingContextLength: trainingContext.length,
@@ -3888,24 +3620,21 @@ export async function generateQueryPitches(
     let client;
     let model;
     
+    let originalModel = "";
+    
     if (userId) {
       try {
         const aiConfig = await getAIClient(userId);
         client = aiConfig.client;
         model = aiConfig.model;
-        console.log(`🤖 QueryPitches using user AI: engine=${aiConfig.engine}, model=${model}`);
+        originalModel = model;
         
-        // Use faster models for quick analysis
-        if (model.includes('gpt-4')) {
-          model = 'gpt-4o-mini';
-        } else if (model.includes('claude-sonnet-4') || model.includes('claude-opus-4')) {
-          model = 'claude-haiku-4-5';
-        } else if (model.includes('gemini-2.5-pro')) {
-          model = 'gemini-2.5-flash';
-        }
-        console.log(`🤖 QueryPitches optimized model: ${model}`);
+        const fastModel = model.includes('gpt-4') ? 'gpt-4o-mini'
+                        : model.includes('claude') ? 'claude-3-5-haiku-latest'
+                        : model.includes('gemini') ? 'gemini-2.0-flash'
+                        : model;
+        model = fastModel;
       } catch (error) {
-        console.warn(`⚠️ QueryPitches: Failed to get user AI client, falling back to default:`, error);
         if (!deepseek) throw new Error("AI engine not configured");
         client = deepseek;
         model = "deepseek-chat";
@@ -3914,93 +3643,52 @@ export async function generateQueryPitches(
       if (!deepseek) throw new Error("Default AI engine not configured");
       client = deepseek;
       model = "deepseek-chat";
-      console.log(`🤖 QueryPitches using default AI: deepseek-chat`);
     }
 
-    const userPrompt = `LIVE TRANSCRIPT:
-${conversationText.slice(-2000)}
+    const userPrompt = `TRANSCRIPT (recent):
+${conversationText.slice(-1200)}
+Focus: ${domainExpertise}
 
-TASK: Identify ALL questions and queries in the conversation and generate pitch responses.
+DETECT AND EXTRACT every customer query, concern, objection, and challenge from the transcript above. Include:
+- Direct questions ("what is", "how does", "can you", "tell me about")
+- Indirect questions ("I want to know", "we're looking at", "what are the offerings")
+- Objections disguised as questions ("isn't that expensive?", "why switch?")
+- Walking-away signals ("we'll think about it", "send proposal", "not interested")
+- Pricing inquiries, technical queries, comparison requests
 
-IMPORTANT: Look for ANY questions in the transcript, including:
-- Direct questions with "?" marks
-- Implied questions or concerns
-- Statements that need clarification
-- Any topic that needs a sales response
+Auto-detect buyer persona and conversation stage. Select best framework.
+For each detected query generate a pitch (40-80 words): direct answer + business value translation + risk reduction + confidence positioning.
+If objection hidden in question: address surface question AND underlying concern.
+For pricing: use EXACT values from training docs only. Never guess.
+End each pitch with a micro-close or leverage follow-up question.
 
-For each query:
-1. Address the question with Solutions
-2. For PRICING queries: Use EXACT prices from training documents if available
-3. Quantify Value Proposition with metrics
-4. Provide Technical Answers with implementation details
-5. Reference case studies when relevant
-6. Include positioning
+JSON: {"queries":[{"query":"exact question/concern","queryType":"technical|pricing|features|integration|support|general|comparison|challenge|objection|walking_away","pitch":"40-80 words: direct answer + value + risk reduction","keyPoints":["point1","point2","point3"],"followUpQuestion":"micro-close or leverage question"}]}`;
 
-Keep responses concise (40-80 words per pitch).
-
-QUERY TYPES:
-- technical: How does it work? Integration questions, technical specs
-- pricing: Cost, ROI, pricing models, budget questions
-- features: What can it do? Feature requests, capabilities
-- integration: Third-party integrations, compatibility
-- support: Training, onboarding, customer success
-- general: Company info, case studies, general inquiries
-
-RESPONSE FORMAT (strict JSON):
-{
-  "queries": [
-    {
-      "query": "The question or topic from transcript",
-      "queryType": "technical|pricing|features|integration|support|general",
-      "pitch": "Pitch response covering technical + business value (40-80 words)",
-      "keyPoints": [
-        "Key point 1",
-        "Key point 2",
-        "Key point 3"
-      ]
-    }
-  ]
-}
-
-CRITICAL RULES:
-- Look for ANY questions or topics that need sales responses
-- If you see "?" marks, those are definitely queries
-- If no queries detected, return empty array: {"queries": []}
-- Each pitch must be 40-80 words
-- Focus on ${domainExpertise} expertise
-
-Example:
-{
-  "queries": [
-    {
-      "query": "How does your solution integrate with our existing CRM?",
-      "queryType": "integration",
-      "pitch": "We offer native integrations with Salesforce, HubSpot, and 50+ CRMs via our REST API. Setup takes 15 minutes with pre-built connectors. Real-time two-way sync ensures your team always has the latest customer data.",
-      "keyPoints": [
-        "Native connectors for top CRMs + REST API",
-        "15-minute setup with automatic sync",
-        "Saves 10+ hours/week per rep"
-      ]
-    }
-  ]
-}`;
-
-    const aiStartTime = Date.now();
-    const response = await client.chat.completions.create({
-      model,
-      messages: [
-        { 
-          role: "system", 
-          content: systemPrompt
-        },
-        { role: "user", content: userPrompt }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.1, // OPTIMIZED: Lower for faster, more consistent output
-      max_tokens: 1500, // INCREASED: Prevent JSON truncation (was 500, causing incomplete responses)
-    });
+    let response;
+    const modelsToTry = (originalModel && originalModel !== model) ? [model, originalModel] : [model];
     
-    console.log(`⚡ QueryPitches AI call: ${Date.now() - aiStartTime}ms | Total: ${Date.now() - startTime}ms`);
+    for (const tryModel of modelsToTry) {
+      try {
+        console.log(`💬 QueryPitches: Trying model ${tryModel}...`);
+        response = await client.chat.completions.create({
+          model: tryModel,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.15,
+          max_tokens: 1500,
+        });
+        console.log(`💬 QueryPitches: Model ${tryModel} succeeded`);
+        break;
+      } catch (modelError: any) {
+        console.warn(`⚠️ QueryPitches: Model ${tryModel} failed: ${modelError.message}`);
+        if (tryModel === modelsToTry[modelsToTry.length - 1]) throw modelError;
+      }
+    }
+    
+    if (!response) throw new Error("All models failed");
 
     const messageContent = response.choices?.[0]?.message?.content;
     if (!messageContent) {
@@ -4008,25 +3696,42 @@ Example:
     }
     
     const cleanedContent = cleanJSONResponse(messageContent);
-    const fallback = { queries: [] };
-    const result = safeJSONParse(cleanedContent, fallback, 'generateQueryPitches');
+    let result;
+    try {
+      result = JSON.parse(cleanedContent);
+    } catch (parseError: any) {
+      console.warn(`⚠️ QueryPitches: JSON parse failed (${parseError.message}), attempting repair...`);
+      let repaired = cleanedContent;
+      if (!repaired.endsWith('}')) {
+        const lastComplete = repaired.lastIndexOf('},');
+        if (lastComplete > 0) {
+          repaired = repaired.substring(0, lastComplete + 1) + ']}';
+        } else {
+          const lastBrace = repaired.lastIndexOf('}');
+          if (lastBrace > 0) {
+            repaired = repaired.substring(0, lastBrace + 1) + ']}';
+          }
+        }
+      }
+      try {
+        result = JSON.parse(repaired);
+        console.log('✅ QueryPitches: JSON repair succeeded');
+      } catch {
+        console.error('❌ QueryPitches: JSON repair also failed');
+        return [];
+      }
+    }
     const queries = result.queries || [];
     
-    // LOG: Verify AI response is contextual
-    console.log('Customer Query Pitches Response:', {
+    console.log('✅ Customer Query Pitches Response:', {
       queriesCount: queries.length,
       queryTypes: queries.map((q: QueryPitch) => q.queryType),
       queries: queries.map((q: QueryPitch) => q.query)
     });
     
-    return queries.slice(0, 5); // Max 5 queries to keep it manageable
-  } catch (error: any) {
-    console.error("❌ Query pitch generation error:", error);
-    console.error("❌ Error details:", {
-      message: error.message,
-      stack: error.stack?.split('\n').slice(0, 3),
-      name: error.name
-    });
+    return queries.slice(0, 5);
+  } catch (error) {
+    console.error("Query pitch generation error:", error);
     return [];
   }
 }
@@ -4042,8 +3747,24 @@ export async function generatePresentToWin(
 ): Promise<any> {
   try {
     console.log(`🎯 Starting Present to Win generation for user ${userId}, type: ${type}, domain: ${domainExpertise}`);
-    const aiConfig = await getAIClient(userId);
-    const { client, model, engine } = aiConfig;
+    let client: any;
+    let model: string;
+    let engine: string;
+    
+    try {
+      const aiConfig = await getAIClient(userId);
+      client = aiConfig.client;
+      model = aiConfig.model;
+      engine = aiConfig.engine;
+    } catch (aiError: any) {
+      console.warn(`⚠️ Present to Win: User AI key failed (${aiError.message}), falling back to DeepSeek`);
+      if (!deepseek) {
+        throw new Error("AI engine not available - please configure your API key in Settings");
+      }
+      client = deepseek;
+      model = "deepseek-chat";
+      engine = "deepseek";
+    }
     console.log(`🎯 Using AI engine: ${engine}, model: ${model}`);
 
     // CACHE KEY: provider + model + type + domain + last 300 chars
@@ -4057,7 +3778,7 @@ export async function generatePresentToWin(
         return cached;
       }
     } else {
-      console.log(`Battle card caching DISABLED for contextual accuracy`);
+      console.log(`🔄 Battle card caching DISABLED for contextual accuracy`);
     }
 
     // Optimize: Limit context to last 4000 characters for faster generation
@@ -4069,36 +3790,27 @@ export async function generatePresentToWin(
     if (type === 'pitch-deck') {
       console.log(`⚡ ULTRA-FAST pitch deck`);
       
-      // PRIORITY 1: Fetch Train Me documents (INCREASED for better context)
+      // PRIORITY 1: Fetch Train Me documents (reduced for speed)
       // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
-      const trainingContext = await getTrainingDocumentContext(userId, 8000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
-      console.log(`Pitch Deck - Training documents loaded: ${trainingContext ? trainingContext.length : 0} chars`);
+      const trainingContext = await getTrainingDocumentContext(userId, 4000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
+      console.log(`📚 Pitch Deck - Training documents loaded: ${trainingContext ? trainingContext.length : 0} chars`);
       
-      // ENHANCED: Use last 2000 chars for better conversation context
-      const ultraContext = conversationContext.length > 2000
-        ? conversationContext.slice(-2000)
+      // Ultra-optimized: last 1000 chars only for speed
+      const ultraContext = conversationContext.length > 1000
+        ? conversationContext.slice(-1000)
         : conversationContext;
       
       // Inject intelligence engine supplement
       const supplement = buildPromptSupplement(conversationContext, domainExpertise, 'pitch_deck');
       const supplementText = formatPromptSupplement(supplement);
       
-      // Build ENHANCED training context section
+      // Build compact training context section
       const trainingSection = trainingContext && trainingContext.trim().length > 0
-        ? `\n=== YOUR TRAIN ME KNOWLEDGE (Use this for accurate product info, pricing, features) ===\n${trainingContext.slice(0, 4000)}\n=== END TRAIN ME ===\n`
+        ? `\n=== TRAINING DOCS ===\n${trainingContext.slice(0, 2000)}\n===\n`
         : '';
       
       const prompt = `${supplementText}${trainingSection}
-
-=== CONVERSATION CONTEXT (Use this to understand customer needs) ===
-${ultraContext}
-=== END CONVERSATION ===
-
-CRITICAL: Generate a ${domainExpertise} pitch deck that:
-1. Uses ACTUAL product details from Train Me knowledge above
-2. Addresses SPECIFIC pain points mentioned in the conversation
-3. Shows how YOUR product solves THEIR problems (not generic)
-4. Uses real features, pricing, and benefits from Train Me data
+${domainExpertise} pitch (5 slides). Context: ${ultraContext}
 
 JSON:
 {
@@ -4127,8 +3839,7 @@ JSON:
       const content = response.choices?.[0]?.message?.content;
       if (!content) throw new Error("No content in AI response");
       const cleanedContent = cleanJSONResponse(content);
-      const fallback = { slides: [], _meta: {} };
-      const result: any = safeJSONParse(cleanedContent, fallback, 'generatePresentToWin-pitch-deck');
+      const result = JSON.parse(cleanedContent);
       
       // Inject intelligence metadata into result
       result._meta = {
@@ -4146,15 +3857,15 @@ JSON:
     } else if (type === 'case-study') {
       console.log(`⚡ Generating contextual case study for domain: ${domainExpertise}`);
       
-      // PRIORITY 1: Fetch Train Me documents for contextual accuracy (INCREASED)
+      // PRIORITY 1: Fetch Train Me documents for contextual accuracy (reduced for speed)
       // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
-      const trainingContext = await getTrainingDocumentContext(userId, 10000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
+      const trainingContext = await getTrainingDocumentContext(userId, 6000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
       const hasTrainingDocs = trainingContext && trainingContext.trim().length > 100;
-      console.log(`Case Study - Training documents loaded: ${trainingContext ? trainingContext.length : 0} chars`);
+      console.log(`📚 Case Study - Training documents loaded: ${trainingContext ? trainingContext.length : 0} chars`);
       
-      // ENHANCED: Use last 2500 chars for better conversation context
-      const conversationSummary = conversationContext.length > 2500
-        ? conversationContext.slice(-2500)
+      // Use optimized conversation context for speed
+      const conversationSummary = conversationContext.length > 1500
+        ? conversationContext.slice(-1500)
         : conversationContext;
       
       // Inject intelligence engine supplement with case study tagging
@@ -4164,15 +3875,15 @@ JSON:
       // Determine source priority
       const sourceType = hasTrainingDocs ? 'train_me' : 'knowledge_base';
       
-      // Build ENHANCED training context section
+      // Build compact training context section for speed
       const trainingSection = hasTrainingDocs
         ? `
-=== PRIORITY KNOWLEDGE SOURCE: YOUR TRAIN ME DOCUMENTS ===
-${trainingContext.slice(0, 6000)}
-=== END TRAIN ME DOCUMENTS ===
+=== PRIORITY KNOWLEDGE SOURCE: TRAINING DOCUMENTS ===
+${trainingContext.slice(0, 4000)}
+=== END TRAINING DOCUMENTS ===
 
 CRITICAL INSTRUCTIONS FOR CASE STUDY GENERATION:
-1. SEARCH the Train Me documents above for ANY real case studies, customer success stories, testimonials, or documented results
+1. SEARCH the training documents above for ANY real case studies, customer success stories, testimonials, or documented results
 2. If you find real case study data (company names, actual metrics, real outcomes), EXTRACT and use that data directly
 3. Use actual customer names, real statistics, and documented results from the training materials
 4. Set verificationType to "real" and verificationLabel to "Verified Case Study" if using documented data
@@ -4248,20 +3959,7 @@ JSON format:
       const content = response.choices?.[0]?.message?.content;
       if (!content) throw new Error("No content in AI response");
       const cleanedContent = cleanJSONResponse(content);
-      const fallback = { 
-        title: "", 
-        customer: "", 
-        industry: "", 
-        challenge: "", 
-        solution: "", 
-        outcomes: [],
-        verificationType: "illustrative",
-        verificationLabel: "",
-        citation: "",
-        storySource: "",
-        _meta: {}
-      };
-      const result: any = safeJSONParse(cleanedContent, fallback, 'generatePresentToWin-case-study');
+      const result = JSON.parse(cleanedContent);
       
       // Inject intelligence metadata into result - respect AI's determination of verification type
       const isVerified = result.verificationType === 'real' || result.verificationType === 'anonymized';
@@ -4292,31 +3990,25 @@ JSON format:
     } else if (type === 'battle-card') {
       console.log(`🎯 Generating battle card for domain: ${domainExpertise}`);
       
-      // OPTIMIZATION: Reduce training context size for faster generation
+      // PRIORITY 1: Fetch Train Me documents (reduced for speed)
       // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
-      const trainingContext = await getTrainingDocumentContext(userId, 6000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
-      console.log(`Battle Card - Training documents loaded: ${trainingContext ? trainingContext.length : 0} chars`);
+      const trainingContext = await getTrainingDocumentContext(userId, 2000, true, undefined, 3, domainExpertise);
+      console.log(`📚 Battle Card - Training: ${trainingContext ? trainingContext.length : 0} chars`);
       
-      // OPTIMIZATION: Use last 1500 chars for faster processing while maintaining context
-      const fullContext = conversationContext.length > 1500
-        ? conversationContext.slice(-1500)
+      const fullContext = conversationContext.length > 1000
+        ? conversationContext.slice(-1000)
         : conversationContext;
       
-      // Inject intelligence engine supplement for honest battle cards
       const supplement = buildPromptSupplement(conversationContext, domainExpertise, 'battle_card');
       const supplementText = formatPromptSupplement(supplement);
-      
-      console.log(`📝 Battle Card - Intelligence supplement: ${supplement.domainBadge}`);
-      console.log(`📝 Battle Card - Conversation context length: ${fullContext.length} chars (optimized)`);
-      console.log(`📝 Battle Card - Context sample (first 500 chars): ${fullContext.substring(0, 500)}`);
       
       // LIGHTWEIGHT COMPETITOR EXTRACTION - scan conversation for known competitors
       const extractCompetitorsFromConversation = (text: string): string[] => {
         const competitors: string[] = [];
         const normalizedText = text.toLowerCase();
         
-        console.log(` Extraction - Testing text length: ${text.length}, normalized length: ${normalizedText.length}`);
-        console.log(` Extraction - Normalized sample (first 300 chars): ${normalizedText.substring(0, 300)}`);
+        console.log(`🔍 Extraction - Testing text length: ${text.length}, normalized length: ${normalizedText.length}`);
+        console.log(`🔍 Extraction - Normalized sample (first 300 chars): ${normalizedText.substring(0, 300)}`);
         
         // Comprehensive competitor dictionary (case-insensitive patterns)
         const competitorPatterns = [
@@ -4364,7 +4056,7 @@ JSON format:
           if (pattern.test(normalizedText)) {
             if (!competitors.includes(name)) {
               competitors.push(name);
-              console.log(` Detected competitor in conversation: "${name}"`);
+              console.log(`🔍 Detected competitor in conversation: "${name}"`);
             }
           }
         }
@@ -4374,7 +4066,7 @@ JSON format:
       
       // Extract competitors mentioned in the conversation
       const conversationCompetitors = extractCompetitorsFromConversation(conversationContext);
-      console.log(` Competitors extracted from conversation: [${conversationCompetitors.join(', ') || 'None'}]`);
+      console.log(`🔍 Competitors extracted from conversation: [${conversationCompetitors.join(', ') || 'None'}]`);
       
       // DETERMINISTIC COMPETITOR MAPPING - maps domains to their actual competitors
       interface CompetitorSet {
@@ -4680,7 +4372,7 @@ JSON format:
       for (const { pattern, canonical } of providerSynonyms) {
         if (pattern.test(preMappedDomain)) {
           preMappedDomain = canonical.toLowerCase();
-          console.log(`Pre-mapping: "${domainExpertise}" → "${canonical}"`);
+          console.log(`🔄 Pre-mapping: "${domainExpertise}" → "${canonical}"`);
           break;
         }
       }
@@ -4697,14 +4389,14 @@ JSON format:
         .replace(/\s+/g, ' ')
         .trim();
       
-      console.log(` Domain normalization: "${domainExpertise}" → "${normalizedDomain}"`);
+      console.log(`🔍 Domain normalization: "${domainExpertise}" → "${normalizedDomain}"`);
       
       // STEP 2: Find matching competitor set (check if any registry key is contained in the domain)
       let competitorSet: CompetitorSet | null = null;
       for (const [key, value] of Object.entries(competitorRegistry)) {
         if (normalizedDomain.includes(key) || key.includes(normalizedDomain)) {
           competitorSet = value;
-          console.log(`Direct match found: "${domainExpertise}" → ${value.category}`);
+          console.log(`✅ Direct match found: "${domainExpertise}" → ${value.category}`);
           break;
         }
       }
@@ -4724,28 +4416,28 @@ JSON format:
           if (/\b(aws|amazon(\s*web)?)\b/i.test(normalizedDomain)) {
             canonicalProduct = "Amazon Web Services (AWS)";
             competitors = ["Microsoft Azure", "Google Cloud Platform (GCP)", "Oracle Cloud"];
-            console.log(` Cloud detected: AWS keywords found`);
+            console.log(`📊 Cloud detected: AWS keywords found`);
           } else if (/\b(google\s*cloud|gcp|google)\b/i.test(normalizedDomain)) {
             canonicalProduct = "Google Cloud Platform (GCP)";
             competitors = ["Microsoft Azure", "Amazon Web Services (AWS)", "Oracle Cloud"];
-            console.log(` Cloud detected: Google Cloud keywords found`);
+            console.log(`📊 Cloud detected: Google Cloud keywords found`);
           } else if (/\bazure\b/i.test(normalizedDomain)) {
             canonicalProduct = "Microsoft Azure";
             competitors = ["Google Cloud Platform (GCP)", "Amazon Web Services (AWS)", "Oracle Cloud"];
-            console.log(` Cloud detected: Azure keywords found`);
+            console.log(`📊 Cloud detected: Azure keywords found`);
           } else if (/\boracle\s*cloud\b/i.test(normalizedDomain)) {
             canonicalProduct = "Oracle Cloud";
             competitors = ["Microsoft Azure", "AWS", "Google Cloud Platform"];
-            console.log(` Cloud detected: Oracle Cloud keywords found`);
+            console.log(`📊 Cloud detected: Oracle Cloud keywords found`);
           } else if (/\bibm\s*cloud\b/i.test(normalizedDomain)) {
             canonicalProduct = "IBM Cloud";
             competitors = ["Microsoft Azure", "AWS", "Google Cloud Platform"];
-            console.log(` Cloud detected: IBM Cloud keywords found`);
+            console.log(`📊 Cloud detected: IBM Cloud keywords found`);
           } else {
             // Generic cloud keywords without specific provider → use conversation context or default to Azure
             canonicalProduct = "Microsoft Azure"; // Last resort default
             competitors = ["Google Cloud Platform (GCP)", "Amazon Web Services (AWS)", "Oracle Cloud"];
-            console.log(` Cloud detected: Generic cloud keywords, defaulting to Azure`);
+            console.log(`📊 Cloud detected: Generic cloud keywords, defaulting to Azure`);
           }
           
           competitorSet = {
@@ -4753,105 +4445,105 @@ JSON format:
             competitors: competitors,
             category: "Cloud Computing Platform"
           };
-          console.log(`Cloud category: "${canonicalProduct}" vs [${competitors.slice(0, 2).join(", ")}]`);
+          console.log(`✅ Cloud category: "${canonicalProduct}" vs [${competitors.slice(0, 2).join(", ")}]`);
         } else if (/(rmm|remote monitoring|endpoint management|patch|msp|managed service)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise, // Keep original for non-cloud
             competitors: ["ConnectWise Automate", "Kaseya VSA", "NinjaRMM", "Datto RMM"],
             category: "RMM/MSP Platform"
           };
-          console.log(` Category detected: RMM/MSP`);
+          console.log(`📊 Category detected: RMM/MSP`);
         } else if (/(psa|professional service|ticketing|help desk|service desk)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["ConnectWise Manage", "Autotask", "HaloPSA"],
             category: "PSA Platform"
           };
-          console.log(` Category detected: PSA`);
+          console.log(`📊 Category detected: PSA`);
         } else if (/(crm|customer relationship|salesforce|hubspot)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["Salesforce", "HubSpot", "Microsoft Dynamics"],
             category: "CRM Platform"
           };
-          console.log(` Category detected: CRM`);
+          console.log(`📊 Category detected: CRM`);
         } else if (/(security|endpoint protection|antivirus|edr|threat)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["CrowdStrike", "SentinelOne", "Microsoft Defender"],
             category: "Endpoint Security"
           };
-          console.log(` Category detected: Security`);
+          console.log(`📊 Category detected: Security`);
         } else if (/(backup|disaster recovery|bcdr|data protection)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["Veeam", "Acronis", "Datto BCDR"],
             category: "Backup & DR"
           };
-          console.log(` Category detected: Backup`);
+          console.log(`📊 Category detected: Backup`);
         } else if (/(itsm|it service|incident|change management|service desk)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["BMC Remedy", "Jira Service Management", "ManageEngine ServiceDesk Plus"],
             category: "IT Service Management"
           };
-          console.log(` Category detected: ITSM`);
+          console.log(`📊 Category detected: ITSM`);
         } else if (/(csm|customer service|case management|customer support)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["Salesforce Service Cloud", "Zendesk", "Microsoft Dynamics 365"],
             category: "Customer Service Management"
           };
-          console.log(` Category detected: CSM`);
+          console.log(`📊 Category detected: CSM`);
         } else if (/(irm|grc|risk management|compliance|governance)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["RSA Archer", "MetricStream", "LogicGate"],
             category: "Integrated Risk Management"
           };
-          console.log(` Category detected: IRM/GRC`);
+          console.log(`📊 Category detected: IRM/GRC`);
         } else if (/(hr|hris|hcm|payroll|workforce|employee|talent|recruiting|onboarding|benefits|compensation|people\s*management|human\s*capital|human\s*resource)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["Workday", "ADP Workforce Now", "Rippling", "Gusto", "BambooHR"],
             category: "HR/Payroll Platform"
           };
-          console.log(` Category detected: HR/Payroll`);
+          console.log(`📊 Category detected: HR/Payroll`);
         } else if (/(erp|enterprise\s*resource|business\s*planning)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["SAP S/4HANA", "Oracle ERP", "Microsoft Dynamics 365", "NetSuite"],
             category: "ERP System"
           };
-          console.log(` Category detected: ERP`);
+          console.log(`📊 Category detected: ERP`);
         } else if (/(project\s*management|task\s*management|agile|scrum|kanban|sprint|workflow\s*management)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["Asana", "Monday.com", "Jira", "Trello", "ClickUp"],
             category: "Project Management"
           };
-          console.log(` Category detected: Project Management`);
+          console.log(`📊 Category detected: Project Management`);
         } else if (/(communication|collaboration|messaging|chat|video\s*conference|meeting)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["Slack", "Microsoft Teams", "Zoom", "Google Meet"],
             category: "Communication/Collaboration"
           };
-          console.log(` Category detected: Communication/Collaboration`);
+          console.log(`📊 Category detected: Communication/Collaboration`);
         } else if (/(marketing|email\s*marketing|automation|campaign|lead\s*gen)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["HubSpot", "Marketo", "Pardot", "Mailchimp", "ActiveCampaign"],
             category: "Marketing Automation"
           };
-          console.log(` Category detected: Marketing Automation`);
+          console.log(`📊 Category detected: Marketing Automation`);
         } else if (/(accounting|finance|bookkeeping|invoicing|billing|expense)/i.test(normalizedDomain)) {
           competitorSet = {
             yourProduct: domainExpertise,
             competitors: ["QuickBooks", "Xero", "FreshBooks", "Sage", "NetSuite"],
             category: "Accounting/Finance"
           };
-          console.log(` Category detected: Accounting/Finance`);
+          console.log(`📊 Category detected: Accounting/Finance`);
         }
       }
       
@@ -4889,7 +4581,7 @@ JSON format:
             // Use domain detection to find contextually relevant competitors
             const domainContextForGuard = detectDomainFromConversation(conversationContext, normalizedDomain);
             if (domainContextForGuard.suggestedCompetitors.length > 0) {
-              console.log(` Anti-fallback guard: Found domain competitors from conversation: [${domainContextForGuard.suggestedCompetitors.join(', ')}]`);
+              console.log(`📊 Anti-fallback guard: Found domain competitors from conversation: [${domainContextForGuard.suggestedCompetitors.join(', ')}]`);
               for (const competitor of domainContextForGuard.suggestedCompetitors) {
                 if (!mergedCompetitors.includes(competitor) && mergedCompetitors.length < 3) {
                   mergedCompetitors.push(competitor);
@@ -4910,7 +4602,7 @@ JSON format:
           competitors: mergedCompetitors.slice(0, 3), // Maximum 3 competitors
           category: "Domain-Specific Solution"
         };
-        console.log(`Guard activated: ${competitorSet.yourProduct} vs [${competitorSet.competitors.join(", ")}]`);
+        console.log(`✅ Guard activated: ${competitorSet.yourProduct} vs [${competitorSet.competitors.join(", ")}]`);
       }
       
       // FINAL ANTI-FALLBACK GUARD: Prevent Rev Winner for cloud-related domains/conversations
@@ -4929,15 +4621,15 @@ JSON format:
             competitors: ["Microsoft Azure", "Amazon Web Services (AWS)", "Google Cloud Platform (GCP)"],
             category: "Cloud Computing Platform"
           };
-          console.log(`Cloud guard activated: "${competitorSet.yourProduct}" vs [${competitorSet.competitors.slice(0, 2).join(", ")}]`);
+          console.log(`✅ Cloud guard activated: "${competitorSet.yourProduct}" vs [${competitorSet.competitors.slice(0, 2).join(", ")}]`);
         } else {
           // INTELLIGENT FALLBACK: Use domain detection from conversation to find contextually relevant competitors
-          console.log(`INTELLIGENT FALLBACK: Using conversation-aware domain detection for "${domainExpertise}"`);
+          console.log(`🔄 INTELLIGENT FALLBACK: Using conversation-aware domain detection for "${domainExpertise}"`);
           
           // Use the domain-detection module to analyze conversation context for better competitor suggestions
           const conversationDomainContext = detectDomainFromConversation(conversationContext, domainExpertise);
-          console.log(` Domain detection result: detected="${conversationDomainContext.detectedDomain}", confidence=${conversationDomainContext.confidenceScore}%`);
-          console.log(` Suggested competitors from domain detection: [${conversationDomainContext.suggestedCompetitors.join(', ') || 'None'}]`);
+          console.log(`📊 Domain detection result: detected="${conversationDomainContext.detectedDomain}", confidence=${conversationDomainContext.confidenceScore}%`);
+          console.log(`📊 Suggested competitors from domain detection: [${conversationDomainContext.suggestedCompetitors.join(', ') || 'None'}]`);
           
           let contextualCompetitors: string[] = [];
           let detectedCategory = "Custom Solution";
@@ -4958,8 +4650,8 @@ JSON format:
                 contextualCompetitors = intelligence.competitors.map(c => c.name).slice(0, 3);
                 detectedCategory = intelligence.industry || "Industry Solution";
                 aiResearchSucceeded = true;
-                console.log(`AI Research found ${intelligence.competitors.length} competitors: [${contextualCompetitors.join(', ')}]`);
-                console.log(` Industry: ${intelligence.industry}, Source: ${intelligence.source}`);
+                console.log(`✅ AI Research found ${intelligence.competitors.length} competitors: [${contextualCompetitors.join(', ')}]`);
+                console.log(`📊 Industry: ${intelligence.industry}, Source: ${intelligence.source}`);
               } else {
                 console.log(`⚠️ AI Research returned no competitors - falling back to generic competitors`);
               }
@@ -4969,11 +4661,11 @@ JSON format:
             
             // If AI research didn't provide competitors, use sensible generic defaults
             if (!aiResearchSucceeded) {
-              console.log(`Using generic competitor fallback for unknown domain`);
+              console.log(`🔄 Using generic competitor fallback for unknown domain`);
               // Provide generic industry competitors so the prompt has something to work with
               contextualCompetitors = ["Industry Leader A", "Industry Leader B", "Industry Leader C"];
               detectedCategory = "Industry Solution";
-              console.log(` Generic fallback: Will ask AI to identify specific competitors for "${domainExpertise}"`);
+              console.log(`📊 Generic fallback: Will ask AI to identify specific competitors for "${domainExpertise}"`);
             }
           }
           
@@ -4984,14 +4676,14 @@ JSON format:
           };
           
           if (contextualCompetitors.length > 0) {
-            console.log(`Dynamic fallback: "${competitorSet.yourProduct}" vs [${competitorSet.competitors.join(", ")}]`);
+            console.log(`✅ Dynamic fallback: "${competitorSet.yourProduct}" vs [${competitorSet.competitors.join(", ")}]`);
           } else {
             console.log(`⚠️ No competitors found - AI will identify appropriate competitors`);
           }
         }
       }
       
-      console.log(`Battle Card: ${competitorSet.yourProduct} vs [${competitorSet.competitors.slice(0, 2).join(", ")}]`);
+      console.log(`✅ Battle Card: ${competitorSet.yourProduct} vs [${competitorSet.competitors.slice(0, 2).join(", ")}]`);
       
       // Build deterministic prompt that ENFORCES conversation-mentioned competitors
       const competitorSection = conversationCompetitors.length > 0
@@ -5006,7 +4698,7 @@ ${competitorSet.competitors.length > 0 ? competitorSet.competitors.map((c, i) =>
 SUGGESTED COMPETITORS FOR ${competitorSet.yourProduct}:
 ${competitorSet.competitors.map((c, i) => `${i + 1}. ${c}`).join('\n')}`
           : `
- COMPETITOR IDENTIFICATION REQUIRED:
+🔍 COMPETITOR IDENTIFICATION REQUIRED:
 Based on your knowledge of ${competitorSet.yourProduct}, identify the 2 most relevant competitors in the same market.
 Research and use REAL competitor products that compete directly with "${competitorSet.yourProduct}".
 Examples: If this is an HR platform, competitors might include Workday, ADP, Rippling, Gusto, etc.
@@ -5015,105 +4707,29 @@ Examples: If this is an HR platform, competitors might include Workday, ADP, Rip
 IMPORTANT: NEVER use "Gong", "Clari Copilot", or other sales intelligence tools as competitors 
 UNLESS "${competitorSet.yourProduct}" is specifically a sales/conversation intelligence product.`;
 
-      // Build ENHANCED training context section with clear instructions
+      // Build compact training context section for speed
       const trainingSection = trainingContext && trainingContext.trim().length > 0
         ? `
-=== YOUR TRAIN ME KNOWLEDGE (PRIORITY SOURCE - USE THIS FIRST) ===
-${trainingContext.slice(0, 6000)}
-=== END TRAIN ME KNOWLEDGE ===
-
-CRITICAL: The Train Me knowledge above contains YOUR ACTUAL product details, features, pricing, and competitive advantages.
-Use this information to create an ACCURATE and SPECIFIC battle card, not generic comparisons.
+=== TRAINING DOCS (USE FIRST) ===
+${trainingContext.slice(0, 2000)}
+===
 `
         : '';
 
       let prompt = `${supplementText}
-
-You are a sales expert creating a competitive battle card for ${competitorSet.yourProduct} (${competitorSet.category}).
-
-${trainingSection}
-
-=== CONVERSATION CONTEXT (Customer's actual discussion) ===
+Battle card: ${competitorSet.yourProduct} (${competitorSet.category}).
+${trainingSection}CONVERSATION:
 ${fullContext}
-=== END CONVERSATION ===
-
 ${competitorSection}
+RULES:
+- ${conversationCompetitors.length > 0 ? `MUST use conversation-mentioned competitors as competitor1/competitor2` : `Use suggested competitors`}
+- competitor1/competitor2 MUST be real product names, NOT generic terms
+- Training docs priority: use EXACT prices from docs, NEVER guess pricing
+- 5-6 features relevant to THIS customer. Show technical superiority
+- keyDifferentiators: unique capabilities competitors lack
+- technicalAdvantages: architecture/performance edges
 
-CRITICAL INSTRUCTIONS:
-0. TRAIN ME PRIORITY: If Train Me knowledge is provided above, use those SPECIFIC product features, differentiators, 
-   pricing, and competitive positioning. This is YOUR ACTUAL PRODUCT DATA - use it to create accurate comparisons.
-1. CONVERSATION CONTEXT: Address the SPECIFIC pain points and needs discussed in the conversation above.
-2. BE SPECIFIC: Use real features, capabilities, and benefits from Train Me data, not generic statements.
-1. COMPETITOR SELECTION (STRICTLY ENFORCED):
-   ${conversationCompetitors.length > 0 
-     ? `⭐ MANDATORY: Use competitors marked with ⭐ (mentioned by customer) as competitor1 and competitor2
-   - If 1 conversation competitor: Use it as competitor1, pick relevant suggested competitor for competitor2
-   - If 2+ conversation competitors: Use the 2 most discussed ones`
-     : `📋 Use the suggested competitors list since no competitors were mentioned in conversation`}
-   
-   IMPORTANT: competitor1 and competitor2 MUST be actual product/company names (e.g., "NinjaOne", "Gong"), NOT generic terms
-
-3. Create an accurate battle card that CLEARLY DEMONSTRATES TECHNICAL SUPERIORITY.
-   - Focus on 6-8 features that matter to THIS customer based on what they discussed
-   - Be specific and factual - use real product capabilities, performance metrics, and technical advantages
-   - HIGHLIGHT where ${competitorSet.yourProduct} is BETTER than competitors (faster, more reliable, easier, more comprehensive)
-
-4. CRITICAL: You MUST include the following sections to show clear competitive advantages:
-   
-   A. KEY DIFFERENTIATORS (3-5 items):
-      - Specific reasons why ${competitorSet.yourProduct} is SUPERIOR
-      - Focus on unique capabilities competitors DON'T have
-      - Use concrete examples: "10x faster deployment", "Zero-touch automation", "Built-in AI analytics"
-   
-   B. TECHNICAL ADVANTAGES (3-5 items):
-      - Specific technical capabilities that give ${competitorSet.yourProduct} an edge
-      - Architecture benefits, performance improvements, integration capabilities
-      - Example: "Cloud-native architecture vs legacy on-premise", "Real-time processing vs batch updates"
-   
-   C. WHY CHOOSE US:
-      - A compelling 2-3 sentence summary of why ${competitorSet.yourProduct} wins
-      - Reference the customer's pain points from the conversation
-
-5. IMPORTANT: In your JSON response:
-   - yourProduct: "${competitorSet.yourProduct}" (always use this exact name)
-   - competitor1: Use the MOST RELEVANT competitor (conversation-mentioned OR from suggested list)
-   - competitor2: Use the SECOND MOST RELEVANT competitor
-
-JSON FORMAT (STRICTLY FOLLOW THIS):
-{
-  "yourProduct": "${competitorSet.yourProduct}",
-  "competitor1": "Name of primary competitor",
-  "competitor2": "Name of secondary competitor",
-  "buyerContext": "Who is the ideal buyer and what situation are they in?",
-  "whenFitsWell": ["Situation where this product excels", "Another good-fit scenario"],
-  "whenMayNotFit": ["Situation where competitor might be better", "Honest limitation"],
-  "keyDifferentiators": [
-    "Unique capability #1 that competitors lack",
-    "Unique capability #2 with measurable benefit",
-    "Unique capability #3 that solves customer pain"
-  ],
-  "technicalAdvantages": [
-    "Technical edge #1 (e.g., architecture, performance)",
-    "Technical edge #2 (e.g., integration, scalability)",
-    "Technical edge #3 (e.g., automation, analytics)"
-  ],
-  "competitorStrengths": {
-    "competitor1": "Honest acknowledgment of competitor1 strengths",
-    "competitor2": "Honest acknowledgment of competitor2 strengths"
-  },
-  "whyChooseUs": "Compelling 2-3 sentence summary showing why ${competitorSet.yourProduct} is the clear winner based on customer needs",
-  "slides": [
-    {
-      "title": "Feature Comparison",
-      "comparison": [
-        {"feature": "Feature customer cares about", "yourProduct": "Your superior capability", "competitor1": "Their limited capability", "competitor2": "Their capability"},
-        {"feature": "Another feature", "yourProduct": true, "competitor1": false, "competitor2": "Limited"}
-      ]
-    }
-  ]
-}
-
-Generate a detailed, factual battle card that CLEARLY shows ${competitorSet.yourProduct}'s technical superiority and competitive advantages.`;
+JSON:{"yourProduct":"${competitorSet.yourProduct}","competitor1":"name","competitor2":"name","buyerContext":"who+situation","whenFitsWell":["scenario1","scenario2"],"whenMayNotFit":["limitation1"],"keyDifferentiators":["unique1","unique2","unique3"],"technicalAdvantages":["edge1","edge2","edge3"],"competitorStrengths":{"competitor1":"strengths","competitor2":"strengths"},"whyChooseUs":"2-3 sentence summary","slides":[{"title":"Features","comparison":[{"feature":"name","yourProduct":"superior","competitor1":"limited","competitor2":"basic"}]}]}`;
 
       let result;
       let retryCount = 0;
@@ -5128,7 +4744,7 @@ Generate a detailed, factual battle card that CLEARLY shows ${competitorSet.your
             ],
             response_format: { type: "json_object" },
             temperature: 0.2,
-            max_tokens: 1500,
+            max_tokens: 1000,
           });
 
           const content = response.choices?.[0]?.message?.content;
@@ -5166,14 +4782,14 @@ Generate a detailed, factual battle card that CLEARLY shows ${competitorSet.your
           }
           
           result = JSON.parse(sanitizedContent);
-          console.log(`Battle Card JSON parsed successfully on attempt ${retryCount + 1}`);
+          console.log(`✅ Battle Card JSON parsed successfully on attempt ${retryCount + 1}`);
           break; // Success - exit retry loop
           
         } catch (parseError: any) {
           console.error(`❌ Battle Card JSON parse failed (Attempt ${retryCount + 1}/${MAX_RETRIES + 1}): ${parseError.message}`);
           
           if (retryCount < MAX_RETRIES) {
-            console.log(`Retrying with simplified prompt...`);
+            console.log(`🔄 Retrying with simplified prompt...`);
             retryCount++;
             
             // Simplify prompt for retry - focus on core content
@@ -5271,7 +4887,7 @@ Generate a JSON response with this EXACT structure (keep it concise to avoid tru
       if (validationWarnings > 0) {
         console.warn(`⚠️  Battle Card validation: ${validationWarnings} section(s) used fallback content`);
       } else {
-        console.log(`Battle Card validation: All sections populated by AI`);
+        console.log(`✅ Battle Card validation: All sections populated by AI`);
       }
       
       // Inject intelligence metadata into result
@@ -5339,7 +4955,7 @@ Generate a JSON response with this EXACT structure (keep it concise to avoid tru
     
     // Handle authentication errors specifically
     if (statusCode === 401 || statusCode === 403 || error?.message?.includes('Invalid Authentication') || error?.message?.includes('Incorrect API key')) {
-      console.error("Authentication error detected - API key issue");
+      console.error("🔑 Authentication error detected - API key issue");
       throw new Error("AI API key authentication failed. Please check your AI engine settings and ensure your API key is valid.");
     }
     
@@ -5421,7 +5037,7 @@ export async function generateMultiProductPresentToWin(
     
     // If only 1 or no products detected, fall back to single-product mode
     if (allProducts.length <= 1) {
-      console.log(` Single product detected (${allProducts.length}), using standard generation`);
+      console.log(`📦 Single product detected (${allProducts.length}), using standard generation`);
       const content = await generatePresentToWin(type, conversationContext, domainExpertise, userId);
       return {
         ...content,
@@ -5429,7 +5045,7 @@ export async function generateMultiProductPresentToWin(
       };
     }
     
-    console.log(` ${allProducts.length} products detected: ${allProducts.map((p: any) => p.productName).join(', ')}`);
+    console.log(`📦 ${allProducts.length} products detected: ${allProducts.map((p: any) => p.productName).join(', ')}`);
     
     // Generate content for each detected product (in parallel for speed)
     const productContents = await Promise.all(
@@ -5474,7 +5090,7 @@ export async function generateMultiProductPresentToWin(
       })
     );
     
-    console.log(`Multi-product ${type} generation complete: ${productContents.length} products`);
+    console.log(`✅ Multi-product ${type} generation complete: ${productContents.length} products`);
     
     return {
       _multiProduct: true,
@@ -5579,8 +5195,7 @@ Keep each point to ONE line (max 15 words). Focus on the most important and acti
     }
     
     const cleanedContent = cleanJSONResponse(messageContent);
-    const fallback = { learnings: [], summary: [], points: [] };
-    const result: any = safeJSONParse(cleanedContent, fallback, 'generateDocumentSummary');
+    const result = JSON.parse(cleanedContent);
     
     // Handle different response formats
     if (Array.isArray(result)) {
