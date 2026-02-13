@@ -138,7 +138,7 @@ function cleanJSONResponse(content: string): string {
 
 // Cache for training document context to avoid repeated DB queries
 const trainingContextCache = new Map<string, { context: string, timestamp: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
+const CACHE_TTL = 30 * 1000; // 30 seconds cache (reduced from 5 minutes for faster knowledge updates)
 
 // Export function to invalidate training context cache when documents are updated/deleted
 // DOMAIN ISOLATION: Now clears all domain-specific cache entries for the user
@@ -3990,13 +3990,14 @@ JSON format:
     } else if (type === 'battle-card') {
       console.log(`🎯 Generating battle card for domain: ${domainExpertise}`);
       
-      // PRIORITY 1: Fetch Train Me documents (reduced for speed)
+      // OPTIMIZED: Reduced training context for faster generation (1000 chars instead of 2000)
       // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
-      const trainingContext = await getTrainingDocumentContext(userId, 2000, true, undefined, 3, domainExpertise);
+      const trainingContext = await getTrainingDocumentContext(userId, 1000, true, undefined, 2, domainExpertise);
       console.log(`📚 Battle Card - Training: ${trainingContext ? trainingContext.length : 0} chars`);
       
-      const fullContext = conversationContext.length > 1000
-        ? conversationContext.slice(-1000)
+      // OPTIMIZED: Use last 800 chars instead of 1000 for faster processing
+      const fullContext = conversationContext.length > 800
+        ? conversationContext.slice(-800)
         : conversationContext;
       
       const supplement = buildPromptSupplement(conversationContext, domainExpertise, 'battle_card');

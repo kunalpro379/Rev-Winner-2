@@ -6,7 +6,7 @@ import { verifyAccessToken } from "./utils/jwt";
 import { storage } from "./storage";
 import { authStorage } from "./storage-auth";
 import { generateSalesResponse, generateCallSummary, generateCoachingSuggestions } from "./services/openai";
-import { insertConversationSchema, insertMessageSchema, insertTeamsMeetingSchema, insertAudioSourceSchema, insertSessionUsageSchema, AUDIO_SOURCE_TYPES, subscriptions, pendingOrders, addonPurchases, sessionUsage, conversations } from "../shared/schema";
+import { insertConversationSchema, insertMessageSchema, insertTeamsMeetingSchema, insertAudioSourceSchema, insertSessionUsageSchema, AUDIO_SOURCE_TYPES, subscriptions, pendingOrders, addonPurchases, sessionUsage, conversations, userFeedback } from "../shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { setupAuth, isAuthenticated } from "./replitAuth";
@@ -3560,6 +3560,35 @@ Crawl-delay: 1`;
                 processingStatus: 'completed',
                 metadata: processedMetadata
               });
+              
+              // IMMEDIATE KNOWLEDGE EXTRACTION (synchronous for small files)
+              // This ensures knowledge is available immediately after upload
+              const fileSizeInMB = file.size / (1024 * 1024);
+              if (fileSizeInMB < 5) {
+                // Small files: Process synchronously for immediate availability
+                console.log(`📚 Processing knowledge synchronously for ${file.originalname} (${fileSizeInMB.toFixed(2)}MB)`);
+                try {
+                  const { processDocumentForKnowledge } = await import("./services/knowledgeExtraction");
+                  await processDocumentForKnowledge(doc, req.params.id, userId);
+                  console.log(`✅ Knowledge extraction completed for ${file.originalname}`);
+                } catch (knowledgeError: any) {
+                  console.error(`⚠️ Knowledge extraction failed for ${file.originalname}:`, knowledgeError.message);
+                  // Don't fail the upload if knowledge extraction fails
+                }
+              } else {
+                // Large files: Process asynchronously to avoid blocking
+                console.log(`📚 Queuing async knowledge extraction for ${file.originalname} (${fileSizeInMB.toFixed(2)}MB)`);
+                setImmediate(async () => {
+                  try {
+                    const { processDocumentForKnowledge } = await import("./services/knowledgeExtraction");
+                    await processDocumentForKnowledge(doc, req.params.id, userId);
+                    console.log(`✅ Async knowledge extraction completed for ${file.originalname}`);
+                  } catch (error: any) {
+                    console.error(`❌ Async knowledge extraction failed for ${file.originalname}:`, error.message);
+                  }
+                });
+              }
+              
               results.push(doc);
             } else {
               // Unsupported type - mark as failed instead of corrupting with UTF-8 decode
@@ -3583,32 +3612,18 @@ Crawl-delay: 1`;
           }
         }
 
-        // Invalidate training context cache for immediate effect
+        // Invalidate training context cache AFTER knowledge extraction
         const { invalidateTrainingContextCache } = await import("./services/openai");
         invalidateTrainingContextCache(userId);
+        console.log(`🔄 Training context cache invalidated for user ${userId}`);
 
-        // Trigger async knowledge extraction for uploaded documents
-        if (results.length > 0) {
-          setImmediate(async () => {
-            try {
-              const { processDocumentForKnowledge } = await import("./services/knowledgeExtraction");
-              for (const doc of results) {
-                await processDocumentForKnowledge(doc, req.params.id, userId);
-              }
-              console.log(`📚 Knowledge extraction completed for ${results.length} documents`);
-            } catch (error: any) {
-              console.error("Knowledge extraction error:", error.message);
-            }
-          });
-        }
-
-        res.status(201).json({ 
-          success: results.length > 0,
-          uploaded: results,
-          errors: errors,
-          message: errors.length > 0 
-            ? `${results.length} document(s) uploaded, ${errors.length} failed`
-            : `${results.length} document(s) uploaded successfully`
+        res.json({ 
+          success: true, 
+          documents: results, 
+          errors,
+          message: results.length > 0 
+            ? `${results.length} document(s) uploaded and ready to use` 
+            : 'Upload completed with errors'
         });
       });
     } catch (error: any) {
@@ -4010,15 +4025,17 @@ Crawl-delay: 1`;
       // Process in background
       setImmediate(async () => {
         try {
+          console.log(`🚀 Starting knowledge rebuild for domain ${req.params.id}, force=${forceFullRebuild}`);
           const { rebuildKnowledgeBase } = await import("./services/knowledgeExtraction");
           const result = await rebuildKnowledgeBase(req.params.id, userId, forceFullRebuild);
-          console.log(`📚 Knowledge base updated: ${result.newEntriesAdded} new entries created`);
+          console.log(`✅ Knowledge base updated: ${result.newEntriesAdded} new entries created, ${result.duplicatesSkipped} duplicates skipped`);
           
           // Invalidate cache
           const { invalidateTrainingContextCache } = await import("./services/openai");
           invalidateTrainingContextCache(userId);
         } catch (error: any) {
-          console.error("Knowledge base rebuild error:", error.message);
+          console.error("❌ Knowledge base rebuild error:", error.message);
+          console.error("Stack trace:", error.stack);
         }
       });
     } catch (error: any) {
@@ -4123,6 +4140,144 @@ Crawl-delay: 1`;
   registerBibleRoutes(app); // Rev Winner Bible PDF download
   app.use("/api/download", apiDocsRouter); // API Documentation PDF download
   app.use(recordingsRouter); // Call recordings and meeting minutes (7-day retention)
+
+  // ====== USER FEEDBACK ROUTES ======
+  const feedbackSubmitSchema = z.object({
+    category: z.enum(['bug_report', 'feature_request', 'improvement', 'general', 'performance', 'ui_ux']),
+    subject: z.string().min(1).max(255),
+    message: z.string().min(1),
+    priority: z.enum(['low', 'medium', 'high']).default('medium'),
+    page: z.string().max(255).optional(),
+    userPhone: z.string().max(20).optional(),
+    screenshotUrl: z.string().optional(),
+  });
+
+  // Submit feedback
+  app.post("/api/feedback", authenticateToken, async (req: any, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const validated = feedbackSubmitSchema.parse(req.body);
+      
+      const feedback = await db.insert(userFeedback).values({
+        userId,
+        category: validated.category,
+        subject: validated.subject,
+        message: validated.message,
+        priority: validated.priority,
+        page: validated.page,
+        userPhone: validated.userPhone,
+        screenshotUrl: validated.screenshotUrl,
+        status: 'open',
+      }).returning();
+
+      console.log(`📝 Feedback submitted by user ${userId}: ${validated.subject}`);
+      
+      res.json({ success: true, data: feedback[0] });
+    } catch (error: any) {
+      console.error("Submit feedback error:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid feedback data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to submit feedback" });
+    }
+  });
+
+  // Get user's feedback history
+  app.get("/api/feedback", authenticateToken, async (req: any, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const feedbackList = await db
+        .select()
+        .from(userFeedback)
+        .where(eq(userFeedback.userId, userId))
+        .orderBy(desc(userFeedback.createdAt));
+
+      res.json({ success: true, data: feedbackList });
+    } catch (error: any) {
+      console.error("Get feedback error:", error);
+      res.status(500).json({ error: "Failed to retrieve feedback" });
+    }
+  });
+
+  // Admin: Get all feedback (requires admin role)
+  app.get("/api/admin/feedback", authenticateToken, async (req: any, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // Check if user is admin
+      const user = await authStorage.getUserById(userId);
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { status, category } = req.query;
+      let query = db.select().from(userFeedback);
+
+      if (status) {
+        query = query.where(eq(userFeedback.status, status as string)) as any;
+      }
+      if (category) {
+        query = query.where(eq(userFeedback.category, category as string)) as any;
+      }
+
+      const feedbackList = await query.orderBy(desc(userFeedback.createdAt));
+
+      res.json({ success: true, data: feedbackList });
+    } catch (error: any) {
+      console.error("Admin get feedback error:", error);
+      res.status(500).json({ error: "Failed to retrieve feedback" });
+    }
+  });
+
+  // Admin: Update feedback status/notes
+  app.patch("/api/admin/feedback/:id", authenticateToken, async (req: any, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // Check if user is admin
+      const user = await authStorage.getUserById(userId);
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { status, adminNotes } = req.body;
+      const updates: any = { updatedAt: new Date() };
+      
+      if (status) updates.status = status;
+      if (adminNotes !== undefined) updates.adminNotes = adminNotes;
+
+      const updated = await db
+        .update(userFeedback)
+        .set(updates)
+        .where(eq(userFeedback.id, req.params.id))
+        .returning();
+
+      if (!updated.length) {
+        return res.status(404).json({ error: "Feedback not found" });
+      }
+
+      res.json({ success: true, data: updated[0] });
+    } catch (error: any) {
+      console.error("Admin update feedback error:", error);
+      res.status(500).json({ error: "Failed to update feedback" });
+    }
+  });
+
+  console.log("💬 Feedback routes registered");
 
   const httpServer = createServer(app);
   

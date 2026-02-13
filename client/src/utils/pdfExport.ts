@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import revWinnerLogoUrl from '@assets/rev-winner-logo.png';
 import pdfBannerUrl from '@assets/IMG_20251213_202308_1765637622298.jpg';
 
@@ -662,4 +663,507 @@ export async function exportQuickReferenceToPDF() {
   }
 
   doc.save('Rev_Winner_Quick_Reference.pdf');
+}
+
+
+// Helper function to capture DOM element as image
+async function captureElementAsImage(element: HTMLElement): Promise<ImageData | null> {
+  try {
+    // Temporarily remove any scrollbars and set fixed dimensions
+    const originalOverflow = element.style.overflow;
+    const originalHeight = element.style.height;
+    const originalMaxHeight = element.style.maxHeight;
+    
+    element.style.overflow = 'visible';
+    element.style.height = 'auto';
+    element.style.maxHeight = 'none';
+    
+    const canvas = await html2canvas(element, {
+      backgroundColor: '#ffffff',
+      scale: 2, // Higher quality
+      logging: false,
+      useCORS: true,
+      allowTaint: true,
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight
+    });
+    
+    // Restore original styles
+    element.style.overflow = originalOverflow;
+    element.style.height = originalHeight;
+    element.style.maxHeight = originalMaxHeight;
+    
+    return {
+      base64: canvas.toDataURL('image/png'),
+      width: canvas.width,
+      height: canvas.height,
+      aspectRatio: canvas.width / canvas.height
+    };
+  } catch (error) {
+    console.error('Failed to capture element as image:', error);
+    return null;
+  }
+}
+
+// Export Present to Win content with UI screenshots
+export async function exportPresentToWinToPDF(
+  contentType: 'pitch-deck' | 'case-study' | 'battle-card',
+  domainExpertise: string
+) {
+  // Find the Present to Win content container
+  const contentElement = document.querySelector('[data-testid^="slide-"]') as HTMLElement;
+  
+  if (!contentElement) {
+    throw new Error('Content not found. Please ensure the content is visible before exporting.');
+  }
+
+  // Load banner image
+  let bannerData: ImageData | undefined;
+  try {
+    bannerData = await loadImageAsBase64(pdfBannerUrl);
+  } catch (e) {
+    console.warn('Could not load banner image');
+  }
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 15;
+  const contentWidth = pageWidth - (margin * 2);
+
+  // Add header
+  let yPosition = addBannerHeader(doc, pageWidth, bannerData);
+
+  // Add title
+  const titles = {
+    'pitch-deck': 'Pitch Deck',
+    'case-study': 'Case Study',
+    'battle-card': 'Battle Card'
+  };
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.setTextColor(BRAND_COLORS.primary.r, BRAND_COLORS.primary.g, BRAND_COLORS.primary.b);
+  doc.text(`${domainExpertise} - ${titles[contentType]}`, margin, yPosition);
+  yPosition += 10;
+
+  // Capture the UI as image
+  const contentImage = await captureElementAsImage(contentElement);
+  
+  if (contentImage) {
+    // Calculate dimensions to fit page width
+    const imageWidth = contentWidth;
+    const imageHeight = imageWidth / contentImage.aspectRatio;
+    
+    // Available height on first page
+    const availableHeight = pageHeight - yPosition - 20; // Leave space for footer
+    
+    if (imageHeight <= availableHeight) {
+      // Image fits on one page
+      doc.addImage(
+        contentImage.base64,
+        'PNG',
+        margin,
+        yPosition,
+        imageWidth,
+        imageHeight,
+        undefined,
+        'FAST'
+      );
+    } else {
+      // Image needs multiple pages - split it
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = reject;
+        img.src = contentImage.base64;
+      });
+      
+      // Calculate how many pixels per mm
+      const pixelsPerMm = contentImage.width / imageWidth;
+      let remainingPixels = contentImage.height;
+      let sourceY = 0;
+      let currentPage = 1;
+      
+      while (remainingPixels > 0) {
+        const availableHeightMm = currentPage === 1 ? availableHeight : (pageHeight - 35); // Less space on first page
+        const heightPixels = Math.min(remainingPixels, availableHeightMm * pixelsPerMm);
+        const heightMm = heightPixels / pixelsPerMm;
+        
+        // Create a canvas slice
+        canvas.width = contentImage.width;
+        canvas.height = heightPixels;
+        
+        if (ctx) {
+          ctx.drawImage(img, 0, sourceY, contentImage.width, heightPixels, 0, 0, contentImage.width, heightPixels);
+          const sliceDataUrl = canvas.toDataURL('image/png');
+          
+          const yPos = currentPage === 1 ? yPosition : 25;
+          doc.addImage(sliceDataUrl, 'PNG', margin, yPos, imageWidth, heightMm, undefined, 'FAST');
+        }
+        
+        remainingPixels -= heightPixels;
+        sourceY += heightPixels;
+        
+        if (remainingPixels > 0) {
+          doc.addPage();
+          yPosition = addBannerHeader(doc, pageWidth, bannerData);
+          currentPage++;
+        }
+      }
+    }
+  } else {
+    // Fallback: show error message
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
+    doc.setTextColor(BRAND_COLORS.text.r, BRAND_COLORS.text.g, BRAND_COLORS.text.b);
+    doc.text('Failed to capture content. Please try again.', margin, yPosition);
+  }
+
+  // Update page numbers
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    addFooter(doc, pageWidth, pageHeight, i, totalPages);
+  }
+
+  // Save the PDF
+  const fileName = `${domainExpertise.replace(/[^a-z0-9]/gi, '_')}_${contentType.replace('-', '_')}.pdf`;
+  doc.save(fileName);
+}
+
+// Export Pitch Deck to PDF
+export async function exportPitchDeckToPDF(pitchData: any, domainExpertise: string) {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  
+  // Load logo
+  let logoData: ImageData | undefined;
+  try {
+    logoData = await loadImageAsBase64(revWinnerLogoUrl);
+  } catch (e) {
+    console.warn('Failed to load logo for pitch deck PDF');
+  }
+  
+  const slides = pitchData.slides || [];
+  
+  // Generate each slide as a page
+  slides.forEach((slide: any, index: number) => {
+    if (index > 0) {
+      doc.addPage();
+    }
+    
+    // Add header
+    addHeader(doc, pageWidth, `${domainExpertise} - Pitch Deck`, `Slide ${index + 1}: ${slide.title}`, logoData);
+    
+    let yPosition = 55;
+    
+    // Slide title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(BRAND_COLORS.primary.r, BRAND_COLORS.primary.g, BRAND_COLORS.primary.b);
+    doc.text(slide.title, 20, yPosition);
+    yPosition += 12;
+    
+    // Highlight (if present)
+    if (slide.highlight) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(BRAND_COLORS.secondary.r, BRAND_COLORS.secondary.g, BRAND_COLORS.secondary.b);
+      doc.text(`>> ${slide.highlight}`, 20, yPosition);
+      yPosition += 10;
+    }
+    
+    // Content points
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(BRAND_COLORS.text.r, BRAND_COLORS.text.g, BRAND_COLORS.text.b);
+    
+    if (slide.content && Array.isArray(slide.content)) {
+      slide.content.forEach((point: string) => {
+        const lines = doc.splitTextToSize(`• ${point}`, pageWidth - 40);
+        lines.forEach((line: string) => {
+          if (yPosition > pageHeight - 30) {
+            doc.addPage();
+            addHeader(doc, pageWidth, `${domainExpertise} - Pitch Deck`, `Slide ${index + 1}: ${slide.title} (continued)`, logoData);
+            yPosition = 55;
+          }
+          doc.text(line, 25, yPosition);
+          yPosition += 7;
+        });
+        yPosition += 3;
+      });
+    }
+    
+    // Add footer
+    addFooter(doc, pageWidth, pageHeight, index + 1, slides.length);
+  });
+  
+  // Save the PDF
+  const fileName = `${domainExpertise.replace(/[^a-z0-9]/gi, '_')}_Pitch_Deck.pdf`;
+  doc.save(fileName);
+}
+
+// Export Battle Card to PDF
+export async function exportBattleCardToPDF(battleData: any, domainExpertise: string) {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  
+  // Load logo
+  let logoData: ImageData | undefined;
+  try {
+    logoData = await loadImageAsBase64(revWinnerLogoUrl);
+  } catch (e) {
+    console.warn('Failed to load logo for battle card PDF');
+  }
+  
+  // Add header
+  addHeader(doc, pageWidth, `${domainExpertise} - Battle Card`, 'Competitive Analysis', logoData);
+  
+  let yPosition = 55;
+  
+  // Your Product vs Competitors
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.setTextColor(BRAND_COLORS.primary.r, BRAND_COLORS.primary.g, BRAND_COLORS.primary.b);
+  doc.text(`${battleData.yourProduct} vs Competition`, 20, yPosition);
+  yPosition += 10;
+  
+  // Technical Advantages
+  if (battleData.technicalAdvantages && battleData.technicalAdvantages.length > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(BRAND_COLORS.secondary.r, BRAND_COLORS.secondary.g, BRAND_COLORS.secondary.b);
+    doc.text('>> Technical Edge', 20, yPosition);
+    yPosition += 8;
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(BRAND_COLORS.text.r, BRAND_COLORS.text.g, BRAND_COLORS.text.b);
+    
+    battleData.technicalAdvantages.forEach((adv: string) => {
+      const lines = doc.splitTextToSize(`+ ${adv}`, pageWidth - 40);
+      lines.forEach((line: string) => {
+        doc.text(line, 25, yPosition);
+        yPosition += 6;
+      });
+    });
+    yPosition += 5;
+  }
+  
+  // Feature Comparison Table
+  if (battleData.slides && battleData.slides.length > 0 && battleData.slides[0].comparison) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(BRAND_COLORS.primary.r, BRAND_COLORS.primary.g, BRAND_COLORS.primary.b);
+    doc.text('Feature Comparison', 20, yPosition);
+    yPosition += 8;
+    
+    // Table headers
+    const colWidth = (pageWidth - 40) / 3;
+    doc.setFillColor(BRAND_COLORS.primary.r, BRAND_COLORS.primary.g, BRAND_COLORS.primary.b);
+    doc.rect(20, yPosition - 5, pageWidth - 40, 8, 'F');
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
+    doc.text('Feature', 22, yPosition);
+    doc.text(battleData.yourProduct, 22 + colWidth, yPosition);
+    doc.text(battleData.competitor1 || 'Competitor', 22 + colWidth * 2, yPosition);
+    yPosition += 10;
+    
+    // Table rows
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(BRAND_COLORS.text.r, BRAND_COLORS.text.g, BRAND_COLORS.text.b);
+    
+    battleData.slides[0].comparison.forEach((row: any, index: number) => {
+      if (yPosition > pageHeight - 30) {
+        doc.addPage();
+        addHeader(doc, pageWidth, `${domainExpertise} - Battle Card`, 'Competitive Analysis (continued)', logoData);
+        yPosition = 55;
+      }
+      
+      // Alternating row colors
+      if (index % 2 === 0) {
+        doc.setFillColor(245, 245, 245);
+        doc.rect(20, yPosition - 5, pageWidth - 40, 8, 'F');
+      }
+      
+      doc.text(row.feature, 22, yPosition);
+      doc.text(String(row.yourProduct === true ? 'YES' : row.yourProduct === false ? 'NO' : row.yourProduct), 22 + colWidth, yPosition);
+      doc.text(String(row.competitor1 === true ? 'YES' : row.competitor1 === false ? 'NO' : row.competitor1 || '-'), 22 + colWidth * 2, yPosition);
+      yPosition += 8;
+    });
+    yPosition += 5;
+  }
+  
+  // Why Choose Us
+  if (battleData.whyChooseUs) {
+    if (yPosition > pageHeight - 40) {
+      doc.addPage();
+      addHeader(doc, pageWidth, `${domainExpertise} - Battle Card`, 'Competitive Analysis (continued)', logoData);
+      yPosition = 55;
+    }
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(BRAND_COLORS.secondary.r, BRAND_COLORS.secondary.g, BRAND_COLORS.secondary.b);
+    doc.text('Why Choose Us', 20, yPosition);
+    yPosition += 8;
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(BRAND_COLORS.text.r, BRAND_COLORS.text.g, BRAND_COLORS.text.b);
+    const lines = doc.splitTextToSize(battleData.whyChooseUs, pageWidth - 40);
+    lines.forEach((line: string) => {
+      doc.text(line, 20, yPosition);
+      yPosition += 6;
+    });
+  }
+  
+  // Add footer
+  addFooter(doc, pageWidth, pageHeight, 1, 1);
+  
+  // Save the PDF
+  const fileName = `${domainExpertise.replace(/[^a-z0-9]/gi, '_')}_Battle_Card.pdf`;
+  doc.save(fileName);
+}
+
+// Export Case Study to PDF
+export async function exportCaseStudyToPDF(caseData: any, domainExpertise: string) {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  
+  // Load logo
+  let logoData: ImageData | undefined;
+  try {
+    logoData = await loadImageAsBase64(revWinnerLogoUrl);
+  } catch (e) {
+    console.warn('Failed to load logo for case study PDF');
+  }
+  
+  // Add header
+  addHeader(doc, pageWidth, `${domainExpertise} - Case Study`, caseData.title || 'Customer Success Story', logoData);
+  
+  let yPosition = 55;
+  
+  // Title
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.setTextColor(BRAND_COLORS.primary.r, BRAND_COLORS.primary.g, BRAND_COLORS.primary.b);
+  const titleLines = doc.splitTextToSize(caseData.title, pageWidth - 40);
+  titleLines.forEach((line: string) => {
+    doc.text(line, 20, yPosition);
+    yPosition += 8;
+  });
+  yPosition += 5;
+  
+  // Customer & Industry
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(BRAND_COLORS.secondary.r, BRAND_COLORS.secondary.g, BRAND_COLORS.secondary.b);
+  doc.text(`Customer: ${caseData.customer}`, 20, yPosition);
+  yPosition += 6;
+  doc.text(`Industry: ${caseData.industry}`, 20, yPosition);
+  yPosition += 10;
+  
+  // Challenge
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(BRAND_COLORS.primary.r, BRAND_COLORS.primary.g, BRAND_COLORS.primary.b);
+  doc.text('The Challenge', 20, yPosition);
+  yPosition += 8;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(BRAND_COLORS.text.r, BRAND_COLORS.text.g, BRAND_COLORS.text.b);
+  const challengeLines = doc.splitTextToSize(caseData.challenge, pageWidth - 40);
+  challengeLines.forEach((line: string) => {
+    if (yPosition > pageHeight - 30) {
+      doc.addPage();
+      addHeader(doc, pageWidth, `${domainExpertise} - Case Study`, 'Customer Success Story (continued)', logoData);
+      yPosition = 55;
+    }
+    doc.text(line, 20, yPosition);
+    yPosition += 6;
+  });
+  yPosition += 8;
+  
+  // Solution
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.setTextColor(BRAND_COLORS.primary.r, BRAND_COLORS.primary.g, BRAND_COLORS.primary.b);
+  doc.text('The Solution', 20, yPosition);
+  yPosition += 8;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(BRAND_COLORS.text.r, BRAND_COLORS.text.g, BRAND_COLORS.text.b);
+  const solutionLines = doc.splitTextToSize(caseData.solution, pageWidth - 40);
+  solutionLines.forEach((line: string) => {
+    if (yPosition > pageHeight - 30) {
+      doc.addPage();
+      addHeader(doc, pageWidth, `${domainExpertise} - Case Study`, 'Customer Success Story (continued)', logoData);
+      yPosition = 55;
+    }
+    doc.text(line, 20, yPosition);
+    yPosition += 6;
+  });
+  yPosition += 8;
+  
+  // Outcomes
+  if (caseData.outcomes && caseData.outcomes.length > 0) {
+    if (yPosition > pageHeight - 50) {
+      doc.addPage();
+      addHeader(doc, pageWidth, `${domainExpertise} - Case Study`, 'Customer Success Story (continued)', logoData);
+      yPosition = 55;
+    }
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(BRAND_COLORS.primary.r, BRAND_COLORS.primary.g, BRAND_COLORS.primary.b);
+    doc.text('Results Achieved', 20, yPosition);
+    yPosition += 8;
+    
+    caseData.outcomes.forEach((outcome: any) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(BRAND_COLORS.secondary.r, BRAND_COLORS.secondary.g, BRAND_COLORS.secondary.b);
+      doc.text(`${outcome.value}`, 25, yPosition);
+      yPosition += 6;
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(BRAND_COLORS.text.r, BRAND_COLORS.text.g, BRAND_COLORS.text.b);
+      doc.text(outcome.metric, 25, yPosition);
+      yPosition += 8;
+    });
+  }
+  
+  // Verification label
+  if (caseData.verificationLabel) {
+    yPosition += 5;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.setTextColor(BRAND_COLORS.lightText.r, BRAND_COLORS.lightText.g, BRAND_COLORS.lightText.b);
+    doc.text(caseData.verificationLabel, 20, yPosition);
+  }
+  
+  // Add footer
+  addFooter(doc, pageWidth, pageHeight, 1, 1);
+  
+  // Save the PDF
+  const fileName = `${domainExpertise.replace(/[^a-z0-9]/gi, '_')}_Case_Study.pdf`;
+  doc.save(fileName);
 }

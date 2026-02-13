@@ -596,13 +596,42 @@ export function setupBillingRoutes(app: Router) {
 
       // Validate category if provided
       if (category && promoCode.category && promoCode.category !== category) {
-        return res.status(400).json({
-          message: `This promo code is only valid for ${promoCode.category} purchases, not ${category}.`,
-          valid: false,
-          invalidCategory: true,
-          expectedCategory: promoCode.category,
-          providedCategory: category
-        });
+        // Use category mapping to handle aliases (e.g., 'service' -> 'train_me')
+        const categoryMap: Record<string, string> = {
+          'platform_access': 'platform_subscription',
+          'platform_subscription': 'platform_subscription',
+          'session_minutes': 'session_minutes',
+          'usage_bundle': 'session_minutes',
+          'train_me': 'train_me',
+          'dai': 'dai',
+          'service': 'train_me', // Map 'service' to 'train_me' for Train Me purchases
+        };
+        
+        const mappedPromoCategory = categoryMap[promoCode.category] || promoCode.category;
+        const mappedItemCategory = categoryMap[category] || category;
+        
+        // Check if categories match after mapping
+        if (mappedPromoCategory !== mappedItemCategory) {
+          // Provide user-friendly category names
+          const categoryNames: Record<string, string> = {
+            'train_me': 'Train Me',
+            'dai': 'Domain AI Intelligence',
+            'service': 'Train Me',
+            'session_minutes': 'Session Minutes',
+            'platform_subscription': 'Platform Access',
+          };
+          
+          const friendlyPromoCategory = categoryNames[promoCode.category] || promoCode.category;
+          const friendlyItemCategory = categoryNames[category] || category;
+          
+          return res.status(400).json({
+            message: `This promo code is only valid for ${friendlyPromoCategory} purchases, not ${friendlyItemCategory}.`,
+            valid: false,
+            invalidCategory: true,
+            expectedCategory: promoCode.category,
+            providedCategory: category
+          });
+        }
       }
 
       const discountMessage = promoCode.discountType === 'percentage'
@@ -2868,6 +2897,7 @@ export function setupBillingRoutes(app: Router) {
       try {
         const gatewayProvider = await billingStorage.getGatewayProviderByName(pendingOrder.gatewayProvider);
         if (gatewayProvider) {
+          const orderMetadata = pendingOrder.metadata as any || {};
           const gatewayTx = await billingStorage.createGatewayTransaction({
             providerId: gatewayProvider.id,
             providerTransactionId: verifiedPaymentId,
@@ -2879,7 +2909,7 @@ export function setupBillingRoutes(app: Router) {
             relatedEntity: 'cart_checkout',
             payload: {
               orderId,
-              cartItems: metadata?.items || [],
+              cartItems: orderMetadata.items || [],
               gatewayProvider: pendingOrder.gatewayProvider,
             },
             metadata: { 

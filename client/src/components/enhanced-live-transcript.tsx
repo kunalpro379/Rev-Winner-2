@@ -44,8 +44,8 @@ interface EnhancedLiveTranscriptProps {
   onTranscribingChange?: (isTranscribing: boolean) => void;
   onNewSession?: () => void;
   resetVersion?: number;
-    sessionId?: number;
-    onStop?: () => Promise<void>;
+  sessionId?: string | null;
+  onStop?: () => Promise<void>;
 }
 
 const SPEAKER_COLORS = [

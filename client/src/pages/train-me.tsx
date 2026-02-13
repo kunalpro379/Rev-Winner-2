@@ -188,8 +188,17 @@ export default function TrainMe() {
         // All files uploaded successfully
         toast({ 
           title: "Files uploaded", 
-          description: `${uploaded.length} file(s) uploaded successfully. Processing...` 
+          description: `${uploaded.length} file(s) uploaded. Extracting knowledge...` 
         });
+        
+        // Auto-refresh knowledge base after 3 seconds to show extracted data
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/domain-expertise', variables.domainId, 'knowledge'] });
+          toast({
+            title: "Knowledge extracted",
+            description: "Your documents have been processed and added to the knowledge base.",
+          });
+        }, 3000);
       } else if (uploaded.length > 0 && errors.length > 0) {
         // Partial success
         toast({ 
@@ -671,6 +680,12 @@ function DomainCard({
       if (!res.ok) throw new Error('Failed to fetch documents');
       return res.json();
     },
+    // Poll every 3 seconds if any document is processing
+    refetchInterval: (data) => {
+      if (!data || !Array.isArray(data)) return false;
+      const hasProcessing = data.some(d => d.processingStatus === 'processing');
+      return hasProcessing ? 3000 : false;
+    }
   });
 
   const { data: knowledgeEntries, isLoading: knowledgeLoading } = useQuery<KnowledgeEntry[]>({
@@ -685,6 +700,8 @@ function DomainCard({
       if (!res.ok) throw new Error('Failed to fetch knowledge entries');
       return res.json();
     },
+    // Poll every 5 seconds if rebuilding knowledge
+    refetchInterval: isRebuilding ? 5000 : false
   });
 
   const handleRebuildKnowledge = async (forceFullRebuild: boolean = false) => {

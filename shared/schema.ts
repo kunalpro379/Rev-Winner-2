@@ -2938,3 +2938,23 @@ export const insertTermsAndConditionsSchema = createInsertSchema(termsAndConditi
   createdAt: true,
   updatedAt: true,
 });
+
+// User Feedback System
+export const userFeedback = pgTable("user_feedback", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => authUsers.id, { onDelete: "cascade" }),
+  category: text("category").notNull(), // bug_report, feature_request, improvement, general, performance, ui_ux
+  subject: varchar("subject", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  priority: text("priority").notNull().default("medium"), // low, medium, high
+  status: text("status").notNull().default("open"), // open, in_progress, resolved, closed
+  page: varchar("page", { length: 255 }),
+  userPhone: varchar("user_phone", { length: 20 }),
+  screenshotUrl: text("screenshot_url"),
+  adminNotes: text("admin_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type UserFeedback = typeof userFeedback.$inferSelect;
+export type InsertUserFeedback = typeof userFeedback.$inferInsert;

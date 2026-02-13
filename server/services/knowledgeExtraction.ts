@@ -56,78 +56,60 @@ const anthropic = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   : null;
 
-const COMPREHENSIVE_EXTRACTION_PROMPT = `You are a comprehensive knowledge extraction AI for Rev Winner, a sales intelligence platform.
+const COMPREHENSIVE_EXTRACTION_PROMPT = `You are a world-class knowledge extraction AI for a sales intelligence platform. Your extraction directly powers real-time AI responses during live sales calls. EVERY missed detail = a failed sales conversation.
 
-Your goal is to THOROUGHLY analyze the document and extract ALL valuable information into a structured knowledge base that will be used to generate accurate, detailed responses during live sales conversations.
+MISSION: Extract ALL knowledge from this document into structured entries. Be exhaustive. This is the ONLY data source the AI will use.
 
-IMPORTANT: Extract as much detail as possible. This knowledge base is the ONLY source the AI will use to answer questions. Missing information means the AI cannot help sales reps.
-
-For EACH distinct piece of knowledge, create an entry with:
+For EACH entry, provide:
 - category: One of: product, pricing, process, faq, case_study, competitor, pain_point, objection, feature, integration
-- title: A clear, descriptive title (max 150 chars)
-- content: COMPREHENSIVE content (5-15 sentences with full details, not summaries)
-- details: Structured JSON with ALL specific data points (every number, metric, feature, step, comparison)
-- keywords: 8-15 relevant keywords for matching (include synonyms, related terms)
-- confidence: Your confidence in this extraction (0-100)
+- title: Clear, descriptive title (max 150 chars). For pricing: "{Product/Tier} - Pricing Details"
+- content: COMPREHENSIVE content (5-15 sentences with FULL details, exact numbers, specific names)
+- details: Structured JSON object with ALL data points. REQUIRED fields by category:
+  * pricing: {productName, tierName, price, currency, billingCycle, seatsIncluded, featuresIncluded:[], addOns:[], discounts:[], effectiveDate, comparedTo}
+  * product/feature: {productName, featureName, howItWorks, benefits:[], useCases:[], limitations:[], integrations:[], technicalSpecs}
+  * case_study: {companyName, industry, companySize, challenge, solution, results:{}, timeline, roi, testimonialQuote}
+  * competitor: {competitorName, comparedProduct, strengthsUs:[], strengthsThem:[], pricingComparison, migrationPath}
+  * process: {processName, steps:[], prerequisites:[], timeline, decisionCriteria:[], dependencies:[]}
+  * pain_point: {painDescription, affectedRole, impact, solution, quantifiedBenefit, beforeAfter}
+  * objection: {objection, response, evidence:[], proofPoints:[]}
+- keywords: 10-20 relevant keywords (include synonyms, abbreviations, related terms, industry jargon)
+- confidence: 0-100
 
-EXTRACTION RULES - EXTRACT EVERYTHING:
+DEEP EXTRACTION RULES:
 
- PRODUCTS & FEATURES:
-- Every feature with full description, not just names
-- How each feature works technically
-- Benefits and use cases for each feature
-- Supported integrations and compatibility
-- Limitations and requirements
-- Screenshots/UI descriptions if mentioned
+📦 PRODUCTS & FEATURES: Every feature with full description, technical details, benefits, use cases, integrations, limitations, supported platforms.
 
- PRICING:
-- ALL pricing tiers with exact amounts
-- What's included in each tier
-- Add-ons and their costs
-- Discounts, promotions, volume pricing
-- Payment terms and billing cycles
-- Free trial details
+💰 PRICING (CRITICAL - EXTRACT EVERY PRICE POINT):
+- ALL tiers with EXACT amounts and currencies
+- What's included vs excluded in each tier
+- Per-user/per-seat pricing details
+- Add-ons and their individual costs
+- Discounts (volume, annual, promotional)
+- Payment terms, billing cycles, contract lengths
+- Free trial details and limitations
+- Enterprise/custom pricing indicators
+- Create SEPARATE entries for EACH pricing tier
 
- CASE STUDIES & RESULTS:
-- Company names and industries
-- Specific metrics and improvements (exact numbers)
-- Timeline of implementation
-- Challenges faced and solutions
-- Quotes and testimonials
-- ROI calculations
+📊 CASE STUDIES: Company names, industries, sizes, specific metrics (exact numbers), timelines, ROI, quotes.
 
-🏆 COMPETITIVE INTELLIGENCE:
-- Feature-by-feature comparisons
-- Pricing comparisons
-- Strengths and weaknesses
-- Migration/switching considerations
-- Win/loss reasons
+📈 GRAPHS/CHARTS/STATISTICS: If the document references or contains data from charts, graphs, infographics, or statistics tables - extract ALL data points, trends, percentages, comparisons, and their context.
 
-🎯 PAIN POINTS & SOLUTIONS:
-- Customer problems in detail
-- How the product solves each problem
-- Before/after scenarios
-- Quantified benefits
+🏆 COMPETITIVE: Feature-by-feature comparisons, pricing diffs, strengths/weaknesses, migration paths, win/loss reasons.
 
-💬 OBJECTIONS & RESPONSES:
-- Common customer concerns
-- Detailed counter-arguments
-- Supporting evidence and proof points
+🎯 PAIN POINTS: Customer problems, solutions, before/after, quantified benefits.
 
-📋 PROCESSES:
-- Step-by-step workflows (every step)
-- Decision criteria at each stage
-- Timeline expectations
-- Dependencies and prerequisites
+💬 OBJECTIONS: Concerns, counter-arguments, evidence, proof points.
 
-DO NOT:
-- Skip any factual information
-- Summarize when detail exists
-- Omit numbers, metrics, or specifics
-- Combine unrelated topics
-- Use vague language when specifics exist
+📋 PROCESSES: Step-by-step workflows, decision criteria, timelines, dependencies.
 
-Create as many entries as needed to capture ALL information. If a topic is complex, create multiple entries covering different aspects.
+🔗 INTEGRATIONS: Supported platforms, API details, setup steps, limitations.
+
+RULES:
+- Create SEPARATE entries for each distinct topic (don't combine pricing + features)
+- NEVER summarize - preserve ALL specifics (numbers, names, dates, percentages)
+- Extract data from reconstructed tables, charts, and visual content markers
+- If document contains "[DEEP ANALYSIS]" or "[TABLE STRUCTURE]" sections, extract those structured insights as separate entries
+- Create multiple entries per complex topic
 
 Return JSON format: {"entries": [...]}
 
@@ -136,11 +118,14 @@ DOCUMENT TO ANALYZE:
 
 const CHUNK_EXTRACTION_PROMPT = `Continue extracting knowledge from this document chunk. This is part of a larger document.
 
-IMPORTANT: 
-- Extract ALL new information not seen before
-- Be comprehensive - capture every detail
-- Create detailed entries (5-15 sentences each)
-- Don't skip anything that could be useful for sales conversations
+CRITICAL RULES:
+- Extract ALL new information not covered in previous chunks
+- Be EXHAUSTIVE - every number, price, feature, metric, name, and data point matters
+- Create detailed entries (5-15 sentences each) with structured "details" JSON
+- For pricing data: create SEPARATE entries per product/tier with {productName, tierName, price, currency, billingCycle, featuresIncluded}
+- For tables/charts: extract ALL rows and data points, don't summarize
+- For processes/workflows: capture every step with prerequisites and outcomes
+- Include 10-20 keywords per entry including synonyms and industry terms
 
 Return JSON format: {"entries": [...]}
 
@@ -222,7 +207,7 @@ async function extractFromChunkWithClaude(
     ? COMPREHENSIVE_EXTRACTION_PROMPT + chunk
     : CHUNK_EXTRACTION_PROMPT + chunk;
   
-  console.log(`[Claude] Chunk ${chunkIndex + 1}/${totalChunks}: Sending to Claude (${chunk.length} chars)...`);
+  console.log(`🔄 [Claude] Chunk ${chunkIndex + 1}/${totalChunks}: Sending to Claude (${chunk.length} chars)...`);
   
   try {
     const response = await anthropic.messages.create({
@@ -231,10 +216,11 @@ async function extractFromChunkWithClaude(
       messages: [
         { 
           role: 'user', 
-          content: `You are a comprehensive knowledge extraction AI. Extract MAXIMUM detail from documents.
+          content: `You are a world-class knowledge extraction AI for a sales intelligence platform.
 Always respond with valid JSON only: {"entries": [...]}
-Each entry must have: category, title (descriptive), content (5-15 detailed sentences), details (all data points), keywords (8-15), confidence.
-Create multiple entries to cover all information. Do not summarize - preserve all details.
+Each entry must have: category, title (descriptive), content (5-15 detailed sentences with ALL specifics), details (structured JSON with ALL data points - for pricing include productName/tierName/price/currency/billingCycle), keywords (10-20 including synonyms), confidence (0-100).
+Create SEPARATE entries for each topic. For pricing: one entry per tier. Extract data from tables, charts, statistics.
+NEVER summarize - preserve every number, name, metric, and data point.
 
 ${prompt}`
         }
@@ -242,10 +228,10 @@ ${prompt}`
     });
     
     const responseText = response.content[0].type === 'text' ? response.content[0].text : '[]';
-    console.log(`[Claude] Chunk ${chunkIndex + 1}/${totalChunks}: Received ${responseText.length} chars`);
+    console.log(`✅ [Claude] Chunk ${chunkIndex + 1}/${totalChunks}: Received ${responseText.length} chars`);
     
     const entries = parseAIResponse(responseText);
-    console.log(` [Claude] Chunk ${chunkIndex + 1}/${totalChunks}: Extracted ${entries.length} entries`);
+    console.log(`📊 [Claude] Chunk ${chunkIndex + 1}/${totalChunks}: Extracted ${entries.length} entries`);
     
     return entries;
   } catch (error: any) {
@@ -266,7 +252,7 @@ async function extractFromChunk(
       ? COMPREHENSIVE_EXTRACTION_PROMPT + chunk
       : CHUNK_EXTRACTION_PROMPT + chunk;
     
-    console.log(`Chunk ${chunkIndex + 1}/${totalChunks}: Sending to DeepSeek (${chunk.length} chars)...`);
+    console.log(`🔄 Chunk ${chunkIndex + 1}/${totalChunks}: Sending to DeepSeek (${chunk.length} chars)...`);
     
     try {
       const response = await deepseek.chat.completions.create({
@@ -274,10 +260,11 @@ async function extractFromChunk(
         messages: [
           { 
             role: 'system', 
-            content: `You are a comprehensive knowledge extraction AI. Extract MAXIMUM detail from documents.
+            content: `You are a world-class knowledge extraction AI for a sales intelligence platform.
 Always respond with valid JSON: {"entries": [...]}
-Each entry must have: category, title (descriptive), content (5-15 detailed sentences), details (all data points), keywords (8-15), confidence.
-Create multiple entries to cover all information. Do not summarize - preserve all details.`
+Each entry must have: category, title (descriptive), content (5-15 detailed sentences with ALL specifics), details (structured JSON with ALL data points - for pricing include productName/tierName/price/currency/billingCycle), keywords (10-20 including synonyms), confidence (0-100).
+Create SEPARATE entries for each topic. For pricing: one entry per tier. Extract data from tables, charts, statistics.
+NEVER summarize - preserve every number, name, metric, and data point.`
           },
           { role: 'user', content: prompt }
         ],
@@ -286,10 +273,10 @@ Create multiple entries to cover all information. Do not summarize - preserve al
       });
       
       const responseText = response.choices[0]?.message?.content || '[]';
-      console.log(`Chunk ${chunkIndex + 1}/${totalChunks}: Received ${responseText.length} chars from DeepSeek`);
+      console.log(`✅ Chunk ${chunkIndex + 1}/${totalChunks}: Received ${responseText.length} chars from DeepSeek`);
       
       const entries = parseAIResponse(responseText);
-      console.log(` Chunk ${chunkIndex + 1}/${totalChunks}: Extracted ${entries.length} entries`);
+      console.log(`📊 Chunk ${chunkIndex + 1}/${totalChunks}: Extracted ${entries.length} entries`);
       
       if (entries.length > 0) {
         return entries;
@@ -299,7 +286,7 @@ Create multiple entries to cover all information. Do not summarize - preserve al
       console.log(`⚠️ DeepSeek returned no entries, trying Claude...`);
     } catch (error: any) {
       console.error(`❌ DeepSeek failed for chunk ${chunkIndex + 1}: ${error.message}`);
-      console.log(`Falling back to Claude...`);
+      console.log(`🔄 Falling back to Claude...`);
     }
   }
   
@@ -322,7 +309,7 @@ export async function extractKnowledgeFromDocument(
   }
 
   const content = document.content.trim();
-  console.log(`Processing document: ${document.fileName} (${content.length} chars)`);
+  console.log(`📚 Processing document: ${document.fileName} (${content.length} chars)`);
 
   try {
     const chunks = splitIntoChunks(content, CHUNK_SIZE);
@@ -341,7 +328,7 @@ export async function extractKnowledgeFromDocument(
       }
     }
 
-    console.log(` Total raw entries extracted: ${allParsedEntries.length}`);
+    console.log(`📊 Total raw entries extracted: ${allParsedEntries.length}`);
 
     const validEntries: ExtractedKnowledge[] = [];
     const seenTitles = new Set<string>(); // Avoid duplicate titles within same document
@@ -354,8 +341,7 @@ export async function extractKnowledgeFromDocument(
         entry.category = 'product';
       }
 
-      // Skip very short content (not comprehensive)
-      if (entry.content.length < 100) continue;
+      if (entry.content.length < 50) continue;
 
       const titleNormalized = entry.title.toLowerCase().trim();
       const contentHash = generateContentHash(entry.title + entry.content);
@@ -378,13 +364,87 @@ export async function extractKnowledgeFromDocument(
       seenTitles.add(titleNormalized);
     }
 
-    console.log(`Extracted ${validEntries.length} comprehensive knowledge entries from ${document.fileName}`);
+    console.log(`✅ Extracted ${validEntries.length} comprehensive knowledge entries from ${document.fileName}`);
     return validEntries;
 
   } catch (error: any) {
     console.error(`❌ Knowledge extraction failed for ${document.fileName}:`, error.message);
     return [];
   }
+}
+
+function isPricingDocument(document: TrainingDocument): boolean {
+  const fileNameLower = (document.fileName || '').toLowerCase();
+  const pricingFilePatterns = /pric(e|ing|es|elist)|rate\s*card|rate\s*sheet|tariff|cost\s*sheet|plan|subscription|billing|quote|proposal/i;
+  if (pricingFilePatterns.test(fileNameLower)) return true;
+
+  const content = (document.content || '').toLowerCase();
+  const pricingKeywords = ['pricing', 'price', 'cost', 'rate card', 'per user', 'per seat', 'per month',
+    'annual', 'monthly', 'subscription', 'tier', 'plan', 'enterprise', 'professional', 'starter',
+    'basic plan', 'premium', 'free trial', 'billing', 'discount', 'volume pricing', 'add-on', 'mrp',
+    '$/user', '₹', 'usd', 'inr', 'eur'];
+  
+  const matchCount = pricingKeywords.filter(kw => content.includes(kw)).length;
+  return matchCount >= 4;
+}
+
+function extractProductIdentifier(entry: ExtractedKnowledge): string | null {
+  const details = entry.details || {};
+  const productName = details.productName || details.product_name || details.product || details.tierName || details.tier || details.planName || details.plan;
+  if (productName) return String(productName).toLowerCase().trim();
+
+  const titleMatch = entry.title.match(/^(.+?)[\s\-–:]+(?:pricing|price|cost|plan|tier|rate)/i);
+  if (titleMatch) return titleMatch[1].toLowerCase().trim();
+
+  return entry.title.toLowerCase().trim();
+}
+
+async function supersedePricingEntries(
+  storage: any,
+  existingEntries: KnowledgeEntry[],
+  newPricingEntries: ExtractedKnowledge[],
+  userId: string
+): Promise<{ superseded: number }> {
+  let superseded = 0;
+  const existingPricingEntries = existingEntries.filter(e => e.category === 'pricing');
+
+  if (existingPricingEntries.length === 0) return { superseded: 0 };
+
+  const newProductIds = new Set(
+    newPricingEntries.map(e => extractProductIdentifier(e)).filter(Boolean) as string[]
+  );
+
+  for (const existing of existingPricingEntries) {
+    const existingProductId = extractProductIdentifier({
+      category: existing.category as KnowledgeCategory,
+      title: existing.title,
+      content: existing.content,
+      details: (existing.details || {}) as Record<string, any>,
+      keywords: existing.keywords || [],
+      confidence: existing.confidence || 80
+    });
+
+    if (!existingProductId) continue;
+
+    const hasExactProductMatch = newProductIds.has(existingProductId);
+    const hasTitleMatch = newPricingEntries.some(newEntry => {
+      const similarity = calculateSimilarity(existing.title, newEntry.title);
+      return similarity > 0.7;
+    });
+    const shouldSupersede = hasExactProductMatch || hasTitleMatch;
+
+    if (shouldSupersede) {
+      try {
+        await storage.deleteKnowledgeEntry(existing.id, userId);
+        superseded++;
+        console.log(`🔄 Superseded old pricing entry: "${existing.title}"`);
+      } catch (err: any) {
+        console.error(`Failed to supersede entry: ${err.message}`);
+      }
+    }
+  }
+
+  return { superseded };
 }
 
 export async function processDocumentForKnowledge(
@@ -399,13 +459,30 @@ export async function processDocumentForKnowledge(
 
   const extracted = await extractKnowledgeFromDocument(document, existingHashes);
 
+  const isPricing = isPricingDocument(document);
+  let pricingSuperseded = 0;
+
+  if (isPricing) {
+    const newPricingEntries = extracted.filter(e => e.category === 'pricing');
+    if (newPricingEntries.length > 0) {
+      console.log(`💰 Pricing document detected: "${document.fileName}". Superseding ${newPricingEntries.length} old pricing entries...`);
+      const result = await supersedePricingEntries(storage, existingEntries, newPricingEntries, userId);
+      pricingSuperseded = result.superseded;
+      console.log(`🔄 Superseded ${pricingSuperseded} old pricing entries`);
+    }
+  }
+
   let newEntriesAdded = 0;
   let duplicatesSkipped = 0;
+
+  const refreshedEntries = pricingSuperseded > 0
+    ? await storage.getKnowledgeEntriesByDomain(domainExpertiseId, userId)
+    : existingEntries;
 
   for (const entry of extracted) {
     const contentHash = generateContentHash(entry.title + entry.content);
     
-    const isDuplicate = existingEntries.some(existing => {
+    const isDuplicate = refreshedEntries.some(existing => {
       if (existing.contentHash === contentHash) return true;
       const similarity = calculateSimilarity(
         existing.title + ' ' + existing.content,
@@ -436,7 +513,6 @@ export async function processDocumentForKnowledge(
       });
       newEntriesAdded++;
       
-      // Generate embedding for semantic search (async, don't block)
       const text = `${entry.title}. ${entry.content}`;
       generateEmbeddingForEntry(storage, created.id, text).catch(err => 
         console.warn(`⚠️ Embedding generation deferred: ${err.message}`)
@@ -446,7 +522,7 @@ export async function processDocumentForKnowledge(
     }
   }
 
-  console.log(`Knowledge extraction complete: ${newEntriesAdded} added, ${duplicatesSkipped} duplicates skipped`);
+  console.log(`📚 Knowledge extraction complete: ${newEntriesAdded} added, ${duplicatesSkipped} duplicates skipped${pricingSuperseded > 0 ? `, ${pricingSuperseded} pricing entries superseded` : ''}`);
 
   return {
     entries: extracted,
@@ -485,7 +561,7 @@ export async function rebuildKnowledgeBase(
       });
   
   if (unprocessedDocs.length === 0 && !forceFullRebuild) {
-    console.log(`All ${completedDocs.length} documents already processed. No new extraction needed.`);
+    console.log(`✅ All ${completedDocs.length} documents already processed. No new extraction needed.`);
     return {
       entries: [],
       duplicatesSkipped: 0,
@@ -499,7 +575,7 @@ export async function rebuildKnowledgeBase(
     await storage.deleteKnowledgeEntriesByDomain(domainExpertiseId, userId);
   }
   
-  console.log(`Processing ${unprocessedDocs.length} unprocessed documents (${completedDocs.length - unprocessedDocs.length} already done)`);
+  console.log(`📚 Processing ${unprocessedDocs.length} unprocessed documents (${completedDocs.length - unprocessedDocs.length} already done)`);
 
   let totalAdded = 0;
   let totalDuplicates = 0;
@@ -513,15 +589,33 @@ export async function rebuildKnowledgeBase(
   // Track newly created entries in this run for intra-run duplicate detection
   const newlyCreatedEntries: Array<{ title: string; content: string; hash: string }> = [];
 
+  let totalPricingSuperseded = 0;
+
   for (const doc of unprocessedDocs) {
     console.log(`📄 Extracting knowledge from: ${doc.fileName}`);
     const extracted = await extractKnowledgeFromDocument(doc, existingHashes);
     let docEntriesAdded = 0;
+
+    if (!forceFullRebuild && isPricingDocument(doc)) {
+      const newPricingEntries = extracted.filter(e => e.category === 'pricing');
+      if (newPricingEntries.length > 0) {
+        const currentEntries = await storage.getKnowledgeEntriesByDomain(domainExpertiseId, userId);
+        const result = await supersedePricingEntries(storage, currentEntries, newPricingEntries, userId);
+        totalPricingSuperseded += result.superseded;
+        if (result.superseded > 0) {
+          const refreshed = await storage.getKnowledgeEntriesByDomain(domainExpertiseId, userId);
+          existingEntries.length = 0;
+          existingEntries.push(...refreshed);
+          existingHashes.clear();
+          refreshed.forEach(e => { if (e.contentHash) existingHashes.add(e.contentHash); });
+        }
+        console.log(`💰 Superseded ${result.superseded} old pricing entries for "${doc.fileName}"`);
+      }
+    }
     
     for (const entry of extracted) {
       const contentHash = generateContentHash(entry.title + entry.content);
       
-      // Check for duplicates against existing entries in database
       const isDuplicateOfExisting = !forceFullRebuild && existingEntries.some(existing => {
         if (existing.contentHash === contentHash) return true;
         const similarity = calculateSimilarity(
@@ -531,7 +625,6 @@ export async function rebuildKnowledgeBase(
         return similarity > 0.85;
       });
       
-      // Also check against entries created in this run
       const isDuplicateOfNew = newlyCreatedEntries.some(created => {
         if (created.hash === contentHash) return true;
         const similarity = calculateSimilarity(
@@ -586,12 +679,12 @@ export async function rebuildKnowledgeBase(
         knowledgeExtractedAt: new Date(),
         contentHash: docContentHash
       });
-      console.log(`Marked ${doc.fileName} as processed (${docEntriesAdded} entries added)`);
+      console.log(`✅ Marked ${doc.fileName} as processed (${docEntriesAdded} entries added)`);
     }
   }
 
-  const totalEntries = forceFullRebuild ? totalAdded : existingEntries.length + totalAdded;
-  console.log(`Knowledge base updated: ${totalAdded} new entries added (${totalEntries} total), ${totalDuplicates} duplicates skipped`);
+  const totalEntries = forceFullRebuild ? totalAdded : existingEntries.length + totalAdded - totalPricingSuperseded;
+  console.log(`🔄 Knowledge base updated: ${totalAdded} new entries added (${totalEntries} total), ${totalDuplicates} duplicates skipped${totalPricingSuperseded > 0 ? `, ${totalPricingSuperseded} pricing entries superseded` : ''}`);
 
   return {
     entries: allEntries,
@@ -615,8 +708,8 @@ export function buildStructuredKnowledgeContext(entries: KnowledgeEntry[]): stri
 ╚══════════════════════════════════════════════════════════════════╝\n\n`;
 
   const categoryLabels: Record<string, string> = {
-    product: ' PRODUCTS & SERVICES',
-    pricing: ' PRICING INFORMATION',
+    product: '📦 PRODUCTS & SERVICES',
+    pricing: '💰 PRICING INFORMATION',
     process: '📋 PROCESSES & WORKFLOWS',
     faq: '❓ FREQUENTLY ASKED QUESTIONS',
     case_study: '📈 CASE STUDIES & SUCCESS STORIES',
@@ -643,7 +736,7 @@ export function buildStructuredKnowledgeContext(entries: KnowledgeEntry[]): stri
       // Include ALL details for comprehensive response generation
       if (entry.details && Object.keys(entry.details).length > 0) {
         const details = entry.details as Record<string, any>;
-        context += `\n   DETAILS:\n`;
+        context += `\n  📊 DETAILS:\n`;
         
         for (const [key, value] of Object.entries(details)) {
           if (value === null || value === undefined) continue;
@@ -677,7 +770,7 @@ export function buildStructuredKnowledgeContext(entries: KnowledgeEntry[]): stri
   }
 
   context += `\n${'═'.repeat(60)}\n`;
-  context += `KNOWLEDGE BASE SUMMARY:\n`;
+  context += `📚 KNOWLEDGE BASE SUMMARY:\n`;
   context += `   Total Entries: ${entries.length}\n`;
   context += `   Categories: ${Object.keys(byCategory).length}\n`;
   
@@ -696,17 +789,10 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
   }
 
   try {
-    // CRITICAL FIX: Add 10-second timeout to prevent hanging
-    const embeddingPromise = openaiForEmbeddings.embeddings.create({
+    const response = await openaiForEmbeddings.embeddings.create({
       model: EMBEDDING_MODEL,
       input: text.slice(0, 8000),
     });
-    
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Embedding generation timeout after 10s')), 10000);
-    });
-    
-    const response = await Promise.race([embeddingPromise, timeoutPromise]);
     return response.data[0].embedding;
   } catch (error: any) {
     console.error(`❌ Embedding generation failed: ${error.message}`);
@@ -736,10 +822,6 @@ export interface SemanticSearchResult {
   similarity: number;
 }
 
-// PERFORMANCE: Cache query embeddings to avoid repeated API calls (CRITICAL for 3-minute delay fix)
-const queryEmbeddingCache = new Map<string, { embedding: number[]; timestamp: number }>();
-const QUERY_EMBEDDING_CACHE_TTL = 60 * 60 * 1000; // 1 hour cache for query embeddings
-
 export async function semanticSearch(
   query: string,
   entries: KnowledgeEntry[],
@@ -747,30 +829,7 @@ export async function semanticSearch(
 ): Promise<SemanticSearchResult[]> {
   if (entries.length === 0) return [];
   
-  // CRITICAL FIX: Check cache first to avoid expensive embedding API call
-  const cacheKey = query.toLowerCase().trim();
-  const cached = queryEmbeddingCache.get(cacheKey);
-  let queryEmbedding: number[] | null = null;
-  
-  if (cached && (Date.now() - cached.timestamp < QUERY_EMBEDDING_CACHE_TTL)) {
-    queryEmbedding = cached.embedding;
-    console.log(`⚡ Using cached query embedding (age: ${Date.now() - cached.timestamp}ms)`);
-  } else {
-    queryEmbedding = await generateEmbedding(query);
-    
-    // Cache the embedding for future use
-    if (queryEmbedding) {
-      queryEmbeddingCache.set(cacheKey, { embedding: queryEmbedding, timestamp: Date.now() });
-      
-      // Clean up old cache entries (keep cache size manageable)
-      if (queryEmbeddingCache.size > 100) {
-        const oldestKey = Array.from(queryEmbeddingCache.entries())
-          .sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
-        queryEmbeddingCache.delete(oldestKey);
-      }
-    }
-  }
-  
+  const queryEmbedding = await generateEmbedding(query);
   if (!queryEmbedding) {
     console.warn('⚠️ Could not generate query embedding, falling back to enhanced keyword match');
     // ENHANCED: Split query into words and match any of them (essential for pricing queries)
@@ -869,10 +928,10 @@ export async function generateMissingEmbeddings(
     }
     
     if (generated % 10 === 0) {
-      console.log(`Generated embeddings: ${generated}/${entries.length}`);
+      console.log(`🔄 Generated embeddings: ${generated}/${entries.length}`);
     }
   }
 
-  console.log(`Embedding generation complete: ${generated} generated, ${failed} failed`);
+  console.log(`✅ Embedding generation complete: ${generated} generated, ${failed} failed`);
   return { generated, failed };
 }

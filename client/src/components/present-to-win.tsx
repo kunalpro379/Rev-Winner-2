@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronUp, FileText, BookOpen, Target, Loader2, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, BookOpen, Target, Loader2, RefreshCw, Download, Copy, Mail } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -14,6 +14,7 @@ import { CaseStudy } from "./case-study.tsx";
 import { BattleCard } from "./battle-card.tsx";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { exportPitchDeckToPDF, exportBattleCardToPDF, exportCaseStudyToPDF, exportPresentToWinToPDF } from "@/utils/pdfExport";
 
 type ContentType = "pitch-deck" | "case-study" | "battle-card" | null;
 
@@ -103,6 +104,137 @@ export function PresentToWin({ sessionId, conversationContext, domainExpertise, 
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // Export to PDF
+  const handleExportPDF = async () => {
+    if (!generatedContent || !selectedType) return;
+    
+    try {
+      // Handle multi-product exports
+      if (generatedContent._multiProduct && generatedContent.products && generatedContent.products.length > 1) {
+        // For multi-product, we need to export each tab separately
+        const tabs = document.querySelectorAll('[data-testid^="tab-product-"]');
+        
+        for (let i = 0; i < generatedContent.products.length; i++) {
+          const product = generatedContent.products[i];
+          const tab = tabs[i] as HTMLElement;
+          
+          if (tab) {
+            // Click the tab to make it active
+            tab.click();
+            
+            // Wait for content to render
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Export with product-specific name
+            await exportPresentToWinToPDF(selectedType, product.productName);
+          }
+        }
+        
+        toast({
+          title: "PDFs Exported",
+          description: `${generatedContent.products.length} ${selectedType === 'pitch-deck' ? 'pitch deck' : selectedType === 'case-study' ? 'case study' : 'battle card'} PDFs downloaded`,
+        });
+      } else {
+        // Single product export
+        await exportPresentToWinToPDF(selectedType, domainExpertise);
+        
+        toast({
+          title: "PDF Exported",
+          description: `${selectedType === 'pitch-deck' ? 'Pitch deck' : selectedType === 'case-study' ? 'Case study' : 'Battle card'} downloaded with UI screenshots`,
+        });
+      }
+    } catch (error: any) {
+      console.error('PDF export error:', error);
+      toast({
+        title: "Export Failed",
+        description: error.message || "Failed to export PDF. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Copy to clipboard
+  const handleCopyToClipboard = () => {
+    if (!generatedContent || !selectedType) return;
+    
+    let textContent = '';
+    
+    if (selectedType === 'pitch-deck') {
+      textContent = `${domainExpertise} - Pitch Deck\n\n`;
+      if (generatedContent.slides) {
+        generatedContent.slides.forEach((slide: any, index: number) => {
+          textContent += `Slide ${index + 1}: ${slide.title}\n`;
+          if (slide.highlight) textContent += `${slide.highlight}\n`;
+          if (slide.content) {
+            slide.content.forEach((point: string) => {
+              textContent += `• ${point}\n`;
+            });
+          }
+          textContent += '\n';
+        });
+      }
+    } else if (selectedType === 'battle-card') {
+      textContent = `${domainExpertise} - Battle Card\n\n`;
+      textContent += `${generatedContent.yourProduct} vs ${generatedContent.competitor1 || 'Competition'}\n\n`;
+      if (generatedContent.technicalAdvantages) {
+        textContent += 'Technical Advantages:\n';
+        generatedContent.technicalAdvantages.forEach((adv: string) => {
+          textContent += `✓ ${adv}\n`;
+        });
+        textContent += '\n';
+      }
+      if (generatedContent.whyChooseUs) {
+        textContent += `Why Choose Us:\n${generatedContent.whyChooseUs}\n`;
+      }
+    } else if (selectedType === 'case-study') {
+      textContent = `${domainExpertise} - Case Study\n\n`;
+      textContent += `${generatedContent.title}\n\n`;
+      textContent += `Customer: ${generatedContent.customer}\n`;
+      textContent += `Industry: ${generatedContent.industry}\n\n`;
+      textContent += `Challenge:\n${generatedContent.challenge}\n\n`;
+      textContent += `Solution:\n${generatedContent.solution}\n\n`;
+      if (generatedContent.outcomes) {
+        textContent += 'Results:\n';
+        generatedContent.outcomes.forEach((outcome: any) => {
+          textContent += `• ${outcome.value} - ${outcome.metric}\n`;
+        });
+      }
+    }
+    
+    navigator.clipboard.writeText(textContent);
+    toast({
+      title: "Copied to Clipboard",
+      description: "Content copied as formatted text",
+    });
+  };
+
+  // Share via email
+  const handleShareEmail = () => {
+    if (!generatedContent || !selectedType) return;
+    
+    const typeLabel = selectedType === 'pitch-deck' ? 'Pitch Deck' : 
+                      selectedType === 'battle-card' ? 'Battle Card' : 'Case Study';
+    const subject = `${domainExpertise} - ${typeLabel}`;
+    
+    let body = `Hi,\n\nI wanted to share this ${typeLabel} for ${domainExpertise}.\n\n`;
+    
+    // Add brief preview
+    if (selectedType === 'pitch-deck' && generatedContent.slides && generatedContent.slides.length > 0) {
+      body += `This ${generatedContent.slides.length}-slide presentation covers:\n`;
+      generatedContent.slides.forEach((slide: any) => {
+        body += `• ${slide.title}\n`;
+      });
+    } else if (selectedType === 'battle-card') {
+      body += `Competitive analysis: ${generatedContent.yourProduct} vs ${generatedContent.competitor1 || 'Competition'}\n`;
+    } else if (selectedType === 'case-study') {
+      body += `${generatedContent.title}\n`;
+    }
+    
+    body += `\nBest regards`;
+    
+    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
   return (
@@ -202,11 +334,42 @@ export function PresentToWin({ sessionId, conversationContext, domainExpertise, 
             {/* Generated Content */}
             {!isGenerating && selectedType && generatedContent && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-3">
                   <h3 className="font-semibold text-lg">
                     {selectedType === 'pitch-deck' ? 'Your Pitch Deck' : selectedType === 'case-study' ? 'Your Case Study' : 'Your Battle Card'}
                   </h3>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Share Buttons */}
+                    <Button
+                      onClick={handleExportPDF}
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 border-purple-300 text-purple-600 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-950"
+                      data-testid="button-export-pdf"
+                    >
+                      <Download className="h-4 w-4" />
+                      Export PDF
+                    </Button>
+                    <Button
+                      onClick={handleCopyToClipboard}
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 border-purple-300 text-purple-600 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-950"
+                      data-testid="button-copy-text"
+                    >
+                      <Copy className="h-4 w-4" />
+                      Copy Text
+                    </Button>
+                    <Button
+                      onClick={handleShareEmail}
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 border-purple-300 text-purple-600 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-950"
+                      data-testid="button-share-email"
+                    >
+                      <Mail className="h-4 w-4" />
+                      Email
+                    </Button>
                     <Button
                       onClick={() => handleGenerate(selectedType)}
                       variant="outline"

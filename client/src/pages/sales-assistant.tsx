@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { SalesAssistantQA } from "@/components/sales-assistent-qa";
 import TechEnvironmentMindMap from "@/components/mind-map/TechEnvironmentMindMap";
 import { DomainExpertiseSelector, isUniversalRVMode } from "@/components/domain-expertise-selector";
 import { HamburgerNav } from "@/components/hamburger-nav";
+import { FloatingFeedbackButton } from "@/components/feedback-dialog";
 import { AIEngineSetup } from "@/components/ai-engine-setup";
 import { SessionTimer } from "@/components/session-timer";
 import { PresentToWin } from "@/components/present-to-win";
@@ -26,7 +27,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useSEO } from "@/hooks/use-seo";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { Globe, X, Check, Edit2, AlertCircle, MessageCircle } from "lucide-react";
+import { Globe, X, Check, Edit2, AlertCircle, MessageCircle, ArrowDown } from "lucide-react";
 
 export default function SalesAssistant() {
   const [, setLocation] = useLocation();
@@ -84,7 +85,9 @@ export default function SalesAssistant() {
   const [showNewSessionDialog, setShowNewSessionDialog] = useState(false);
   const [showMeetingPreview, setShowMeetingPreview] = useState(false);
   const [resetVersion, setResetVersion] = useState(0);
-  const [summaryGenerationTriggered, setSummaryGenerationTriggered] = useState(false); // Track if summary already generated
+  const [summaryGenerationTriggered, setSummaryGenerationTriggered] = useState(false);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  
   const [domainExpertise, setDomainExpertise] = useState<string>(() => {
     // Load from localStorage or prompt user to set domain
     try {
@@ -149,12 +152,12 @@ export default function SalesAssistant() {
   // Auto-fix subscription limits for users with platform access (one-time check)
   useEffect(() => {
     const fixSubscription = async () => {
-      if (!authData) return;
+      if (!authData || !(authData as any).user) return;
       
-      console.log('🔧 Checking subscription fix for user:', authData.user.id);
+      console.log('🔧 Checking subscription fix for user:', (authData as any).user.id);
       
       // Check if already fixed (stored in localStorage)
-      const fixedKey = `subscription-fixed-${authData.user.id}`;
+      const fixedKey = `subscription-fixed-${(authData as any).user.id}`;
       if (localStorage.getItem(fixedKey)) {
         console.log('✅ Subscription already fixed (cached)');
         return;
@@ -189,6 +192,32 @@ export default function SalesAssistant() {
     
     fixSubscription();
   }, [authData, queryClient, toast]);
+  
+  // Scroll detection for showing/hiding scroll-to-bottom button
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight;
+      const clientHeight = document.documentElement.clientHeight;
+      
+      // Show button if user has scrolled up more than 300px from bottom
+      const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+      setShowScrollButton(distanceFromBottom > 300);
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Check initial state
+    
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+  
+  // Scroll to bottom function
+  const scrollToBottom = () => {
+    window.scrollTo({
+      top: document.documentElement.scrollHeight,
+      behavior: 'smooth'
+    });
+  };
   
   // Sales Intelligence Agent (passive layer - doesn't disrupt existing features)
   const { 
@@ -971,50 +1000,50 @@ export default function SalesAssistant() {
         </div>
 
         {/* Top Row: Live Transcript and Shift Gears Side by Side */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch mb-6">
-            {/* Left Column: Live Transcript */}
-            <div className="space-y-4 h-full">
-              <EnhancedLiveTranscript 
-                onSendMessage={handleSendMessage}
-                onAnalyze={handleAnalyze}
-                isAnalyzing={isAnalyzing}
-                shouldStop={shouldStopListening}
-                onStopped={() => setShouldStopListening(false)}
-                onStartTimer={async () => {
-                  try {
-                    await startTimer();
-                  } catch (error: any) {
-                    toast({
-                      title: "Session Limit Reached",
-                      description: error.message || "Please upgrade to continue",
-                      variant: "destructive",
-                    });
-                  }
-                }}
-                onStopTimer={stopTimer}
-                onTranscriptUpdate={setCurrentTranscript}
-                onTranscribingChange={setIsTranscribing}
-                onNewSession={handleNewSession}
-                resetVersion={resetVersion}
-                  sessionId={sessionId}
-                  onStop={handleStopSession}
-              />
-            </div>
-
-            {/* Right Column: Shift Gears and Mind Map */}
-            <div className="space-y-4 h-full">
-              {/* Shift Gears - Real-time AI tips */}
-              {sessionId && (
-                <ShiftGears
-                  sessionId={sessionId}
-                  transcriptText={currentTranscript}
-                  domainExpertise={domainExpertise}
-                  isTranscribing={isTranscribing}
-                  resetVersion={resetVersion}
-                />
-              )}
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Left Column: Live Transcript */}
+          <div className="flex flex-col">
+            <EnhancedLiveTranscript 
+              onSendMessage={handleSendMessage}
+              onAnalyze={handleAnalyze}
+              isAnalyzing={isAnalyzing}
+              shouldStop={shouldStopListening}
+              onStopped={() => setShouldStopListening(false)}
+              onStartTimer={async () => {
+                try {
+                  await startTimer();
+                } catch (error: any) {
+                  toast({
+                    title: "Session Limit Reached",
+                    description: error.message || "Please upgrade to continue",
+                    variant: "destructive",
+                  });
+                }
+              }}
+              onStopTimer={stopTimer}
+              onTranscriptUpdate={setCurrentTranscript}
+              onTranscribingChange={setIsTranscribing}
+              onNewSession={handleNewSession}
+              resetVersion={resetVersion}
+              sessionId={sessionId}
+              onStop={handleStopSession}
+            />
           </div>
+
+          {/* Right Column: Shift Gears */}
+          <div className="flex flex-col">
+            {/* Shift Gears - Real-time AI tips */}
+            {sessionId && (
+              <ShiftGears
+                sessionId={sessionId}
+                transcriptText={currentTranscript}
+                domainExpertise={domainExpertise}
+                isTranscribing={isTranscribing}
+                resetVersion={resetVersion}
+              />
+            )}
+          </div>
+        </div>
 
           {/* Conversation Analysis (70%) + Sales Q&A (30%) Row */}
           <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 mb-6 min-h-[500px]" id="conversation-area">
@@ -1026,30 +1055,25 @@ export default function SalesAssistant() {
                 hasAnalysis={!!analysisResults}
                 isAnalyzing={isAnalyzing}
               >
-                <div className="flex-1 flex flex-col min-h-0">
-                  {/* Analysis Results Panel */}
-                  <div className="flex-1 rounded-lg border border-border/50 bg-muted/10 p-4 min-h-0">
-                    {analysisResults ? (
-                      <AnalysisResults
-                        results={analysisResults}
-                        onClose={() => setAnalysisResults(null)}
-                        sessionId={sessionId || ""}
-                        conversationContext={analyzedTranscript}
-                        domainExpertise={domainExpertise}
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-full min-h-[350px] text-center">
-                        <div className="p-4 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20 rounded-full mb-4">
-                          <AlertCircle className="h-8 w-8 text-purple-600 dark:text-purple-400" />
-                        </div>
-                        <p className="text-base font-semibold text-foreground mb-2">No Analysis Yet</p>
-                        <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
-                          Select transcript segments or use the Analyze button to get AI-powered insights
-                        </p>
-                      </div>
-                    )}
+                {analysisResults ? (
+                  <AnalysisResults
+                    results={analysisResults}
+                    onClose={() => setAnalysisResults(null)}
+                    sessionId={sessionId || ""}
+                    conversationContext={analyzedTranscript}
+                    domainExpertise={domainExpertise}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full min-h-[350px] text-center">
+                    <div className="p-4 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20 rounded-full mb-4">
+                      <AlertCircle className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <p className="text-base font-semibold text-foreground mb-2">No Analysis Yet</p>
+                    <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
+                      Select transcript segments or use the Analyze button to get AI-powered insights
+                    </p>
                   </div>
-                </div>
+                )}
               </ConversationArea>
             </div>
 
@@ -1124,6 +1148,22 @@ export default function SalesAssistant() {
       
       {/* Floating AI Assistant - Bottom Right Corner */}
       {sessionId && <FloatingAssistant conversationId={sessionId} />}
+      
+      {/* Floating Feedback Button */}
+      <FloatingFeedbackButton />
+      
+      {/* Scroll to Bottom Button */}
+      {showScrollButton && (
+        <Button
+          onClick={scrollToBottom}
+          className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full shadow-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-2 border-white dark:border-slate-800"
+          size="icon"
+          title="Scroll to bottom"
+          data-testid="scroll-to-bottom-button"
+        >
+          <ArrowDown className="h-5 w-5 animate-bounce" />
+        </Button>
+      )}
     </div>
   );
 }

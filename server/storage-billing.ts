@@ -1034,7 +1034,7 @@ export class BillingStorage implements IBillingStorage {
         'usage_bundle': 'session_minutes',
         'train_me': 'train_me',
         'dai': 'dai',
-        'service': 'service', // Keep service as its own category
+        'service': 'train_me', // Map service to train_me (Train Me purchases are categorized as service)
       };
 
       const itemCategory = categoryMap[item.addonType] || item.addonType;

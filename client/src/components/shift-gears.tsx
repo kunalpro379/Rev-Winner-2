@@ -390,7 +390,7 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
 
   if (!transcriptText.trim()) {
     return (
-      <Card className="shadow-lg border-2 border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-indigo-950/30 dark:to-purple-950/20">
+      <Card className="w-full h-full shadow-lg border-2 border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-indigo-950/30 dark:to-purple-950/20 flex flex-col">
         <CardHeader className="pb-4 border-b border-indigo-200/50 dark:border-indigo-800/50">
           <CardTitle className="text-xl flex items-center gap-2.5 font-bold text-indigo-900 dark:text-indigo-100">
             <div className="p-2 bg-indigo-600 dark:bg-indigo-500 rounded-lg shadow-md">
@@ -412,7 +412,7 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
   }
 
   return (
-    <Card className="shadow-lg border-2 border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-indigo-950/30 dark:to-purple-950/20">
+    <Card className="w-full h-full shadow-lg border-2 border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-indigo-950/30 dark:to-purple-950/20 flex flex-col">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CardHeader className="pb-4 border-b border-indigo-200/50 dark:border-indigo-800/50">
           <div className="flex items-center justify-between gap-3">
