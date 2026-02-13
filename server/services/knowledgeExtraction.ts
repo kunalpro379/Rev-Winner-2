@@ -56,60 +56,174 @@ const anthropic = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   : null;
 
-const COMPREHENSIVE_EXTRACTION_PROMPT = `You are a world-class knowledge extraction AI for a sales intelligence platform. Your extraction directly powers real-time AI responses during live sales calls. EVERY missed detail = a failed sales conversation.
+const COMPREHENSIVE_EXTRACTION_PROMPT = `You are an ELITE knowledge extraction AI for a sales intelligence platform. Your extraction directly powers real-time AI responses during live sales calls. EVERY missed detail = a failed sales conversation.
 
-MISSION: Extract ALL knowledge from this document into structured entries. Be exhaustive. This is the ONLY data source the AI will use.
+🎯 MISSION: Extract EVERY SINGLE piece of knowledge from this document. Be EXHAUSTIVE and GRANULAR. This is the ONLY data source the AI will use.
 
 For EACH entry, provide:
 - category: One of: product, pricing, process, faq, case_study, competitor, pain_point, objection, feature, integration
 - title: Clear, descriptive title (max 150 chars). For pricing: "{Product/Tier} - Pricing Details"
-- content: COMPREHENSIVE content (5-15 sentences with FULL details, exact numbers, specific names)
+- content: ULTRA-COMPREHENSIVE content (8-20 sentences with COMPLETE details, exact numbers, specific names, full context)
 - details: Structured JSON object with ALL data points. REQUIRED fields by category:
-  * pricing: {productName, tierName, price, currency, billingCycle, seatsIncluded, featuresIncluded:[], addOns:[], discounts:[], effectiveDate, comparedTo}
-  * product/feature: {productName, featureName, howItWorks, benefits:[], useCases:[], limitations:[], integrations:[], technicalSpecs}
-  * case_study: {companyName, industry, companySize, challenge, solution, results:{}, timeline, roi, testimonialQuote}
-  * competitor: {competitorName, comparedProduct, strengthsUs:[], strengthsThem:[], pricingComparison, migrationPath}
-  * process: {processName, steps:[], prerequisites:[], timeline, decisionCriteria:[], dependencies:[]}
-  * pain_point: {painDescription, affectedRole, impact, solution, quantifiedBenefit, beforeAfter}
-  * objection: {objection, response, evidence:[], proofPoints:[]}
-- keywords: 10-20 relevant keywords (include synonyms, abbreviations, related terms, industry jargon)
+  * pricing: {productName, tierName, price, currency, billingCycle, seatsIncluded, maxSeats, featuresIncluded:[], addOns:[], discounts:[], effectiveDate, comparedTo, setupFee, minimumCommitment, overage, supportLevel, sla}
+  * product/feature: {productName, featureName, howItWorks, benefits:[], useCases:[], limitations:[], integrations:[], technicalSpecs:{}, supportedPlatforms:[], requirements:[], deployment:[], security:[], compliance:[]}
+  * case_study: {companyName, industry, companySize, challenge, solution, results:{}, timeline, roi, testimonialQuote, contactPerson, implementationDetails, beforeMetrics:{}, afterMetrics:{}}
+  * competitor: {competitorName, comparedProduct, strengthsUs:[], strengthsThem:[], pricingComparison:{}, migrationPath:[], winReasons:[], lossReasons:[], marketPosition, customerOverlap}
+  * process: {processName, steps:[], prerequisites:[], timeline, decisionCriteria:[], dependencies:[], stakeholders:[], approvalLevels:[], documentation:[], tools:[]}
+  * pain_point: {painDescription, affectedRole:[], impact:{}, solution, quantifiedBenefit:{}, beforeAfter:{}, frequency, severity, industrySpecific}
+  * objection: {objection, response, evidence:[], proofPoints:[], statistics:[], caseStudies:[], competitorComparison, riskMitigation}
+  * feature: {featureName, description, benefits:[], technicalDetails:{}, useCases:[], pricing, availability, roadmap, integrations:[]}
+  * integration: {partnerName, integrationType, capabilities:[], setupSteps:[], requirements:[], limitations:[], pricing, supportLevel, documentation}
+- keywords: 15-30 relevant keywords (include synonyms, abbreviations, related terms, industry jargon, acronyms, alternative names)
 - confidence: 0-100
 
-DEEP EXTRACTION RULES:
+🔥 ULTRA-DEEP EXTRACTION RULES:
 
-📦 PRODUCTS & FEATURES: Every feature with full description, technical details, benefits, use cases, integrations, limitations, supported platforms.
+📦 PRODUCTS & FEATURES (Extract EVERYTHING):
+- Every single feature with complete description
+- Technical specifications (versions, compatibility, requirements)
+- Benefits with quantified outcomes
+- Use cases with industry examples
+- Integrations with setup details
+- Limitations and workarounds
+- Supported platforms and devices
+- Deployment options (cloud, on-premise, hybrid)
+- Security features and compliance certifications
+- Performance metrics and benchmarks
+- Scalability limits and recommendations
+- API capabilities and documentation
+- Mobile app features
+- Admin/user roles and permissions
 
-💰 PRICING (CRITICAL - EXTRACT EVERY PRICE POINT):
-- ALL tiers with EXACT amounts and currencies
-- What's included vs excluded in each tier
-- Per-user/per-seat pricing details
-- Add-ons and their individual costs
-- Discounts (volume, annual, promotional)
+� PRICING (CRITICAL - EXTRACT EVERY SINGLE PRICE POINT):
+- ALL tiers/plans with EXACT amounts and currencies
+- What's included vs excluded in EACH tier (list every feature)
+- Per-user/per-seat pricing with volume breakpoints
+- Add-ons with individual costs and descriptions
+- Discounts (volume tiers, annual vs monthly, promotional codes, early bird)
 - Payment terms, billing cycles, contract lengths
-- Free trial details and limitations
-- Enterprise/custom pricing indicators
-- Create SEPARATE entries for EACH pricing tier
+- Free trial details (duration, limitations, credit card required?)
+- Enterprise/custom pricing indicators and typical ranges
+- Setup fees, onboarding costs, implementation fees
+- Support tiers and their costs
+- Overage charges and rate limits
+- Minimum commitments and penalties
+- Renewal terms and price lock guarantees
+- Refund policies and cancellation terms
+- Currency options and international pricing
+- Educational/nonprofit/startup discounts
+- Create SEPARATE entries for EACH pricing tier/plan
 
-📊 CASE STUDIES: Company names, industries, sizes, specific metrics (exact numbers), timelines, ROI, quotes.
+📊 CASE STUDIES & SUCCESS STORIES (Extract ALL metrics):
+- Company names with full details (size, industry, location)
+- Specific challenges with quantified pain points
+- Solution implementation details (timeline, team size, approach)
+- Results with EXACT metrics (percentages, dollar amounts, time saved)
+- ROI calculations with methodology
+- Testimonial quotes with attribution
+- Before/after comparisons with numbers
+- Implementation timeline and milestones
+- Key stakeholders and their roles
+- Lessons learned and best practices
 
-📈 GRAPHS/CHARTS/STATISTICS: If the document references or contains data from charts, graphs, infographics, or statistics tables - extract ALL data points, trends, percentages, comparisons, and their context.
+📈 DATA, GRAPHS, CHARTS, STATISTICS (Extract ALL data points):
+- Every number, percentage, and metric
+- Trends over time with specific dates
+- Comparisons between products/competitors
+- Market share data
+- Growth rates and projections
+- Survey results with sample sizes
+- Benchmark data and industry averages
+- Performance metrics and KPIs
+- User statistics and demographics
 
-🏆 COMPETITIVE: Feature-by-feature comparisons, pricing diffs, strengths/weaknesses, migration paths, win/loss reasons.
+🏆 COMPETITIVE INTELLIGENCE (Deep comparison):
+- Competitor names and products
+- Feature-by-feature detailed comparisons
+- Pricing differences with exact amounts
+- Strengths and weaknesses (ours vs theirs)
+- Migration paths with step-by-step guides
+- Win/loss reasons with frequency data
+- Market positioning and differentiation
+- Customer overlap and switching patterns
+- Integration capabilities comparison
+- Support and service level comparison
+- Roadmap and future plans comparison
 
-🎯 PAIN POINTS: Customer problems, solutions, before/after, quantified benefits.
+🎯 PAIN POINTS & SOLUTIONS (Comprehensive):
+- Detailed problem descriptions
+- Affected roles and departments
+- Business impact (cost, time, efficiency)
+- Our solution approach
+- Quantified benefits with ROI
+- Before/after scenarios with metrics
+- Industry-specific variations
+- Frequency and severity ratings
+- Related pain points and dependencies
 
-💬 OBJECTIONS: Concerns, counter-arguments, evidence, proof points.
+💬 OBJECTION HANDLING (Complete responses):
+- Common objections word-for-word
+- Detailed counter-arguments
+- Supporting evidence and data
+- Proof points (case studies, testimonials)
+- Statistics and research citations
+- Competitor comparisons
+- Risk mitigation strategies
+- Success stories addressing the objection
 
-📋 PROCESSES: Step-by-step workflows, decision criteria, timelines, dependencies.
+📋 PROCESSES & WORKFLOWS (Step-by-step):
+- Complete process descriptions
+- Every step with detailed instructions
+- Prerequisites and requirements
+- Timeline with duration estimates
+- Decision criteria and approval gates
+- Stakeholders and their responsibilities
+- Dependencies and sequencing
+- Tools and systems required
+- Documentation and templates
+- Common pitfalls and how to avoid them
 
-🔗 INTEGRATIONS: Supported platforms, API details, setup steps, limitations.
+🔗 INTEGRATIONS & PARTNERSHIPS (Full details):
+- Partner/platform names
+- Integration types (API, native, third-party)
+- Capabilities and features enabled
+- Setup instructions step-by-step
+- Requirements and prerequisites
+- Limitations and known issues
+- Pricing and licensing
+- Support level and SLAs
+- Documentation links
 
-RULES:
-- Create SEPARATE entries for each distinct topic (don't combine pricing + features)
-- NEVER summarize - preserve ALL specifics (numbers, names, dates, percentages)
-- Extract data from reconstructed tables, charts, and visual content markers
-- If document contains "[DEEP ANALYSIS]" or "[TABLE STRUCTURE]" sections, extract those structured insights as separate entries
-- Create multiple entries per complex topic
+🔍 ADDITIONAL EXTRACTION TARGETS:
+- Company information (history, mission, values, team)
+- Industry trends and market analysis
+- Regulatory compliance and certifications
+- Security and privacy policies
+- Terms of service and SLAs
+- Training and onboarding programs
+- Support channels and response times
+- Roadmap and upcoming features
+- Partnership opportunities
+- Geographic availability and restrictions
+- Language support
+- Accessibility features
+- System requirements and compatibility
+- Backup and disaster recovery
+- Data migration services
+- Professional services offerings
+- Community and user resources
+
+CRITICAL RULES:
+- Create SEPARATE entries for each distinct topic (NEVER combine)
+- NEVER summarize - preserve ALL specifics (numbers, names, dates, percentages, quotes)
+- Extract data from tables, charts, graphs, infographics, sidebars, footnotes, appendices
+- If document contains "[DEEP ANALYSIS]" or "[TABLE STRUCTURE]" sections, extract those as separate entries
+- Create 3-5 entries per page of content (be granular)
+- For complex topics, create multiple related entries
+- Include context and background for each entry
+- Cross-reference related entries in keywords
+- Preserve exact terminology and product names
+- Include version numbers and dates where mentioned
 
 Return JSON format: {"entries": [...]}
 
@@ -118,22 +232,44 @@ DOCUMENT TO ANALYZE:
 
 const CHUNK_EXTRACTION_PROMPT = `Continue extracting knowledge from this document chunk. This is part of a larger document.
 
-CRITICAL RULES:
+🔥 ULTRA-CRITICAL RULES FOR CONTINUATION:
 - Extract ALL new information not covered in previous chunks
-- Be EXHAUSTIVE - every number, price, feature, metric, name, and data point matters
-- Create detailed entries (5-15 sentences each) with structured "details" JSON
-- For pricing data: create SEPARATE entries per product/tier with {productName, tierName, price, currency, billingCycle, featuresIncluded}
-- For tables/charts: extract ALL rows and data points, don't summarize
-- For processes/workflows: capture every step with prerequisites and outcomes
-- Include 10-20 keywords per entry including synonyms and industry terms
+- Be ULTRA-EXHAUSTIVE - every number, price, feature, metric, name, quote, and data point matters
+- Create DETAILED entries (8-20 sentences each) with COMPREHENSIVE "details" JSON
+- For pricing data: create SEPARATE entries per product/tier with {productName, tierName, price, currency, billingCycle, seatsIncluded, maxSeats, featuresIncluded:[], addOns:[], discounts:[], setupFee, minimumCommitment, supportLevel}
+- For tables/charts: extract ALL rows, columns, and data points - NEVER summarize
+- For processes/workflows: capture EVERY step with prerequisites, outcomes, timelines, stakeholders
+- For case studies: extract ALL metrics, quotes, company details, before/after data
+- For features: include technical specs, benefits, use cases, limitations, integrations
+- For competitors: detailed comparisons, pricing differences, strengths/weaknesses
+- Include 15-30 keywords per entry including synonyms, acronyms, and industry terms
+- Extract information from headers, footers, sidebars, callout boxes, footnotes
+- Preserve exact terminology, product names, version numbers, dates
+- Create 3-5 entries per page of content (be granular, not broad)
+
+EXTRACTION TARGETS IN THIS CHUNK:
+- Products, features, capabilities
+- Pricing (all tiers, add-ons, discounts)
+- Technical specifications
+- Case studies and success stories
+- Statistics, metrics, benchmarks
+- Competitive comparisons
+- Pain points and solutions
+- Objections and responses
+- Processes and workflows
+- Integrations and partnerships
+- Company information
+- Compliance and certifications
+- Support and SLAs
+- Training and resources
 
 Return JSON format: {"entries": [...]}
 
 DOCUMENT CHUNK:
 `;
 
-const CHUNK_SIZE = 15000; // Characters per chunk for processing
-const MAX_CHUNKS = 10; // Maximum chunks to process per document
+const CHUNK_SIZE = 20000; // Increased for more context per chunk
+const MAX_CHUNKS = 15; // Increased to process more content
 
 function splitIntoChunks(content: string, chunkSize: number): string[] {
   const chunks: string[] = [];
@@ -165,29 +301,49 @@ function parseAIResponse(responseText: string): any[] {
   let parsed: any;
   
   try {
+    // First try direct JSON parse
     parsed = JSON.parse(responseText);
     if (parsed.entries) parsed = parsed.entries;
     if (!Array.isArray(parsed)) parsed = [parsed];
     return parsed;
   } catch {
     // Try to extract JSON from markdown code blocks or surrounding text
-    const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/) ||
-                     responseText.match(/\[\s*\{[\s\S]*\}\s*\]/) ||
-                     responseText.match(/\{\s*"entries"\s*:\s*\[[\s\S]*\]\s*\}/);
+    // Match ```json ... ``` or ``` ... ``` or just the JSON object/array
+    const patterns = [
+      /```(?:json)?\s*([\s\S]*?)```/,  // Markdown code blocks
+      /\{\s*"entries"\s*:\s*\[([\s\S]*)\]\s*\}/,  // {"entries": [...]}
+      /\[\s*\{[\s\S]*\}\s*\]/  // Direct array
+    ];
     
-    if (jsonMatch) {
-      try {
-        const cleanJson = jsonMatch[1] || jsonMatch[0];
-        parsed = JSON.parse(cleanJson);
-        if (parsed.entries) parsed = parsed.entries;
-        if (!Array.isArray(parsed)) parsed = [parsed];
-        return parsed;
-      } catch (innerError) {
-        console.error('Failed to parse AI response as JSON:', responseText.substring(0, 200));
-        return [];
+    for (const pattern of patterns) {
+      const match = responseText.match(pattern);
+      if (match) {
+        try {
+          let jsonStr = match[1] || match[0];
+          
+          // If we matched the entries content only, wrap it
+          if (pattern === patterns[1]) {
+            jsonStr = `{"entries": [${jsonStr}]}`;
+          }
+          
+          // Clean up common issues
+          jsonStr = jsonStr.trim();
+          
+          // Try to parse
+          parsed = JSON.parse(jsonStr);
+          if (parsed.entries) parsed = parsed.entries;
+          if (!Array.isArray(parsed)) parsed = [parsed];
+          
+          console.log(`✅ Successfully parsed JSON from pattern ${patterns.indexOf(pattern) + 1}`);
+          return parsed;
+        } catch (innerError) {
+          console.log(`⚠️ Pattern ${patterns.indexOf(pattern) + 1} matched but parse failed`);
+          continue;
+        }
       }
     }
-    console.error('No valid JSON found in response:', responseText.substring(0, 200));
+    
+    console.error('❌ Failed to parse AI response as JSON. Response preview:', responseText.substring(0, 300));
     return [];
   }
 }
@@ -212,15 +368,24 @@ async function extractFromChunkWithClaude(
   try {
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 8000,
+      max_tokens: 16000, // Increased for more comprehensive extraction
       messages: [
         { 
           role: 'user', 
-          content: `You are a world-class knowledge extraction AI for a sales intelligence platform.
+          content: `You are an ELITE knowledge extraction AI for a sales intelligence platform.
 Always respond with valid JSON only: {"entries": [...]}
-Each entry must have: category, title (descriptive), content (5-15 detailed sentences with ALL specifics), details (structured JSON with ALL data points - for pricing include productName/tierName/price/currency/billingCycle), keywords (10-20 including synonyms), confidence (0-100).
-Create SEPARATE entries for each topic. For pricing: one entry per tier. Extract data from tables, charts, statistics.
-NEVER summarize - preserve every number, name, metric, and data point.
+
+ULTRA-COMPREHENSIVE EXTRACTION REQUIREMENTS:
+- Each entry MUST have: category, title (descriptive, max 150 chars), content (8-20 detailed sentences with ALL specifics), details (structured JSON with ALL data points), keywords (15-30 including synonyms, acronyms, industry terms), confidence (0-100)
+- Create SEPARATE entries for each distinct topic/tier/feature
+- For pricing: one entry per tier with {productName, tierName, price, currency, billingCycle, seatsIncluded, maxSeats, featuresIncluded:[], addOns:[], discounts:[], setupFee, minimumCommitment, supportLevel, sla}
+- For products/features: {productName, featureName, howItWorks, benefits:[], useCases:[], limitations:[], integrations:[], technicalSpecs:{}, supportedPlatforms:[], requirements:[], deployment:[], security:[], compliance:[]}
+- For case studies: {companyName, industry, companySize, challenge, solution, results:{}, timeline, roi, testimonialQuote, contactPerson, beforeMetrics:{}, afterMetrics:{}}
+- Extract data from tables, charts, statistics, graphs, sidebars, footnotes, appendices
+- NEVER summarize - preserve EVERY number, name, metric, quote, date, percentage, and data point
+- Create 3-5 entries per page of content (be granular)
+- Include ALL context and background information
+- Preserve exact terminology, product names, version numbers
 
 ${prompt}`
         }
@@ -246,57 +411,68 @@ async function extractFromChunk(
   totalChunks: number,
   isFirstChunk: boolean
 ): Promise<any[]> {
-  // Try DeepSeek first, fallback to Claude
-  if (deepseek) {
-    const prompt = isFirstChunk 
-      ? COMPREHENSIVE_EXTRACTION_PROMPT + chunk
-      : CHUNK_EXTRACTION_PROMPT + chunk;
-    
-    console.log(`🔄 Chunk ${chunkIndex + 1}/${totalChunks}: Sending to DeepSeek (${chunk.length} chars)...`);
-    
-    try {
-      const response = await deepseek.chat.completions.create({
-        model: 'deepseek-chat',
-        messages: [
-          { 
-            role: 'system', 
-            content: `You are a world-class knowledge extraction AI for a sales intelligence platform.
-Always respond with valid JSON: {"entries": [...]}
-Each entry must have: category, title (descriptive), content (5-15 detailed sentences with ALL specifics), details (structured JSON with ALL data points - for pricing include productName/tierName/price/currency/billingCycle), keywords (10-20 including synonyms), confidence (0-100).
-Create SEPARATE entries for each topic. For pricing: one entry per tier. Extract data from tables, charts, statistics.
-NEVER summarize - preserve every number, name, metric, and data point.`
-          },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.2,
-        max_tokens: 8000
-      });
-      
-      const responseText = response.choices[0]?.message?.content || '[]';
-      console.log(`✅ Chunk ${chunkIndex + 1}/${totalChunks}: Received ${responseText.length} chars from DeepSeek`);
-      
-      const entries = parseAIResponse(responseText);
-      console.log(`📊 Chunk ${chunkIndex + 1}/${totalChunks}: Extracted ${entries.length} entries`);
-      
-      if (entries.length > 0) {
-        return entries;
-      }
-      
-      // If no entries from DeepSeek, try Claude
-      console.log(`⚠️ DeepSeek returned no entries, trying Claude...`);
-    } catch (error: any) {
-      console.error(`❌ DeepSeek failed for chunk ${chunkIndex + 1}: ${error.message}`);
-      console.log(`🔄 Falling back to Claude...`);
-    }
+  // Use DeepSeek only (Claude fallback disabled due to credit issues)
+  if (!deepseek) {
+    console.error('❌ DeepSeek API not configured for knowledge extraction');
+    return [];
   }
   
-  // Fallback to Claude
-  return extractFromChunkWithClaude(chunk, chunkIndex, totalChunks, isFirstChunk);
+  const prompt = isFirstChunk 
+    ? COMPREHENSIVE_EXTRACTION_PROMPT + chunk
+    : CHUNK_EXTRACTION_PROMPT + chunk;
+  
+  console.log(`🔄 Chunk ${chunkIndex + 1}/${totalChunks}: Sending to DeepSeek (${chunk.length} chars)...`);
+  
+  try {
+    const response = await deepseek.chat.completions.create({
+      model: 'deepseek-chat',
+      messages: [
+        { 
+          role: 'system', 
+          content: `You are an ELITE knowledge extraction AI for a sales intelligence platform.
+
+CRITICAL: Respond with ONLY valid JSON. NO markdown, NO code blocks, NO explanations.
+Format: {"entries": [...]}
+
+ULTRA-COMPREHENSIVE EXTRACTION REQUIREMENTS:
+- Each entry MUST have: category, title (descriptive, max 150 chars), content (8-20 detailed sentences with ALL specifics), details (structured JSON with ALL data points), keywords (15-30 including synonyms, acronyms, industry terms), confidence (0-100)
+- Create SEPARATE entries for each distinct topic/tier/feature
+- For pricing: one entry per tier with {productName, tierName, price, currency, billingCycle, seatsIncluded, maxSeats, featuresIncluded:[], addOns:[], discounts:[], setupFee, minimumCommitment, supportLevel, sla}
+- For products/features: {productName, featureName, howItWorks, benefits:[], useCases:[], limitations:[], integrations:[], technicalSpecs:{}, supportedPlatforms:[], requirements:[], deployment:[], security:[], compliance:[]}
+- For case studies: {companyName, industry, companySize, challenge, solution, results:{}, timeline, roi, testimonialQuote, contactPerson, beforeMetrics:{}, afterMetrics:{}}
+- Extract data from tables, charts, statistics, graphs, sidebars, footnotes, appendices
+- NEVER summarize - preserve EVERY number, name, metric, quote, date, percentage, and data point
+- Create 3-5 entries per page of content (be granular)
+- Include ALL context and background information
+- Preserve exact terminology, product names, version numbers
+
+RESPONSE FORMAT (NO MARKDOWN):
+{"entries": [{"category": "pricing", "title": "...", "content": "...", "details": {...}, "keywords": [...], "confidence": 85}]}`
+        },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.1,
+      max_tokens: 8000,
+      response_format: { type: "json_object" } // Force JSON response
+    });
+    
+    const responseText = response.choices[0]?.message?.content || '[]';
+    console.log(`✅ Chunk ${chunkIndex + 1}/${totalChunks}: Received ${responseText.length} chars from DeepSeek`);
+    
+    const entries = parseAIResponse(responseText);
+    console.log(`📊 Chunk ${chunkIndex + 1}/${totalChunks}: Extracted ${entries.length} entries`);
+    
+    return entries;
+  } catch (error: any) {
+    console.error(`❌ DeepSeek failed for chunk ${chunkIndex + 1}: ${error.message}`);
+    return [];
+  }
 }
 
 export async function extractKnowledgeFromDocument(
   document: TrainingDocument,
-  existingHashes: Set<string>
+  existingHashes: Set<string>,
+  progressCallback?: (progress: { current: number; total: number; percentage: number; message: string }) => void
 ): Promise<ExtractedKnowledge[]> {
   if (!document.content || document.content.trim().length < 50) {
     console.log(`⏭️ Skipping document ${document.fileName}: insufficient content`);
@@ -317,14 +493,27 @@ export async function extractKnowledgeFromDocument(
     
     const allParsedEntries: any[] = [];
     
-    // Process chunks sequentially to avoid rate limits
+    // Process chunks with progress tracking
     for (let i = 0; i < chunks.length; i++) {
+      const percentage = Math.round(((i + 1) / chunks.length) * 100);
+      const message = `Processing chunk ${i + 1} of ${chunks.length}...`;
+      
+      // Emit progress
+      if (progressCallback) {
+        progressCallback({
+          current: i + 1,
+          total: chunks.length,
+          percentage,
+          message
+        });
+      }
+      
       const chunkEntries = await extractFromChunk(chunks[i], i, chunks.length, i === 0);
       allParsedEntries.push(...chunkEntries);
       
-      // Brief pause between chunks to avoid rate limits
+      // Brief pause between chunks to avoid rate limits (reduced from 500ms to 200ms for speed)
       if (i < chunks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
 
@@ -342,6 +531,12 @@ export async function extractKnowledgeFromDocument(
       }
 
       if (entry.content.length < 50) continue;
+
+      // Ensure content is comprehensive (encourage longer, detailed entries)
+      if (entry.content.length < 100 && entry.category !== 'faq') {
+        console.log(`⚠️ Skipping short entry: "${entry.title}" (${entry.content.length} chars)`);
+        continue;
+      }
 
       const titleNormalized = entry.title.toLowerCase().trim();
       const contentHash = generateContentHash(entry.title + entry.content);

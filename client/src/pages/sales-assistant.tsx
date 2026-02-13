@@ -12,7 +12,6 @@ import { SalesAssistantQA } from "@/components/sales-assistent-qa";
 import TechEnvironmentMindMap from "@/components/mind-map/TechEnvironmentMindMap";
 import { DomainExpertiseSelector, isUniversalRVMode } from "@/components/domain-expertise-selector";
 import { HamburgerNav } from "@/components/hamburger-nav";
-import { FloatingFeedbackButton } from "@/components/feedback-dialog";
 import { AIEngineSetup } from "@/components/ai-engine-setup";
 import { SessionTimer } from "@/components/session-timer";
 import { PresentToWin } from "@/components/present-to-win";
@@ -1148,9 +1147,6 @@ export default function SalesAssistant() {
       
       {/* Floating AI Assistant - Bottom Right Corner */}
       {sessionId && <FloatingAssistant conversationId={sessionId} />}
-      
-      {/* Floating Feedback Button */}
-      <FloatingFeedbackButton />
       
       {/* Scroll to Bottom Button */}
       {showScrollButton && (

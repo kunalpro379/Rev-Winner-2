@@ -34,10 +34,12 @@ async function throwIfResNotOk(res: Response) {
 async function refreshAccessToken(): Promise<string | null> {
   const refreshToken = localStorage.getItem("refreshToken");
   if (!refreshToken) {
+    console.log("No refresh token found");
     return null;
   }
 
   try {
+    console.log("Attempting to refresh access token...");
     const res = await fetch("/api/auth/refresh", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -45,6 +47,7 @@ async function refreshAccessToken(): Promise<string | null> {
     });
 
     if (!res.ok) {
+      console.log("Refresh token request failed:", res.status, res.statusText);
       // Refresh token is invalid or expired - use pure helper (no circular dependency)
       clearSessionStorageArtifacts();
       return null;
@@ -55,6 +58,7 @@ async function refreshAccessToken(): Promise<string | null> {
     
     // Store new access token
     localStorage.setItem("accessToken", newAccessToken);
+    console.log("✅ Access token refreshed successfully");
     return newAccessToken;
   } catch (error) {
     console.error("Token refresh failed:", error);
@@ -94,11 +98,13 @@ export async function apiRequest(
 
   // If we get a 403 (token expired or session invalidated), try to refresh
   if (res.status === 403 && retryCount === 0) {
+    console.log("⚠️ Got 403, attempting token refresh...");
     // Check if response indicates session invalidation
     try {
       const errorData = await res.clone().json();
       if (errorData.sessionInvalidated) {
         // Session was invalidated (logged in on another device) - clear and redirect immediately
+        console.log("Session invalidated by server");
         clearSessionStorageArtifacts();
         window.location.href = "/login?reason=session_invalidated";
         throw new Error("Session invalidated. Please log in again.");
@@ -110,12 +116,17 @@ export async function apiRequest(
     const newAccessToken = await refreshAccessToken();
     
     if (newAccessToken) {
+      console.log("✅ Token refreshed, retrying request...");
       // Retry the request with new token
       return apiRequest(method, url, data, options, retryCount + 1);
     } else {
+      console.log("❌ Token refresh failed, redirecting to login...");
       // Refresh failed - use pure helper and redirect (no circular dependency)
       clearSessionStorageArtifacts();
-      window.location.href = "/login?reason=token_expired";
+      // Only redirect if not already on login page
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = "/login?reason=token_expired";
+      }
       throw new Error("Session expired. Please log in again.");
     }
   }

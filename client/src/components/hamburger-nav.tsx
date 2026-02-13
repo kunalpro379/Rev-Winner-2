@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { FeedbackDialog } from "@/components/feedback-dialog";
 import { useCart } from "@/contexts/cart-context";
 import { queryClient } from "@/lib/queryClient";
 import { clearAllSessionData } from "@/lib/session";
@@ -80,8 +81,11 @@ export function HamburgerNav({ currentPath = "/" }: HamburgerNavProps) {
             </div>
           </div>
 
-          {/* Right Side - Hamburger Menu + Theme Toggle */}
-          <div className="flex items-center gap-3">
+          {/* Right Side - Feedback + Cart + Theme Toggle + Hamburger Menu */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Feedback Button - Only for authenticated users */}
+            {authData && <FeedbackDialog />}
+            
             <ThemeToggle />
             
             {/* Shopping Cart Icon with Badge */}

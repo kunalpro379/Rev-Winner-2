@@ -118,6 +118,7 @@ export default function TrainMe() {
   const [urlDialogOpen, setUrlDialogOpen] = useState(false);
   const [selectedDomainForUrl, setSelectedDomainForUrl] = useState<string>("");
   const [selectedFiles, setSelectedFiles] = useState<Record<string, FileList | null>>({});
+  const [uploadProgress, setUploadProgress] = useState<Record<string, { current: number; total: number; percentage: number; message: string }>>({});
 
   // Check Train Me subscription status
   const { data: trainMeStatus, isLoading: isLoadingTrainMe } = useQuery<TrainMeStatus>({
@@ -168,12 +169,25 @@ export default function TrainMe() {
         headers["Authorization"] = `Bearer ${accessToken}`;
       }
       
+      // Initialize progress
+      setUploadProgress(prev => ({
+        ...prev,
+        [domainId]: { current: 0, total: 100, percentage: 0, message: 'Uploading files...' }
+      }));
+      
       return fetch(`/api/domain-expertise/${domainId}/documents`, {
         method: 'POST',
         body: formData,
         headers,
       }).then(res => {
         if (!res.ok) throw new Error('Upload failed');
+        
+        // Update progress to show extraction phase
+        setUploadProgress(prev => ({
+          ...prev,
+          [domainId]: { current: 50, total: 100, percentage: 50, message: 'Extracting knowledge...' }
+        }));
+        
         return res.json();
       });
     },
@@ -183,6 +197,21 @@ export default function TrainMe() {
       // Handle partial failures
       const uploaded = data.uploaded || [];
       const errors = data.errors || [];
+      
+      // Complete progress
+      setUploadProgress(prev => ({
+        ...prev,
+        [variables.domainId]: { current: 100, total: 100, percentage: 100, message: 'Complete!' }
+      }));
+      
+      // Clear progress after 2 seconds
+      setTimeout(() => {
+        setUploadProgress(prev => {
+          const newProgress = { ...prev };
+          delete newProgress[variables.domainId];
+          return newProgress;
+        });
+      }, 2000);
       
       if (uploaded.length > 0 && errors.length === 0) {
         // All files uploaded successfully
@@ -232,8 +261,14 @@ export default function TrainMe() {
       
       setSelectedFiles(prev => ({ ...prev, [variables.domainId]: null }));
     },
-    onError: (error: any) => {
+    onError: (error: any, variables) => {
       toast({ title: "Upload failed", description: error.message || "Failed to upload files", variant: "destructive" });
+      // Clear progress on error
+      setUploadProgress(prev => {
+        const newProgress = { ...prev };
+        delete newProgress[variables.domainId];
+        return newProgress;
+      });
     },
   });
 
@@ -496,6 +531,7 @@ export default function TrainMe() {
                 key={domain.id}
                 domain={domain}
                 selectedFile={selectedFiles[domain.id]}
+                uploadProgress={uploadProgress[domain.id]}
                 onFileSelect={(files) => handleFileSelect(domain.id, files)}
                 onFileUpload={() => handleFileUpload(domain.id)}
                 onAddUrl={(url) => addUrlMutation.mutate({ domainId: domain.id, url })}
@@ -638,6 +674,7 @@ function DocumentCard({
 function DomainCard({
   domain,
   selectedFile,
+  uploadProgress,
   onFileSelect,
   onFileUpload,
   onAddUrl,
@@ -652,6 +689,7 @@ function DomainCard({
 }: {
   domain: DomainExpertise;
   selectedFile: FileList | null | undefined;
+  uploadProgress?: { current: number; total: number; percentage: number; message: string };
   onFileSelect: (files: FileList | null) => void;
   onFileUpload: () => void;
   onAddUrl: (url: string) => void;
@@ -874,6 +912,22 @@ function DomainCard({
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Progress Bar */}
+        {uploadProgress && (
+          <div className="space-y-2 p-3 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium text-purple-900 dark:text-purple-100">{uploadProgress.message}</span>
+              <span className="text-purple-700 dark:text-purple-300 font-semibold">{uploadProgress.percentage}%</span>
+            </div>
+            <div className="w-full bg-purple-200 dark:bg-purple-900 rounded-full h-2 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-purple-600 to-pink-600 h-full transition-all duration-300 ease-out"
+                style={{ width: `${uploadProgress.percentage}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Documents List */}
         {documentsLoading ? (
