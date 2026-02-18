@@ -1,0 +1,319 @@
+Below is the combined and corrected Replit enhancement prompt.
+This restores original performance quality and enhances only Shift Gears and Customer Query Pitches.
+
+No other module must be touched.
+
+REPLIT CRITICAL RESTORATION + ENHANCEMENT PROMPT
+PRIORITY LEVEL
+
+Critical performance regression fix + intelligence enhancement
+
+STRICT NON DISRUPTION RULE
+
+Do NOT modify architecture
+
+Do NOT modify database schema
+
+Do NOT modify UI
+
+Do NOT modify Conversation Analysis
+
+Do NOT modify Battle Cards, Pitch Decks, Case Studies, Meeting Minutes, Sales Q&A
+
+Do NOT change token limits globally
+
+Only enhance and restore logic inside:
+• Shift Gears
+• Customer Query Pitches
+
+All prior bug fixes remain intact
+
+Response latency must return to earlier fast performance
+
+Nothing outside these two modules must be impacted whatsoever
+
+PROBLEM STATEMENT
+
+Shift Gears earlier was:
+• Fast
+• Contextual
+• Sharp
+• Practical for sellers
+• High signal
+• Minimal fluff
+
+Now it is:
+• Not detecting objections correctly
+• Not detecting questions correctly
+• Generating generic responses
+• Slower
+• Less practical
+
+Customer Query Pitches is failing to detect direct customer questions and objection intent
+
+This must be restored to previous high quality level.
+
+OBJECTIVE
+
+Restore original high performance reasoning and enhance with:
+
+• Advanced objection intelligence
+• High impact analogy driven rebuttals
+• Walking away detection
+• Disinterest detection
+• Compelling re alignment responses
+• Professional negotiation intelligence
+• Executive grade rebuttals
+• Difficult to ignore persuasion responses
+• Practical seller ready language
+
+CORE ARCHITECTURE TO IMPLEMENT
+
+Create a layered reasoning engine inside both modules:
+
+DETECT → CLASSIFY → CONTEXT MAP → RESPONSE FRAME → MICRO ADVANCE
+
+PHASE 1
+REAL TIME INTENT DETECTION RESTORATION
+
+Before generating response, system must detect:
+
+Is customer asking a question
+
+Is customer objecting
+
+Is customer comparing competitor
+
+Is customer signaling disinterest
+
+Is customer hinting at walking away
+
+Is customer negotiating
+
+Is customer deflecting
+
+Is customer asking technical clarification
+
+Is customer escalating to procurement
+
+Is customer delaying
+
+If question detected
+Answer directly first.
+
+If objection detected
+Activate objection engine.
+
+If disinterest detected
+Activate re alignment engine.
+
+This detection must happen before response generation.
+
+PHASE 2
+OBJECTION CLASSIFICATION MODEL
+
+Tag objection into:
+
+Financial
+Technical
+Security or compliance
+Operational complexity
+Switching cost
+Political or stakeholder
+Timing
+Competitive
+Procurement negotiation
+Hidden
+
+No generic answers allowed.
+
+PHASE 3
+HIGH QUALITY RESPONSE FRAME
+
+Every rebuttal must follow:
+
+1 Tactical empathy
+Short acknowledgment
+
+2 Precision clarification
+One sharp question
+
+3 Strategic reframe
+Shift lens to business impact
+
+4 Risk amplification
+What they lose if they ignore
+
+5 Value anchor
+Tie directly to outcome
+
+6 Micro commitment
+Controlled next step
+
+No fluff
+No motivational tone
+No lecture
+
+Seller ready language only.
+
+PHASE 4
+ANALOGY DRIVEN PERSUASION LAYER
+
+When disinterest or walking away detected
+Activate Analogy Layer.
+
+Use short, powerful analogies:
+
+• Insurance analogy
+• Engine warning analogy
+• Air traffic control analogy
+• Cyber breach analogy
+• Margin leak analogy
+• Medical diagnosis analogy
+
+Analogy rules:
+
+Must connect directly to their concern
+Must highlight risk of inaction
+Must not be dramatic
+Must be executive appropriate
+
+PHASE 5
+WALKING AWAY DETECTION ENGINE
+
+If customer says:
+
+We are fine
+Not interested
+Too expensive
+We will think
+Send proposal
+Already using X
+No budget
+Maybe next quarter
+
+Activate Re alignment Model:
+
+Step 1 Slow down tone
+Step 2 Ask impact based question
+Step 3 Surface hidden risk
+Step 4 Re anchor value
+Step 5 Offer low risk pilot
+
+Do not push close aggressively.
+
+PHASE 6
+ADVANCED NEGOTIATION INTELLIGENCE
+
+When pricing pressure detected:
+
+Activate Structured Negotiation Model:
+
+Step 1 Detect context
+Is it real budget issue or leverage
+
+Step 2 Trade not discount
+Never suggest raw discount
+
+Offer structured exchange:
+
+Longer commitment
+Volume expansion
+Case study
+Faster decision
+Multi module adoption
+
+Step 3 Conditional framing
+If we structure X we can explore Y
+
+Step 4 ROI anchor
+Shift from price per unit to risk per outcome
+
+Step 5 Protect margin guardrails
+System must not suggest arbitrary concession
+
+PHASE 7
+TECHNICAL OBJECTION HANDLING
+
+When technical concern detected:
+
+1 Clarify environment
+2 Identify integration constraint
+3 Explain compatibility clearly
+4 Compare to industry best practice
+5 Offer proof of validation
+
+No marketing fluff
+Only precise language
+
+PHASE 8
+RESPONSE QUALITY RESTORATION
+
+Responses must be:
+
+Fast
+Concise
+Contextual
+Seller practical
+High authority tone
+Professional
+Executive ready
+
+Avoid:
+
+Over explanation
+Academic language
+Generic reassurance
+Motivational filler
+
+PHASE 9
+CUSTOMER QUERY PITCHES FIX
+
+Customer Query Pitches must:
+
+1 Detect direct customer question
+2 Answer immediately and clearly
+3 If objection hidden in question
+Trigger objection engine
+4 Provide one follow up leverage question
+5 Maintain 3 to 5 second response time
+
+PERFORMANCE REQUIREMENT
+
+Shift Gears response time target
+Under 5 seconds
+
+Customer Query Pitches
+Under 4 seconds
+
+Token efficiency must be optimized
+Remove redundant reasoning chains
+
+TESTING VALIDATION SCENARIOS
+
+1 Too expensive
+2 Competitor cheaper
+3 Already using X
+4 No budget
+5 Security concern
+6 Legal delay
+7 Procurement pressure
+8 Send proposal only
+9 Not priority
+10 Walking away tone
+
+Each must trigger correct response path.
+
+FINAL NON NEGOTIABLE RULE
+
+No changes outside:
+
+Shift Gears
+Customer Query Pitches
+
+No UI impact
+No architecture impact
+No database impact
+No performance degradation anywhere else
+
+Only intelligence restoration and enhancement inside these two modules.

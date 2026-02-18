@@ -1,0 +1,324 @@
+Below is a structured system level enhancement prompt you can pass directly to Replit.
+
+It is designed to upgrade only:
+
+• Shift Gears
+• Customer Query Pitches
+
+No other modules must be modified. No UI changes. No logic change outside these two components. No performance impact to unrelated features.
+
+REPLIT IMPLEMENTATION PROMPT
+Enhancement Title
+
+Shift Gears 2.0 and Customer Query Pitches Advanced Negotiation and Objection Intelligence Layer
+
+STRICT NON DISRUPTION RULE
+
+Do NOT modify any existing architecture.
+
+Do NOT change database schema.
+
+Do NOT modify Conversation Analysis, Battle Cards, Case Studies, Pitch Decks, Meeting Minutes or any other module.
+
+Do NOT change UI components.
+
+Only enhance internal reasoning layer of:
+• Shift Gears
+• Customer Query Pitches
+
+All previous bug fixes requested earlier must remain intact.
+
+No change to response speed outside these two modules.
+
+Backward compatibility required.
+
+OBJECTIVE
+
+Enhance Shift Gears and Customer Query Pitches with a universal objection handling, technical response, strategic reframing and negotiation intelligence framework capable of handling:
+
+• Price objections
+• Technical objections
+• Feature comparison
+• Security concerns
+• Compliance concerns
+• Switching resistance
+• Stakeholder alignment
+• Budget constraints
+• Contract negotiation
+• Timing delays
+• Competitive displacement
+• Proof of value requests
+• Procurement pressure
+• Legal redlines
+• Emotional disinterest
+• Authority gaps
+• Strategic misalignment
+
+System must adapt based on context of live conversation.
+
+CORE FRAMEWORK TO IMPLEMENT
+
+Create internal reasoning engine structured as:
+
+EMPATHY → DIAGNOSE → CLASSIFY → REFRAME → VALUE ELEVATE → RISK CONTRAST → NEGOTIATE → MICRO CLOSE
+
+PHASE 1
+REAL TIME OBJECTION CLASSIFICATION ENGINE
+
+Shift Gears must detect objection type using transcript signals.
+
+Build classification buckets:
+
+Financial Objection
+
+Technical Feasibility Objection
+
+Security or Compliance Objection
+
+Operational Complexity Objection
+
+Switching Cost Objection
+
+Political or Stakeholder Objection
+
+Timing or Priority Objection
+
+Competitive Comparison
+
+Negotiation Pressure
+
+Hidden Objection
+
+Return internal tag before generating response.
+
+PHASE 2
+RESPONSE CONSTRUCTION FRAME
+
+For every objection type, follow this structure:
+
+Step 1 Tactical Empathy
+Acknowledge without agreeing against product
+
+Step 2 Clarifying Diagnostic Question
+Ask 1 precision question to uncover real concern
+
+Step 3 Strategic Reframe
+Shift lens from surface concern to business impact
+
+Step 4 Loss Amplification
+Quantify potential downside of inaction
+
+Step 5 Value Anchor
+Tie product capability to business outcome
+
+Step 6 Controlled Next Step
+Offer low friction advancement
+
+PHASE 3
+TECHNICAL SCENARIO HANDLING
+
+When objection is technical:
+
+Use Technical Resolution Layer:
+
+Clarify environment
+
+Confirm architecture constraints
+
+Identify integration layer
+
+Highlight compatibility
+
+Compare against industry benchmark
+
+Offer sandbox or proof test
+
+Avoid generic marketing language.
+Use technical clarity and structure.
+
+PHASE 4
+NON TECHNICAL SCENARIO HANDLING
+
+When objection is emotional or vague:
+
+Use Insight Bridge Model:
+
+Normalize concern
+
+Convert abstract fear into measurable risk
+
+Attach financial impact
+
+Attach reputational impact
+
+Attach operational impact
+
+PHASE 5
+NEGOTIATION FRAMEWORK
+
+Add Negotiation Intelligence Module inside Shift Gears.
+
+When pricing pressure or contract negotiation detected:
+
+Activate Structured Negotiation Model:
+
+Step 1 Context Extraction
+Detect if pressure is budget real or leverage tactic
+
+Step 2 Trade Value Not Price
+If discount requested, require give back:
+
+• Longer term
+• Volume commitment
+• Case study
+• Faster close
+• Multi module expansion
+
+Step 3 Conditional Framing
+Instead of reducing price say:
+
+If we structure X commitment, we can explore Y flexibility.
+
+Step 4 Anchor to Outcome
+Reframe negotiation around ROI not cost
+
+Step 5 Protect Margin Guardrails
+System must not suggest arbitrary discount
+Only suggest structured value exchange
+
+Step 6 Escalation Logic
+If beyond seller authority, suggest executive alignment
+
+PHASE 6
+COMPETITIVE DEFENSE MODEL
+
+When competitor mentioned:
+
+Do not attack competitor
+
+Clarify evaluation criteria
+
+Reframe around differentiation
+
+Introduce risk contrast
+
+Offer side by side proof
+
+Suggest limited pilot
+
+PHASE 7
+AUTHORITY GAP HANDLING
+
+If buyer says need to check with team:
+
+Map decision hierarchy
+
+Ask about evaluation criteria
+
+Offer to equip champion
+
+Provide summary ammunition
+
+Secure follow up
+
+PHASE 8
+MICRO COMMITMENT ENGINE
+
+Every output must end with one of:
+
+• Clarifying question
+• Pilot suggestion
+• Stakeholder alignment step
+• Technical validation step
+• Timeline agreement
+
+Never end with generic closing statement.
+
+CUSTOMER QUERY PITCHES ENHANCEMENT
+
+Customer Query Pitches must:
+
+Detect whether query is informational or objection based
+
+Apply appropriate response frame
+
+Provide structured answer
+
+Provide follow up leverage question
+
+Suggest negotiation framing if pricing related
+
+TONE CONTROL
+
+Allow adaptive tone:
+
+If executive present
+Use strategic language
+
+If technical stakeholder
+Use architectural clarity
+
+If procurement
+Use value trade logic
+
+If emotional disinterest
+Use analogy and risk contrast
+
+OUTPUT REQUIREMENTS
+
+Responses must:
+
+• Be structured
+• Avoid long rambling
+• Avoid defensive tone
+• Avoid product dumping
+• Be confident
+• Be consultative
+
+PERFORMANCE REQUIREMENT
+
+Response generation under:
+
+4 to 6 seconds for Shift Gears
+3 to 5 seconds for Customer Query Pitches
+
+Optimize prompt tokens.
+Avoid redundant reasoning chains.
+
+TESTING CASES TO VALIDATE
+
+Price too expensive
+
+Competitor cheaper
+
+We already use X
+
+Security team concerned
+
+Legal wants changes
+
+Budget frozen
+
+Not priority this quarter
+
+Integration complexity
+
+Need ROI proof
+
+Send proposal only
+
+All must trigger correct reasoning path.
+
+FINAL RULE
+
+No changes outside:
+
+Shift Gears
+Customer Query Pitches
+
+No UI change
+No database change
+No workflow change
+No impact to other modules
+
+Only intelligence layer enhancement.
