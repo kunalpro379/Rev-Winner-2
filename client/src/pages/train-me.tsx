@@ -169,25 +169,12 @@ export default function TrainMe() {
         headers["Authorization"] = `Bearer ${accessToken}`;
       }
       
-      // Initialize progress
-      setUploadProgress(prev => ({
-        ...prev,
-        [domainId]: { current: 0, total: 100, percentage: 0, message: 'Uploading files...' }
-      }));
-      
       return fetch(`/api/domain-expertise/${domainId}/documents`, {
         method: 'POST',
         body: formData,
         headers,
       }).then(res => {
         if (!res.ok) throw new Error('Upload failed');
-        
-        // Update progress to show extraction phase
-        setUploadProgress(prev => ({
-          ...prev,
-          [domainId]: { current: 50, total: 100, percentage: 50, message: 'Extracting knowledge...' }
-        }));
-        
         return res.json();
       });
     },
@@ -198,36 +185,12 @@ export default function TrainMe() {
       const uploaded = data.uploaded || [];
       const errors = data.errors || [];
       
-      // Complete progress
-      setUploadProgress(prev => ({
-        ...prev,
-        [variables.domainId]: { current: 100, total: 100, percentage: 100, message: 'Complete!' }
-      }));
-      
-      // Clear progress after 2 seconds
-      setTimeout(() => {
-        setUploadProgress(prev => {
-          const newProgress = { ...prev };
-          delete newProgress[variables.domainId];
-          return newProgress;
-        });
-      }, 2000);
-      
       if (uploaded.length > 0 && errors.length === 0) {
         // All files uploaded successfully
         toast({ 
           title: "Files uploaded", 
-          description: `${uploaded.length} file(s) uploaded. Extracting knowledge...` 
+          description: `${uploaded.length} file(s) uploaded. Extracting knowledge in background...` 
         });
-        
-        // Auto-refresh knowledge base after 3 seconds to show extracted data
-        setTimeout(() => {
-          queryClient.invalidateQueries({ queryKey: ['/api/domain-expertise', variables.domainId, 'knowledge'] });
-          toast({
-            title: "Knowledge extracted",
-            description: "Your documents have been processed and added to the knowledge base.",
-          });
-        }, 3000);
       } else if (uploaded.length > 0 && errors.length > 0) {
         // Partial success
         toast({ 
@@ -263,12 +226,6 @@ export default function TrainMe() {
     },
     onError: (error: any, variables) => {
       toast({ title: "Upload failed", description: error.message || "Failed to upload files", variant: "destructive" });
-      // Clear progress on error
-      setUploadProgress(prev => {
-        const newProgress = { ...prev };
-        delete newProgress[variables.domainId];
-        return newProgress;
-      });
     },
   });
 
@@ -561,12 +518,14 @@ function DocumentCard({
   onDelete,
   onReplace,
   getStatusBadge,
+  extractionProgress,
 }: {
   document: TrainingDocument;
   domainId: string;
   onDelete: () => void;
   onReplace: (file: File) => void;
   getStatusBadge: (status: string) => JSX.Element;
+  extractionProgress?: { status: string; percentage: number; message: string; phase: string };
 }) {
   const [showSummary, setShowSummary] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -667,6 +626,46 @@ function DocumentCard({
           </Button>
         </div>
       </div>
+      
+      {/* Extraction Progress */}
+      {extractionProgress && extractionProgress.status === 'processing' && (
+        <div className="space-y-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+              <span className="font-medium text-blue-900 dark:text-blue-100">{extractionProgress.message}</span>
+            </div>
+            <span className="text-blue-700 dark:text-blue-300 font-semibold">{extractionProgress.percentage}%</span>
+          </div>
+          <div className="w-full bg-blue-200 dark:bg-blue-900 rounded-full h-2 overflow-hidden">
+            <div 
+              className="bg-gradient-to-r from-blue-600 to-cyan-600 h-full transition-all duration-300 ease-out"
+              style={{ width: `${extractionProgress.percentage}%` }}
+            />
+          </div>
+          <p className="text-xs text-blue-700 dark:text-blue-300">
+            Phase: {extractionProgress.phase}
+          </p>
+        </div>
+      )}
+      
+      {extractionProgress && extractionProgress.status === 'completed' && (
+        <div className="p-2 bg-green-50 dark:bg-green-950/30 rounded border border-green-200 dark:border-green-800">
+          <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300">
+            <CheckCircle2 className="w-4 h-4" />
+            <span>{extractionProgress.message}</span>
+          </div>
+        </div>
+      )}
+      
+      {extractionProgress && extractionProgress.status === 'failed' && (
+        <div className="p-2 bg-red-50 dark:bg-red-950/30 rounded border border-red-200 dark:border-red-800">
+          <div className="flex items-center gap-2 text-sm text-red-700 dark:text-red-300">
+            <AlertCircle className="w-4 h-4" />
+            <span>Extraction failed: {extractionProgress.message}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -724,6 +723,30 @@ function DomainCard({
       const hasProcessing = data.some(d => d.processingStatus === 'processing');
       return hasProcessing ? 3000 : false;
     }
+  });
+
+  // Poll for extraction progress
+  const { data: extractionProgress } = useQuery<Record<string, any>>({
+    queryKey: ['/api/domain-expertise', domain.id, 'extraction-progress'],
+    queryFn: async () => {
+      const accessToken = localStorage.getItem("accessToken");
+      const headers: Record<string, string> = {};
+      if (accessToken) {
+        headers["Authorization"] = `Bearer ${accessToken}`;
+      }
+      const res = await fetch(`/api/domain-expertise/${domain.id}/extraction-progress`, { headers });
+      if (!res.ok) return {};
+      const data = await res.json();
+      
+      // Auto-refresh knowledge base when any extraction completes
+      if (data && Object.values(data).some((p: any) => p.status === 'completed')) {
+        queryClient.invalidateQueries({ queryKey: ['/api/domain-expertise', domain.id, 'knowledge'] });
+      }
+      
+      return data;
+    },
+    refetchInterval: 1000, // Poll every second for real-time updates
+    enabled: !!documents && documents.length > 0
   });
 
   const { data: knowledgeEntries, isLoading: knowledgeLoading } = useQuery<KnowledgeEntry[]>({
@@ -947,6 +970,7 @@ function DomainCard({
                 onDelete={() => onDeleteDocument(doc.id)}
                 onReplace={(file) => onReplaceDocument(doc.id, file)}
                 getStatusBadge={getStatusBadge}
+                extractionProgress={extractionProgress?.[doc.id]}
               />
             ))}
           </div>

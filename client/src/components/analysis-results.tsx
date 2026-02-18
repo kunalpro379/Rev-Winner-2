@@ -886,7 +886,7 @@ function CallFlowScriptTab({ data }: { data: CallFlowScript }) {
             <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200">{pages[currentPage].title}</h3>
           </div>
           
-          <div className="min-h-[200px]">
+          <div>
             {renderPageContent()}
           </div>
         </CardContent>
@@ -1336,33 +1336,33 @@ function AnalysisTabs({ tabData, productName }: { tabData: TabBasedAnalysis; pro
         </TabsTrigger>
       </TabsList>
 
-      <ScrollArea className="max-h-[70vh] mt-4">
-        <TabsContent value="discovery" className="mt-0 pr-4">
+      <div className="mt-4">
+        <TabsContent value="discovery" className="mt-0">
           <DiscoveryQuestionsTab data={safeTabData.discovery} />
         </TabsContent>
 
-        <TabsContent value="objections" className="mt-0 pr-4">
+        <TabsContent value="objections" className="mt-0">
           <ObjectionHandlingTab data={safeTabData.objections} />
         </TabsContent>
 
-        <TabsContent value="nextsteps" className="mt-0 pr-4">
+        <TabsContent value="nextsteps" className="mt-0">
           <NextStepsTab data={safeTabData.nextSteps} />
         </TabsContent>
 
-        <TabsContent value="competitors" className="mt-0 pr-4">
+        <TabsContent value="competitors" className="mt-0">
           <CompetitorAnalysisTab data={safeTabData.competitors} />
         </TabsContent>
 
-        <TabsContent value="urgency" className="mt-0 pr-4">
+        <TabsContent value="urgency" className="mt-0">
           <CreateUrgencyTab data={safeTabData.urgency} />
         </TabsContent>
 
         {safeTabData.callFlowScript && (
-          <TabsContent value="callflow" className="mt-0 pr-4">
+          <TabsContent value="callflow" className="mt-0">
             <CallFlowScriptTab data={safeTabData.callFlowScript} />
           </TabsContent>
         )}
-      </ScrollArea>
+      </div>
     </Tabs>
   );
 }

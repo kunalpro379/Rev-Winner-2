@@ -206,141 +206,143 @@ export function FloatingAssistant({ conversationId, variant = "floating" }: Floa
     );
   }
 
-  // Floating variant - original bottom-right UI
+  // Floating variant - positioned by parent container
   return (
-    <div className="fixed bottom-8 right-8 flex flex-col gap-3 z-50">
-      {/* Toggle visibility button */}
-      <div className="relative ml-auto">
-        <Button
-          size="icon"
-          variant="outline"
-          className="h-12 w-12 rounded-full shadow-xl bg-white dark:bg-gray-900 border-2 border-indigo-200 dark:border-indigo-800 hover:border-indigo-400 dark:hover:border-indigo-600 transition-all hover:scale-105"
-          onClick={toggleVisibility}
-          data-testid="toggle-assistant-visibility"
-          title={preferences.visible ? "Hide assistant" : "Show assistant"}
-        >
-          <ChevronUp className={`h-5 w-5 text-indigo-600 dark:text-indigo-400 transition-transform duration-300 ${preferences.visible ? '' : 'rotate-180'}`} />
-        </Button>
-        <span className="absolute -top-1 -right-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md">
-          AI
-        </span>
-      </div>
-
-      {preferences.visible && (
-        <>
-          {/* Settings button */}
-          <Popover open={showSettings} onOpenChange={setShowSettings}>
-            <PopoverTrigger asChild>
-              <Button
-                size="icon"
-                variant="outline"
-                className="h-12 w-12 rounded-full shadow-xl bg-white dark:bg-gray-900 ml-auto border-2 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 transition-all hover:scale-105"
-                data-testid="assistant-settings"
-                title="Configure assistant"
-              >
-                <Settings className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent side="left" className="w-72 p-4 shadow-xl">
-              <div className="space-y-4">
-                <h3 className="font-semibold text-sm">Sales Assistant Settings</h3>
-                <div className="space-y-3">
-                  {icons.map(({ type, Icon, label, color }) => (
-                    <div key={type} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Icon className={`h-4 w-4 ${color}`} />
-                        <Label htmlFor={`toggle-${type}`} className="text-sm cursor-pointer">
-                          {label}
-                        </Label>
-                      </div>
-                      <Switch
-                        id={`toggle-${type}`}
-                        checked={preferences.enabled[type]}
-                        onCheckedChange={() => toggleIcon(type)}
-                        data-testid={`toggle-${type}`}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          {/* Advice icons */}
-          {enabledIcons.map(({ type, Icon, label, description, color, hoverColor }) => (
-        <Popover
-          key={type}
-          open={openPopover === type}
-          onOpenChange={(open) => {
-            if (!open) {
-              setOpenPopover(null);
-              setActiveAdvice(null);
-            }
-          }}
-        >
-          <PopoverTrigger asChild>
-            <Button
-              size="icon"
-              variant="outline"
-              className={`h-16 w-16 rounded-full shadow-xl border-2 ${hoverColor} transition-all hover:scale-110 bg-white dark:bg-gray-900 hover:shadow-2xl`}
-              onClick={() => handleAdviceClick(type)}
-              data-testid={`floating-assistant-${type}`}
-              title={description}
-            >
-              <Icon className={`h-7 w-7 ${color}`} />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            side="left"
-            className="w-80 p-4 shadow-xl"
-            data-testid={`popover-${type}`}
+    <div className="flex flex-col gap-3 z-30" style={{ pointerEvents: 'none' }}>
+      <div className="flex flex-col gap-3" style={{ pointerEvents: 'auto' }}>
+        {/* Toggle visibility button */}
+        <div className="relative ml-auto">
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-14 w-14 rounded-full shadow-xl bg-white dark:bg-gray-900 border-2 border-indigo-200 dark:border-indigo-800 hover:border-indigo-400 dark:hover:border-indigo-600 transition-all hover:scale-105"
+            onClick={toggleVisibility}
+            data-testid="toggle-assistant-visibility"
+            title={preferences.visible ? "Hide assistant" : "Show assistant"}
           >
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Icon className={`h-5 w-5 ${color}`} />
-                <h3 className="font-semibold text-sm">{label}</h3>
-              </div>
-              
-              {adviceMutation.isPending && openPopover === type ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <ChevronUp className={`h-5 w-5 text-indigo-600 dark:text-indigo-400 transition-transform duration-300 ${preferences.visible ? '' : 'rotate-180'}`} />
+          </Button>
+          <span className="absolute -top-1 -right-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md">
+            AI
+          </span>
+        </div>
+
+        {preferences.visible && (
+          <>
+            {/* Settings button */}
+            <Popover open={showSettings} onOpenChange={setShowSettings}>
+              <PopoverTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-14 w-14 rounded-full shadow-xl bg-white dark:bg-gray-900 ml-auto border-2 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 transition-all hover:scale-105"
+                  data-testid="assistant-settings"
+                  title="Configure assistant"
+                >
+                  <Settings className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent side="left" className="w-72 p-4 shadow-xl">
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-sm">Sales Assistant Settings</h3>
+                  <div className="space-y-3">
+                    {icons.map(({ type, Icon, label, color }) => (
+                      <div key={type} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Icon className={`h-4 w-4 ${color}`} />
+                          <Label htmlFor={`toggle-${type}`} className="text-sm cursor-pointer">
+                            {label}
+                          </Label>
+                        </div>
+                        <Switch
+                          id={`toggle-${type}`}
+                          checked={preferences.enabled[type]}
+                          onCheckedChange={() => toggleIcon(type)}
+                          data-testid={`toggle-${type}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ) : activeAdvice && activeAdvice.type === type ? (
-                <div className="space-y-2">
-                  <p className="text-sm leading-relaxed whitespace-pre-line" data-testid={`advice-content-${type}`}>
-                    {activeAdvice.content}
-                  </p>
+              </PopoverContent>
+            </Popover>
+
+            {/* Advice icons */}
+            {enabledIcons.map(({ type, Icon, label, description, color, hoverColor }) => (
+              <Popover
+                key={type}
+                open={openPopover === type}
+                onOpenChange={(open) => {
+                  if (!open) {
+                    setOpenPopover(null);
+                    setActiveAdvice(null);
+                  }
+                }}
+              >
+                <PopoverTrigger asChild>
                   <Button
-                    size="sm"
-                    variant="ghost"
+                    size="icon"
+                    variant="outline"
+                    className={`h-16 w-16 rounded-full shadow-xl border-2 ${hoverColor} transition-all hover:scale-110 bg-white dark:bg-gray-900 hover:shadow-2xl`}
                     onClick={() => handleAdviceClick(type)}
-                    className="w-full"
-                    data-testid={`refresh-advice-${type}`}
+                    data-testid={`floating-assistant-${type}`}
+                    title={description}
                   >
-                    Get New Advice
+                    <Icon className={`h-7 w-7 ${color}`} />
                   </Button>
-                </div>
-              ) : adviceMutation.isError ? (
-                <div className="space-y-2">
-                  <p className="text-sm text-destructive">
-                    Failed to generate advice. Please try again.
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleAdviceClick(type)}
-                    className="w-full"
-                  >
-                    Retry
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          </PopoverContent>
-        </Popover>
-          ))}
-        </>
-      )}
+                </PopoverTrigger>
+                <PopoverContent
+                  side="left"
+                  className="w-80 p-4 shadow-xl"
+                  data-testid={`popover-${type}`}
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Icon className={`h-5 w-5 ${color}`} />
+                      <h3 className="font-semibold text-sm">{label}</h3>
+                    </div>
+                    
+                    {adviceMutation.isPending && openPopover === type ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : activeAdvice && activeAdvice.type === type ? (
+                      <div className="space-y-2">
+                        <p className="text-sm leading-relaxed whitespace-pre-line" data-testid={`advice-content-${type}`}>
+                          {activeAdvice.content}
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleAdviceClick(type)}
+                          className="w-full"
+                          data-testid={`refresh-advice-${type}`}
+                        >
+                          Get New Advice
+                        </Button>
+                      </div>
+                    ) : adviceMutation.isError ? (
+                      <div className="space-y-2">
+                        <p className="text-sm text-destructive">
+                          Failed to generate advice. Please try again.
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleAdviceClick(type)}
+                          className="w-full"
+                        >
+                          Retry
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            ))}
+          </>
+        )}
+      </div>
     </div>
   );
 }

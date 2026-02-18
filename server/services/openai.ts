@@ -3293,7 +3293,8 @@ STRICT RULES:
         }
       ],
       temperature: 0.5,
-      max_tokens: 300
+      max_tokens: 400,
+      timeout: 30000 // 30 second timeout instead of 10
     });
 
     const answer = response.choices[0]?.message?.content?.trim() || "I couldn't generate an answer. Please try rephrasing your question.";

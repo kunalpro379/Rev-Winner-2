@@ -247,20 +247,55 @@ function getLayoutedElements(
 ): { nodes: Node[]; edges: Edge[] } {
   if (nodes.length === 0) return { nodes: [], edges };
   
+  // If there are no edges, create a hierarchical structure based on categories
+  if (edges.length === 0) {
+    return createCategoryBasedLayout(nodes, direction);
+  }
+  
+  // Use dagre for hierarchical layout with optimized settings for organized structure
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
-  dagreGraph.setGraph({ rankdir: direction, ranksep: 80, nodesep: 50 });
-
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+  
+  // Configure graph for clean, organized hierarchical layout
+  dagreGraph.setGraph({ 
+    rankdir: direction,
+    ranksep: direction === 'TB' ? 120 : 180,  // Increased vertical spacing between levels
+    nodesep: direction === 'TB' ? 80 : 80,    // Horizontal spacing between nodes
+    edgesep: 40,                               // Spacing between edges
+    marginx: 60,
+    marginy: 60,
+    align: 'UL',                               // Align nodes to upper-left
+    ranker: 'network-simplex',                 // Better for hierarchical layouts
+    acyclicer: 'greedy'                        // Handle cycles better
   });
+
+  // Add nodes to graph with proper hierarchy hints
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { 
+      width: nodeWidth, 
+      height: nodeHeight,
+      // Add rank hint based on status and category for better organization
+      rank: node.data?.status === 'confirmed' ? 0 : 
+            node.data?.status === 'assumed' ? 1 : 
+            node.data?.status === 'preemptive' ? 2 : 1
+    });
+  });
+  
+  // Add edges with proper hierarchy
   edges.forEach((edge) => {
     if (nodes.some(n => n.id === edge.source) && nodes.some(n => n.id === edge.target)) {
-      dagreGraph.setEdge(edge.source, edge.target);
+      dagreGraph.setEdge(edge.source, edge.target, {
+        // Add weight for important connections
+        weight: edge.type === 'reports_to' ? 3 : 
+                edge.type === 'sequence' ? 3 : 
+                edge.type === 'integration' ? 2 : 1
+      });
     }
   });
+  
   dagre.layout(dagreGraph);
 
+  // Apply calculated positions
   const layoutedNodes = nodes.map((node) => {
     const nodeWithPosition = dagreGraph.node(node.id);
     return {
@@ -275,24 +310,102 @@ function getLayoutedElements(
   return { nodes: layoutedNodes, edges };
 }
 
+// Create a category-based hierarchical layout when no edges exist
+function createCategoryBasedLayout(nodes: Node[], direction: 'TB' | 'LR' = 'LR'): { nodes: Node[]; edges: Edge[] } {
+  // Group nodes by category
+  const nodesByCategory = new Map<string, Node[]>();
+  nodes.forEach((node) => {
+    const category = node.data?.category || 'default';
+    if (!nodesByCategory.has(category)) {
+      nodesByCategory.set(category, []);
+    }
+    nodesByCategory.get(category)!.push(node);
+  });
+
+  const categories = Array.from(nodesByCategory.keys());
+  const layoutedNodes: Node[] = [];
+  
+  if (direction === 'LR') {
+    // Horizontal layout: categories as columns
+    let xOffset = 0;
+    categories.forEach((category, catIndex) => {
+      const categoryNodes = nodesByCategory.get(category)!;
+      let yOffset = 0;
+      
+      categoryNodes.forEach((node, nodeIndex) => {
+        layoutedNodes.push({
+          ...node,
+          position: {
+            x: xOffset,
+            y: yOffset
+          }
+        });
+        yOffset += nodeHeight + 40; // Vertical spacing within category
+      });
+      
+      xOffset += nodeWidth + 100; // Horizontal spacing between categories
+    });
+  } else {
+    // Vertical layout: categories as rows
+    let yOffset = 0;
+    categories.forEach((category, catIndex) => {
+      const categoryNodes = nodesByCategory.get(category)!;
+      let xOffset = 0;
+      
+      categoryNodes.forEach((node, nodeIndex) => {
+        layoutedNodes.push({
+          ...node,
+          position: {
+            x: xOffset,
+            y: yOffset
+          }
+        });
+        xOffset += nodeWidth + 60; // Horizontal spacing within category
+      });
+      
+      yOffset += nodeHeight + 80; // Vertical spacing between categories
+    });
+  }
+
+  return { nodes: layoutedNodes, edges: [] };
+}
+
 function convertToReactFlowNodes(techNodes: TechNode[]): Node[] {
   return techNodes.map((node) => {
     const isPainPoint = node.category === 'pain_point';
     const isPreemptive = node.status === 'preemptive';
+    const isConfirmed = node.status === 'confirmed';
+    const isAssumed = node.status === 'assumed';
     const hasProblem = node.problemDetected === true;
     const painPointStyle = isPainPoint && node.painPointType ? painPointColors[node.painPointType] : null;
     const NodeIcon = getNodeIcon(node);
     
+    // Color coding based on reference image:
+    // Blue: Confirmed, Yellow: Assumed, Purple: Pre-emptive, Red: Problem
     let colors = categoryColors[node.category] || categoryColors.applications;
-    if (isPreemptive) {
+    
+    if (hasProblem) {
+      // Red for problems (highest priority)
+      colors = { bg: '#fef2f2', border: '#dc2626', text: '#991b1b' };
+    } else if (isPreemptive) {
+      // Purple for pre-emptive (not discussed)
       colors = { bg: '#f5f3ff', border: '#7c3aed', text: '#5b21b6' };
+    } else if (isConfirmed) {
+      // Blue for confirmed
+      colors = { bg: '#dbeafe', border: '#3b82f6', text: '#1e40af' };
+    } else if (isAssumed) {
+      // Yellow for assumed
+      colors = { bg: '#fefce8', border: '#ca8a04', text: '#854d0e' };
     } else if (painPointStyle) {
       colors = { ...colors, bg: painPointStyle.bg, border: painPointStyle.border };
     }
     
+    // Border styles: dashed for pre-emptive, thick for problems, solid for others
     const borderStyle = isPreemptive 
       ? '2px dashed #7c3aed' 
       : hasProblem ? '3px solid #dc2626' 
+      : isConfirmed ? '2px solid #3b82f6'
+      : isAssumed ? '2px solid #ca8a04'
       : `2px solid ${colors.border}`;
     
     const boxShadowStyle = hasProblem 
@@ -376,14 +489,16 @@ function convertToReactFlowNodes(techNodes: TechNode[]): Node[] {
 function convertToReactFlowEdges(techEdges: TechEdge[]): Edge[] {
   const getEdgeStyle = (edgeType?: string) => {
     switch (edgeType) {
+      // Dashed lines for missing/preemptive links
+      case 'preemptive_link': return { stroke: '#7c3aed', strokeDasharray: '8,4', strokeWidth: 2 };
+      case 'integration': return { stroke: '#6366f1', strokeDasharray: '5,5' };
       case 'data_flow': return { stroke: '#ec4899', strokeDasharray: '5,5' };
+      case 'replacement': return { stroke: '#ef4444', strokeDasharray: '4,4' };
+      // Solid lines for confirmed connections
       case 'reports_to': return { stroke: '#d946ef', strokeWidth: 2 };
       case 'sequence': return { stroke: '#10b981', strokeWidth: 2 };
-      case 'integration': return { stroke: '#6366f1', strokeDasharray: '3,3' };
-      case 'dependency': return { stroke: '#f59e0b' };
-      case 'preemptive_link': return { stroke: '#7c3aed', strokeDasharray: '8,4', strokeWidth: 2 };
-      case 'replacement': return { stroke: '#ef4444', strokeDasharray: '4,4' };
-      default: return { stroke: '#94a3b8' };
+      case 'dependency': return { stroke: '#f59e0b', strokeWidth: 2 };
+      default: return { stroke: '#94a3b8', strokeWidth: 2 };
     }
   };
   

@@ -146,29 +146,73 @@ export function SalesAssistantQA({ sessionId, conversationContext, domainExperti
     return <div className="space-y-1">{sections}</div>;
   };
 
+  // Load Q&A history from sessionStorage on mount
+  useEffect(() => {
+    const storageKey = `qa_history_${sessionId}`;
+    try {
+      const stored = sessionStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setQaMessages(parsed.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        })));
+      }
+    } catch (error) {
+      console.error('Failed to load Q&A history:', error);
+    }
+  }, [sessionId]);
+
+  // Save Q&A history to sessionStorage whenever it changes
+  useEffect(() => {
+    if (qaMessages.length > 0) {
+      const storageKey = `qa_history_${sessionId}`;
+      try {
+        sessionStorage.setItem(storageKey, JSON.stringify(qaMessages));
+      } catch (error) {
+        console.error('Failed to save Q&A history:', error);
+      }
+    }
+  }, [qaMessages, sessionId]);
+
   // Clear messages when session changes or resetVersion increments
   useEffect(() => {
     if (resetVersion > 0 || sessionId !== prevSessionIdRef.current) {
       setQaMessages([]);
       setCurrentQuestion("");
+      // Clear sessionStorage for old session
+      const oldStorageKey = `qa_history_${prevSessionIdRef.current}`;
+      sessionStorage.removeItem(oldStorageKey);
       prevSessionIdRef.current = sessionId;
     }
   }, [resetVersion, sessionId]);
 
-  // Auto scroll to bottom when new messages are added
-  useEffect(() => {
-    if (qaMessagesEndRef.current) {
-      qaMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [qaMessages]);
+  // REMOVED: Auto scroll to bottom - let user control scrolling
+  // useEffect(() => {
+  //   if (qaMessagesEndRef.current) {
+  //     qaMessagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  //   }
+  // }, [qaMessages]);
 
   const askQuestionMutation = useMutation({
     mutationFn: async (question: string) => {
+      // Build enhanced context with previous Q&A history
+      let enhancedContext = conversationContext || "";
+      
+      // Add previous Q&A to context for memory
+      if (qaMessages.length > 0) {
+        const qaHistory = qaMessages.slice(-5).map(msg => 
+          `Q: ${msg.question}\nA: ${msg.answer}`
+        ).join('\n\n');
+        enhancedContext = `${enhancedContext}\n\n=== Previous Q&A ===\n${qaHistory}\n=== End Previous Q&A ===`;
+      }
+      
       const response = await apiRequest("POST", `/api/conversations/${sessionId}/ask`, {
         question,
-        conversationContext,
+        conversationContext: enhancedContext,
         domainExpertise,
-        domainExpertiseId
+        domainExpertiseId,
+        qaHistory: qaMessages.slice(-5) // Send last 5 Q&A pairs for context
       });
       return response.json();
     },

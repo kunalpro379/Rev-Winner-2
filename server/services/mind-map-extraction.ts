@@ -192,28 +192,94 @@ export async function extractTechEnvironment(
     const { client, model, engine } = aiConfig;
     console.log(`🗺️ Map/Flow: Using user's AI engine: ${engine}, model: ${model}`);
     
-    // Simplified prompt for faster generation
-    const systemPrompt = `Sales intelligence analyst. Extract key elements from conversation. Output JSON only.
+    // Enhanced prompt for better hierarchical structure and connections
+    const systemPrompt = `Sales intelligence analyst. Extract key elements from conversation and create a HIERARCHICAL MIND MAP with proper connections.
 
-${trainMeKnowledge ? 'DOMAIN KNOWLEDGE:\n' + trainMeKnowledge.substring(0, 500) + '...\n\n' : ''}EXTRACT:
+${trainMeKnowledge ? 'DOMAIN KNOWLEDGE:\n' + trainMeKnowledge.substring(0, 500) + '...\n\n' : ''}CRITICAL RULES:
+1. Node labels MUST be complete, descriptive names (e.g., "Cisco Catalyst 9300 Switch", NOT just "switch")
+2. Create AT LEAST 1-2 edges per node for proper hierarchical layout
+3. Use hierarchyLevel (0=top, 1=middle, 2=bottom) for proper ranking
+4. Include full context in labels (company name, product name, version)
 
-1. TECH STACK: Current systems, tools, infrastructure mentioned
-2. PEOPLE: Decision makers with roles and influence
-3. PAIN POINTS: Challenges, issues, inefficiencies
-4. PROCESSES: Key workflows or business processes
-5. FOLLOW-UPS: Questions to ask if info is incomplete
+EXTRACT & CONNECT:
 
-CATEGORIES: users_access, endpoints, network, infrastructure, applications, data_flow, security, operations, cloud, database, integration, vendor, decision_maker, process, pain_point, follow_up
+1. TECH STACK: Current systems, tools, infrastructure
+   - Label format: "[Vendor] [Product] [Version/Type]" (e.g., "Microsoft Azure Cloud Platform")
+   - Create parent-child relationships (Infrastructure → Components)
+   - Connect integrations (System A ↔ System B)
+   - Show data flows (Source → Destination)
 
-STATUS: "confirmed" (explicit) | "assumed" (inferred) | "suggested" (AI-recommended)
+2. PEOPLE: Decision makers with reporting hierarchy
+   - Label format: "[Name] - [Title]" (e.g., "John Smith - CTO")
+   - Use "reports_to" edges for org chart
+   - Set hierarchyLevel: 0 for C-level, 1 for directors, 2 for managers
 
-OUTPUT:
-{"nodes":[{"id":"str","label":"str","category":"str","details":"str","confidence":0-100,"status":"confirmed|assumed|suggested"}],"edges":[{"id":"str","source":"id","target":"id","label":"relationship","type":"default|integration|dependency|data_flow|reports_to"}]}`;
+3. PAIN POINTS: Challenges linked to affected systems
+   - Label format: "Pain: [Specific Issue]" (e.g., "Pain: Slow network performance affecting productivity")
+   - Connect pain points to the systems they affect
+   - Link to potential solutions
+
+4. PROCESSES: Workflows with sequential steps
+   - Label format: "Process: [Step Name]" (e.g., "Process: Initial qualification call")
+   - Use "sequence" edges for process flows
+   - Set sequenceOrder: 1, 2, 3...
+   - Connect to systems involved
+
+5. FOLLOW-UPS: Questions linked to topics
+   - Label format: "Follow-up: [Question]" (e.g., "Follow-up: What is your current backup solution?")
+
+CATEGORIES: users_access, endpoints, network, infrastructure, applications, data_flow, security, operations, cloud, database, integration, vendor, decision_maker, process, pain_point, follow_up, timeline, compliance
+
+STATUS: "confirmed" (explicitly mentioned) | "assumed" (inferred from context) | "suggested" (AI-recommended) | "preemptive" (not discussed but likely exists)
+
+EDGE TYPES:
+- "dependency": Parent-child, infrastructure relationships
+- "integration": System integrations, connections
+- "data_flow": Data movement between systems
+- "reports_to": Organizational hierarchy
+- "sequence": Process steps, timeline
+- "default": General relationships
+
+EXAMPLE STRUCTURE:
+{
+  "nodes": [
+    {"id":"infra1","label":"Enterprise Network Infrastructure","category":"infrastructure","status":"confirmed","hierarchyLevel":0},
+    {"id":"switch1","label":"Cisco Catalyst 9300 Core Switch","category":"network","status":"confirmed","hierarchyLevel":1},
+    {"id":"router1","label":"Cisco ISE Router with Policy Enforcement","category":"network","status":"confirmed","hierarchyLevel":1},
+    {"id":"sec1","label":"CrowdStrike Falcon EDR/XDR Solution","category":"security","status":"assumed","hierarchyLevel":1},
+    {"id":"pain1","label":"Pain: Network congestion during peak hours","category":"pain_point","status":"confirmed","hierarchyLevel":2}
+  ],
+  "edges": [
+    {"id":"e1","source":"infra1","target":"switch1","type":"dependency","label":"contains"},
+    {"id":"e2","source":"infra1","target":"router1","type":"dependency","label":"contains"},
+    {"id":"e3","source":"switch1","target":"sec1","type":"integration","label":"protected by"},
+    {"id":"e4","source":"router1","target":"sec1","type":"integration","label":"protected by"},
+    {"id":"e5","source":"pain1","target":"switch1","type":"dependency","label":"affects"}
+  ]
+}
+
+OUTPUT: Complete JSON with descriptive node labels and proper edges. NO TRUNCATION.`;
 
     let userPrompt: string;
     
     if (isReferenceMode) {
-      userPrompt = `Reference architecture for ${domainExpertiseInput || 'enterprise IT'}. Include typical infrastructure, apps, security, pain points. All nodes "assumed". JSON only.`;
+      userPrompt = `Create reference architecture for ${domainExpertiseInput || 'enterprise IT'}. 
+
+Include:
+- Infrastructure layer (servers, network, cloud)
+- Application layer (business apps, databases)
+- Security layer (firewalls, EDR, access control)
+- Integration layer (APIs, middleware)
+- Common pain points
+
+IMPORTANT: Create hierarchical connections:
+- Infrastructure → Network components
+- Infrastructure → Applications
+- Applications → Databases
+- Security → Protected systems
+- All nodes "assumed" status
+
+Output complete JSON with nodes AND edges arrays.`;
     } else {
       // Truncate transcript for speed - keep most recent and relevant parts
       const maxTranscriptLength = 3000; // Reduced from 5000
@@ -221,13 +287,25 @@ OUTPUT:
         ? '...' + transcript.slice(-maxTranscriptLength)
         : transcript;
       
-      userPrompt = `Analyze sales conversation:
+      userPrompt = `Analyze sales conversation and create hierarchical mind map:
 ${domainExpertiseInput ? `Domain: ${domainExpertiseInput}` : ''}
 
 TRANSCRIPT:
 ${truncatedTranscript}
 
-Extract: tech stack, decision makers, pain points, processes, follow-up questions. JSON only.`;
+Extract: tech stack, decision makers, pain points, processes, follow-up questions.
+
+CRITICAL: Create edges showing:
+1. Infrastructure → Components (dependency)
+2. System integrations (integration)
+3. Data flows (data_flow)
+4. Reporting hierarchy (reports_to)
+5. Process sequences (sequence)
+6. Pain points → Affected systems (dependency)
+
+Ensure EVERY node has at least 1 connection for proper layout.
+
+Output complete JSON with nodes AND edges arrays.`;
     }
 
     console.log(`🧠 Map/Flow: ${isReferenceMode ? 'Reference mode' : 'Live extraction'} for ${transcript?.length || 0} chars`);
@@ -249,7 +327,7 @@ Extract: tech stack, decision makers, pain points, processes, follow-up question
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // CRITICAL: 45-second timeout for Map/Flow AI call (DeepSeek can be slow with complex conversations)
+        // CRITICAL: Increased timeout and tokens for Map/Flow AI call
         const aiCallPromise = client.chat.completions.create({
           model: fastModel,
           messages: [
@@ -258,11 +336,11 @@ Extract: tech stack, decision makers, pain points, processes, follow-up question
           ],
           response_format: { type: "json_object" },
           temperature: 0.1,
-          max_tokens: 1500 // Reduced from 2000 for even faster response
+          max_tokens: 4000 // Increased from 1500 to prevent truncation
         });
         
         const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('AI call timeout after 45 seconds')), 45000)
+          setTimeout(() => reject(new Error('AI call timeout after 60 seconds')), 60000) // Increased from 45s
         );
         
         response = await Promise.race([aiCallPromise, timeoutPromise]) as any;
@@ -403,6 +481,14 @@ Extract: tech stack, decision makers, pain points, processes, follow-up question
 
     console.log(`Map/Flow: Extracted ${nodes.length} nodes, ${edges.length} edges in ${Date.now() - startTime}ms`);
 
+    // FALLBACK: Generate edges if AI didn't create enough
+    if (nodes.length > 0 && edges.length < nodes.length * 0.5) {
+      console.log(`⚠️ Map/Flow: Insufficient edges (${edges.length} for ${nodes.length} nodes). Generating fallback edges...`);
+      const fallbackEdges = generateFallbackEdges(nodes, edges);
+      edges.push(...fallbackEdges);
+      console.log(`✅ Map/Flow: Added ${fallbackEdges.length} fallback edges. Total: ${edges.length}`);
+    }
+
     if (nodes.length === 0) {
       console.warn('⚠️ Map/Flow: AI returned 0 nodes. Raw response:', messageContent?.substring(0, 500));
       console.warn('⚠️ Map/Flow: Parsed result:', JSON.stringify(result).substring(0, 500));
@@ -423,4 +509,153 @@ Extract: tech stack, decision makers, pain points, processes, follow-up question
     console.error("❌ Map/Flow error details:", error.message, error.stack);
     throw new Error(`AI extraction failed: ${error.message || 'Unknown error'}`);
   }
+}
+
+// Fallback edge generation for better hierarchical layout
+function generateFallbackEdges(nodes: TechNode[], existingEdges: TechEdge[]): TechEdge[] {
+  const newEdges: TechEdge[] = [];
+  const existingConnections = new Set(existingEdges.map(e => `${e.source}-${e.target}`));
+  let edgeCounter = existingEdges.length;
+  
+  // Helper to add edge if it doesn't exist
+  const addEdge = (source: string, target: string, type: string, label?: string) => {
+    const key = `${source}-${target}`;
+    if (!existingConnections.has(key) && source !== target) {
+      newEdges.push({
+        id: `fallback_edge_${edgeCounter++}`,
+        source,
+        target,
+        label: label || '',
+        type
+      });
+      existingConnections.add(key);
+    }
+  };
+  
+  // Group nodes by category
+  const nodesByCategory: Record<string, TechNode[]> = {};
+  nodes.forEach(node => {
+    if (!nodesByCategory[node.category]) {
+      nodesByCategory[node.category] = [];
+    }
+    nodesByCategory[node.category].push(node);
+  });
+  
+  // 1. Connect infrastructure to components
+  const infrastructure = nodesByCategory['infrastructure'] || [];
+  const networkNodes = nodesByCategory['network'] || [];
+  const endpoints = nodesByCategory['endpoints'] || [];
+  const applications = nodesByCategory['applications'] || [];
+  
+  infrastructure.forEach(infra => {
+    networkNodes.forEach(net => addEdge(infra.id, net.id, 'dependency', 'contains'));
+    endpoints.slice(0, 2).forEach(ep => addEdge(infra.id, ep.id, 'dependency', 'hosts'));
+    applications.slice(0, 2).forEach(app => addEdge(infra.id, app.id, 'dependency', 'runs'));
+  });
+  
+  // 2. Connect applications to databases
+  const databases = nodesByCategory['database'] || [];
+  applications.forEach(app => {
+    databases.forEach(db => addEdge(app.id, db.id, 'data_flow', 'stores data'));
+  });
+  
+  // 3. Connect security to protected systems
+  const security = nodesByCategory['security'] || [];
+  const protectedSystems = [...networkNodes, ...applications, ...endpoints];
+  security.forEach(sec => {
+    protectedSystems.slice(0, 3).forEach(sys => addEdge(sec.id, sys.id, 'integration', 'protects'));
+  });
+  
+  // 4. Connect cloud services to applications
+  const cloud = nodesByCategory['cloud'] || [];
+  cloud.forEach(cl => {
+    applications.slice(0, 2).forEach(app => addEdge(cl.id, app.id, 'dependency', 'hosts'));
+  });
+  
+  // 5. Connect integrations to systems
+  const integrations = nodesByCategory['integration'] || [];
+  const systems = [...applications, ...cloud, ...databases];
+  integrations.forEach(integ => {
+    systems.slice(0, 2).forEach(sys => addEdge(integ.id, sys.id, 'integration', 'connects'));
+  });
+  
+  // 6. Connect pain points to affected systems
+  const painPoints = nodesByCategory['pain_point'] || [];
+  const allSystems = [...infrastructure, ...networkNodes, ...applications, ...security];
+  painPoints.forEach(pain => {
+    // Connect to 1-2 related systems based on keyword matching
+    const relatedSystems = allSystems.filter(sys => {
+      const painLower = pain.label.toLowerCase();
+      const sysLower = sys.label.toLowerCase();
+      return painLower.includes(sysLower.split(' ')[0]) || sysLower.includes(painLower.split(' ')[0]);
+    }).slice(0, 2);
+    
+    if (relatedSystems.length > 0) {
+      relatedSystems.forEach(sys => addEdge(pain.id, sys.id, 'dependency', 'affects'));
+    } else {
+      // If no keyword match, connect to first system
+      if (allSystems.length > 0) {
+        addEdge(pain.id, allSystems[0].id, 'dependency', 'affects');
+      }
+    }
+  });
+  
+  // 7. Connect decision makers in hierarchy
+  const decisionMakers = nodesByCategory['decision_maker'] || [];
+  if (decisionMakers.length > 1) {
+    // Sort by hierarchy level if available, otherwise by label
+    const sorted = [...decisionMakers].sort((a, b) => {
+      if (a.hierarchyLevel !== undefined && b.hierarchyLevel !== undefined) {
+        return a.hierarchyLevel - b.hierarchyLevel;
+      }
+      // CEO/CTO at top, then directors, then managers
+      const aLevel = a.label.toLowerCase().includes('ceo') ? 0 
+                   : a.label.toLowerCase().includes('cto') || a.label.toLowerCase().includes('cfo') ? 1
+                   : a.label.toLowerCase().includes('director') ? 2
+                   : a.label.toLowerCase().includes('manager') ? 3
+                   : 4;
+      const bLevel = b.label.toLowerCase().includes('ceo') ? 0
+                   : b.label.toLowerCase().includes('cto') || b.label.toLowerCase().includes('cfo') ? 1
+                   : b.label.toLowerCase().includes('director') ? 2
+                   : b.label.toLowerCase().includes('manager') ? 3
+                   : 4;
+      return aLevel - bLevel;
+    });
+    
+    // Connect in hierarchy
+    for (let i = 1; i < sorted.length; i++) {
+      addEdge(sorted[i].id, sorted[0].id, 'reports_to', 'reports to');
+    }
+  }
+  
+  // 8. Connect process steps in sequence
+  const processes = nodesByCategory['process'] || [];
+  if (processes.length > 1) {
+    const sorted = [...processes].sort((a, b) => {
+      if (a.sequenceOrder !== undefined && b.sequenceOrder !== undefined) {
+        return a.sequenceOrder - b.sequenceOrder;
+      }
+      return 0;
+    });
+    
+    for (let i = 0; i < sorted.length - 1; i++) {
+      addEdge(sorted[i].id, sorted[i + 1].id, 'sequence', 'then');
+    }
+  }
+  
+  // 9. If still not enough edges, create category-based connections
+  if (newEdges.length + existingEdges.length < nodes.length * 0.5) {
+    const categories = Object.keys(nodesByCategory);
+    categories.forEach(cat => {
+      const catNodes = nodesByCategory[cat];
+      if (catNodes.length > 1) {
+        // Connect first node to others in same category
+        for (let i = 1; i < Math.min(catNodes.length, 3); i++) {
+          addEdge(catNodes[0].id, catNodes[i].id, 'default', 'related');
+        }
+      }
+    });
+  }
+  
+  return newEdges;
 }

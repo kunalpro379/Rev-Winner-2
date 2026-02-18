@@ -472,7 +472,7 @@ RESPONSE FORMAT (NO MARKDOWN):
 export async function extractKnowledgeFromDocument(
   document: TrainingDocument,
   existingHashes: Set<string>,
-  progressCallback?: (progress: { current: number; total: number; percentage: number; message: string }) => void
+  progressCallback?: (progress: { current: number; total: number; percentage: number; message: string; phase: string }) => void
 ): Promise<ExtractedKnowledge[]> {
   if (!document.content || document.content.trim().length < 50) {
     console.log(`⏭️ Skipping document ${document.fileName}: insufficient content`);
@@ -491,31 +491,53 @@ export async function extractKnowledgeFromDocument(
     const chunks = splitIntoChunks(content, CHUNK_SIZE);
     console.log(`📑 Split into ${chunks.length} chunks for comprehensive extraction`);
     
+    // Notify about chunking
+    if (progressCallback) {
+      progressCallback({
+        current: 0,
+        total: chunks.length,
+        percentage: 0,
+        message: `Split into ${chunks.length} chunks, starting extraction...`,
+        phase: 'chunking'
+      });
+    }
+    
     const allParsedEntries: any[] = [];
     
-    // Process chunks with progress tracking
-    for (let i = 0; i < chunks.length; i++) {
-      const percentage = Math.round(((i + 1) / chunks.length) * 100);
-      const message = `Processing chunk ${i + 1} of ${chunks.length}...`;
+    // Process chunks with progress tracking - PARALLEL processing for speed
+    const chunkPromises = chunks.map(async (chunk, i) => {
+      if (progressCallback) {
+        progressCallback({
+          current: i,
+          total: chunks.length,
+          percentage: Math.round((i / chunks.length) * 100),
+          message: `Processing chunk ${i + 1}/${chunks.length}...`,
+          phase: 'extracting'
+        });
+      }
       
-      // Emit progress
+      const result = await extractFromChunk(chunk, i, chunks.length, i === 0);
+      
       if (progressCallback) {
         progressCallback({
           current: i + 1,
           total: chunks.length,
-          percentage,
-          message
+          percentage: Math.round(((i + 1) / chunks.length) * 100),
+          message: `Completed chunk ${i + 1}/${chunks.length} (${result.length} entries)`,
+          phase: 'extracting'
         });
       }
       
-      const chunkEntries = await extractFromChunk(chunks[i], i, chunks.length, i === 0);
-      allParsedEntries.push(...chunkEntries);
-      
-      // Brief pause between chunks to avoid rate limits (reduced from 500ms to 200ms for speed)
-      if (i < chunks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-    }
+      return result;
+    });
+    
+    // Process all chunks in parallel for maximum speed
+    const chunkResults = await Promise.all(chunkPromises);
+    
+    // Flatten results
+    chunkResults.forEach((entries) => {
+      allParsedEntries.push(...entries);
+    });
 
     console.log(`📊 Total raw entries extracted: ${allParsedEntries.length}`);
 
@@ -645,14 +667,25 @@ async function supersedePricingEntries(
 export async function processDocumentForKnowledge(
   document: TrainingDocument,
   domainExpertiseId: string,
-  userId: string
+  userId: string,
+  progressCallback?: (progress: { current: number; total: number; percentage: number; message: string; phase: string }) => void
 ): Promise<ExtractionResult> {
   const { storage } = await import('../storage');
+  
+  if (progressCallback) {
+    progressCallback({
+      current: 0,
+      total: 100,
+      percentage: 0,
+      message: 'Loading existing knowledge base...',
+      phase: 'initializing'
+    });
+  }
   
   const existingEntries = await storage.getKnowledgeEntriesByDomain(domainExpertiseId, userId);
   const existingHashes = new Set(existingEntries.map(e => e.contentHash).filter(Boolean) as string[]);
 
-  const extracted = await extractKnowledgeFromDocument(document, existingHashes);
+  const extracted = await extractKnowledgeFromDocument(document, existingHashes, progressCallback);
 
   const isPricing = isPricingDocument(document);
   let pricingSuperseded = 0;
@@ -673,6 +706,16 @@ export async function processDocumentForKnowledge(
   const refreshedEntries = pricingSuperseded > 0
     ? await storage.getKnowledgeEntriesByDomain(domainExpertiseId, userId)
     : existingEntries;
+
+  if (progressCallback) {
+    progressCallback({
+      current: 0,
+      total: extracted.length,
+      percentage: 95,
+      message: `Saving ${extracted.length} entries to knowledge base...`,
+      phase: 'saving'
+    });
+  }
 
   for (const entry of extracted) {
     const contentHash = generateContentHash(entry.title + entry.content);
@@ -715,6 +758,16 @@ export async function processDocumentForKnowledge(
     } catch (error: any) {
       console.error(`Failed to save knowledge entry: ${error.message}`);
     }
+  }
+
+  if (progressCallback) {
+    progressCallback({
+      current: extracted.length,
+      total: extracted.length,
+      percentage: 100,
+      message: `Complete! Added ${newEntriesAdded} entries, skipped ${duplicatesSkipped} duplicates`,
+      phase: 'complete'
+    });
   }
 
   console.log(`📚 Knowledge extraction complete: ${newEntriesAdded} added, ${duplicatesSkipped} duplicates skipped${pricingSuperseded > 0 ? `, ${pricingSuperseded} pricing entries superseded` : ''}`);

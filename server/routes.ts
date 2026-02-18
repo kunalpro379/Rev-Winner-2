@@ -32,6 +32,16 @@ import { checkEntitlement } from "./middleware/entitlement";
 import { logSuperUserAccess } from "./utils/accessControl";
 import crypto from "crypto";
 
+// Global type for extraction progress tracking
+declare global {
+  var extractionProgress: Record<string, {
+    status: 'queued' | 'processing' | 'completed' | 'failed';
+    percentage: number;
+    message: string;
+    phase: string;
+  }>;
+}
+
 // Performance optimization: Cache for partner services recommendations
 const partnerServicesCache = new Map<string, { data: any; timestamp: number }>();
 
@@ -805,22 +815,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Conversation not found" });
       }
 
-      const { question, conversationContext, domainExpertiseId } = req.body;
+      const { question, conversationContext, domainExpertiseId, qaHistory } = req.body;
       
       if (!question || !question.trim()) {
         return res.status(400).json({ message: "Question is required" });
       }
 
-      // Get recent conversation history for context (last 15 messages instead of 30 - reduces memory)
+      // Get recent conversation history for context (last 20 messages for better context)
       const allMessages = await storage.getMessages(conversation.id);
-      const recentMessages = allMessages.slice(-15);
+      const recentMessages = allMessages.slice(-20);
       const conversationHistory = recentMessages.map(m => ({
         sender: m.sender,
         content: m.content
       }));
 
-      // Use provided context or build from history
-      const context = conversationContext || conversationHistory.map(m => `${m.sender}: ${m.content}`).join('\n');
+      // Build enhanced context with conversation history + previous Q&A
+      let context = conversationContext || conversationHistory.map(m => `${m.sender}: ${m.content}`).join('\n');
+      
+      // Add Q&A history for conversation memory
+      if (qaHistory && Array.isArray(qaHistory) && qaHistory.length > 0) {
+        const qaContext = qaHistory.map((qa: any) => 
+          `Previous Q: ${qa.question}\nPrevious A: ${qa.answer}`
+        ).join('\n\n');
+        context = `${context}\n\n=== Previous Q&A Context ===\n${qaContext}\n=== End Q&A Context ===`;
+      }
       
       const domain = req.body.domainExpertise || "Generic Product";
       const { answerConversationQuestion } = await import("./services/openai");
@@ -840,7 +858,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      console.log(`❓ Ask Question: domain="${domain}", strict=${!isUniversalMode}, question="${question.slice(0, 50)}..."`);
+      console.log(`❓ Ask Question: domain="${domain}", strict=${!isUniversalMode}, question="${question.slice(0, 50)}...", qaHistory: ${qaHistory?.length || 0} items`);
       
       // Set response headers for faster initial response
       res.setHeader('Cache-Control', 'no-cache');
@@ -3406,6 +3424,34 @@ Crawl-delay: 1`;
     }
   });
 
+  // Get extraction progress for documents
+  app.get("/api/domain-expertise/:id/extraction-progress", authenticateToken, async (req: any, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // Return all extraction progress for this domain's documents
+      const documents = await storage.getTrainingDocumentsByDomain(req.params.id, userId);
+      const documentIds = documents.map(d => d.id);
+      
+      const progress: Record<string, any> = {};
+      global.extractionProgress = global.extractionProgress || {};
+      
+      for (const docId of documentIds) {
+        if (global.extractionProgress[docId]) {
+          progress[docId] = global.extractionProgress[docId];
+        }
+      }
+      
+      res.json(progress);
+    } catch (error: any) {
+      console.error("Get extraction progress error:", error);
+      res.status(500).json({ error: "Failed to get extraction progress" });
+    }
+  });
+
   // Upload documents to a domain
   app.post("/api/domain-expertise/:id/documents", authenticateToken, async (req: any, res) => {
     try {
@@ -3561,33 +3607,65 @@ Crawl-delay: 1`;
                 metadata: processedMetadata
               });
               
-              // IMMEDIATE KNOWLEDGE EXTRACTION (synchronous for small files)
-              // This ensures knowledge is available immediately after upload
+              // ASYNC KNOWLEDGE EXTRACTION WITH PROGRESS TRACKING
+              // Process asynchronously to avoid blocking the upload response
               const fileSizeInMB = file.size / (1024 * 1024);
-              if (fileSizeInMB < 5) {
-                // Small files: Process synchronously for immediate availability
-                console.log(`📚 Processing knowledge synchronously for ${file.originalname} (${fileSizeInMB.toFixed(2)}MB)`);
+              console.log(`📚 Queuing async knowledge extraction for ${file.originalname} (${fileSizeInMB.toFixed(2)}MB)`);
+              
+              // Store extraction status in memory for progress tracking
+              const extractionId = doc.id;
+              global.extractionProgress = global.extractionProgress || {};
+              global.extractionProgress[extractionId] = {
+                status: 'queued',
+                percentage: 0,
+                message: 'Queued for extraction...',
+                phase: 'queued'
+              };
+              
+              setImmediate(async () => {
                 try {
+                  global.extractionProgress[extractionId] = {
+                    status: 'processing',
+                    percentage: 0,
+                    message: 'Starting extraction...',
+                    phase: 'starting'
+                  };
+                  
                   const { processDocumentForKnowledge } = await import("./services/knowledgeExtraction");
-                  await processDocumentForKnowledge(doc, req.params.id, userId);
-                  console.log(`✅ Knowledge extraction completed for ${file.originalname}`);
-                } catch (knowledgeError: any) {
-                  console.error(`⚠️ Knowledge extraction failed for ${file.originalname}:`, knowledgeError.message);
-                  // Don't fail the upload if knowledge extraction fails
+                  
+                  // Progress callback to update status
+                  const progressCallback = (progress: any) => {
+                    global.extractionProgress[extractionId] = {
+                      status: 'processing',
+                      ...progress
+                    };
+                  };
+                  
+                  await processDocumentForKnowledge(doc, req.params.id, userId, progressCallback);
+                  
+                  global.extractionProgress[extractionId] = {
+                    status: 'completed',
+                    percentage: 100,
+                    message: 'Extraction complete!',
+                    phase: 'complete'
+                  };
+                  
+                  console.log(`✅ Async knowledge extraction completed for ${file.originalname}`);
+                  
+                  // Clean up after 30 seconds
+                  setTimeout(() => {
+                    delete global.extractionProgress[extractionId];
+                  }, 30000);
+                } catch (error: any) {
+                  console.error(`❌ Async knowledge extraction failed for ${file.originalname}:`, error.message);
+                  global.extractionProgress[extractionId] = {
+                    status: 'failed',
+                    percentage: 0,
+                    message: error.message,
+                    phase: 'error'
+                  };
                 }
-              } else {
-                // Large files: Process asynchronously to avoid blocking
-                console.log(`📚 Queuing async knowledge extraction for ${file.originalname} (${fileSizeInMB.toFixed(2)}MB)`);
-                setImmediate(async () => {
-                  try {
-                    const { processDocumentForKnowledge } = await import("./services/knowledgeExtraction");
-                    await processDocumentForKnowledge(doc, req.params.id, userId);
-                    console.log(`✅ Async knowledge extraction completed for ${file.originalname}`);
-                  } catch (error: any) {
-                    console.error(`❌ Async knowledge extraction failed for ${file.originalname}:`, error.message);
-                  }
-                });
-              }
+              });
               
               results.push(doc);
             } else {

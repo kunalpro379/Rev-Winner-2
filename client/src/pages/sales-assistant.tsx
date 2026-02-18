@@ -998,10 +998,11 @@ export default function SalesAssistant() {
           </Card>
         </div>
 
-        {/* Top Row: Live Transcript and Shift Gears Side by Side */}
+        {/* Top Row: Live Transcript + Sales Q&A (Left) and Shift Gears (Right) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Left Column: Live Transcript */}
-          <div className="flex flex-col">
+          {/* Left Column: Live Transcript + Sales Q&A */}
+          <div className="flex flex-col gap-6">
+            {/* Live Transcript */}
             <EnhancedLiveTranscript 
               onSendMessage={handleSendMessage}
               onAnalyze={handleAnalyze}
@@ -1027,6 +1028,17 @@ export default function SalesAssistant() {
               sessionId={sessionId}
               onStop={handleStopSession}
             />
+            
+            {/* Sales Q&A - Below Live Transcript */}
+            {sessionId && (
+              <SalesAssistantQA
+                sessionId={sessionId}
+                conversationContext={currentTranscript || analyzedTranscript}
+                domainExpertise={domainExpertise}
+                domainExpertiseId={domainExpertiseId}
+                resetVersion={resetVersion}
+              />
+            )}
           </div>
 
           {/* Right Column: Shift Gears */}
@@ -1044,50 +1056,34 @@ export default function SalesAssistant() {
           </div>
         </div>
 
-          {/* Conversation Analysis (70%) + Sales Q&A (30%) Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 mb-6 min-h-[500px]" id="conversation-area">
-            {/* Left: Conversation Analysis - 70% */}
-            <div className="lg:col-span-7 flex flex-col min-h-0">
-              <ConversationArea
-                onRegenerate={handleRegenerateAnalysis}
-                isRegenerating={isAnalyzing}
-                hasAnalysis={!!analysisResults}
-                isAnalyzing={isAnalyzing}
-              >
-                {analysisResults ? (
-                  <AnalysisResults
-                    results={analysisResults}
-                    onClose={() => setAnalysisResults(null)}
-                    sessionId={sessionId || ""}
-                    conversationContext={analyzedTranscript}
-                    domainExpertise={domainExpertise}
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full min-h-[350px] text-center">
-                    <div className="p-4 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20 rounded-full mb-4">
-                      <AlertCircle className="h-8 w-8 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <p className="text-base font-semibold text-foreground mb-2">No Analysis Yet</p>
-                    <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
-                      Select transcript segments or use the Analyze button to get AI-powered insights
-                    </p>
-                  </div>
-                )}
-              </ConversationArea>
-            </div>
-
-            {/* Right: Sales Q&A - 30% */}
-            <div className="lg:col-span-3 flex flex-col min-h-0">
-              {sessionId && (
-                <SalesAssistantQA
-                  sessionId={sessionId}
-                  conversationContext={currentTranscript || analyzedTranscript}
+          {/* Conversation Analysis - Full Width, Full Content Display */}
+          <div className="w-full mb-6" id="conversation-area">
+            <ConversationArea
+              onRegenerate={handleRegenerateAnalysis}
+              isRegenerating={isAnalyzing}
+              hasAnalysis={!!analysisResults}
+              isAnalyzing={isAnalyzing}
+            >
+              {analysisResults ? (
+                <AnalysisResults
+                  results={analysisResults}
+                  onClose={() => setAnalysisResults(null)}
+                  sessionId={sessionId || ""}
+                  conversationContext={analyzedTranscript}
                   domainExpertise={domainExpertise}
-                  domainExpertiseId={domainExpertiseId}
-                  resetVersion={resetVersion}
                 />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full min-h-[350px] text-center">
+                  <div className="p-4 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20 rounded-full mb-4">
+                    <AlertCircle className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <p className="text-base font-semibold text-foreground mb-2">No Analysis Yet</p>
+                  <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
+                    Select transcript segments or use the Analyze button to get AI-powered insights
+                  </p>
+                </div>
               )}
-            </div>
+            </ConversationArea>
           </div>
 
           {/* Present to Win - Added margin-top for spacing */}
@@ -1146,19 +1142,24 @@ export default function SalesAssistant() {
       </main>
       
       {/* Floating AI Assistant - Bottom Right Corner */}
-      {sessionId && <FloatingAssistant conversationId={sessionId} />}
-      
-      {/* Scroll to Bottom Button */}
+      {/* Fixed Bottom Right - Scroll Button (separate from AI Assistant) */}
       {showScrollButton && (
         <Button
           onClick={scrollToBottom}
-          className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full shadow-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-2 border-white dark:border-slate-800"
+          className="fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-2 border-white dark:border-slate-800"
           size="icon"
           title="Scroll to bottom"
           data-testid="scroll-to-bottom-button"
         >
           <ArrowDown className="h-5 w-5 animate-bounce" />
         </Button>
+      )}
+      
+      {/* AI Assistant - positioned above scroll button */}
+      {sessionId && (
+        <div className="fixed bottom-24 right-6 z-40">
+          <FloatingAssistant conversationId={sessionId} />
+        </div>
       )}
     </div>
   );
