@@ -270,42 +270,51 @@ async function activateCartCheckout(
           console.log(`[Cart Activation] Created new session_minutes purchase with ${newMinutes} minutes`);
         }
       } else {
-        // For platform_access subscriptions: Create one purchase per quantity item
+        // For platform_access, train_me, dai: Create one purchase per quantity item
         for (let i = 0; i < item.quantity; i++) {
           const startDate = new Date();
           const endDate = pkg.validityDays ? calculateEndDate(startDate, pkg.validityDays) : null;
 
-          const addon = await billingStorage.createAddonPurchase({
-            userId,
-            organizationId: null,
-            addonType: mappedAddonType,
-            packageSku: item.packageSku,
-            billingType: 'one_time',
-            purchaseAmount: itemPaidAmount.toFixed(2), // Use actual paid amount
-            currency: actualCurrency, // Use actual currency
-            totalUnits: pkg.totalUnits || 0,
-            usedUnits: 0,
-            status: 'active',
-            startDate,
-            endDate,
-            gatewayTransactionId: gatewayTransactionId || undefined,
-            metadata: {
-              packageName: pkg.name,
-              basePrice: item.basePrice, // Keep original base price for reference
-              quantity: 1,
-              purchasedViaCart: true,
-              cartOrderId: orderId,
-              paymentId: verifiedPaymentId,
-              gatewayProvider: pendingOrder.gatewayProvider,
-              itemNumber: i + 1,
-              totalItems: item.quantity,
-              originalAddonType: item.addonType, // Store original for reference
-              actualPaidAmount: itemPaidAmount.toFixed(2), // Store actual paid amount
-              actualCurrency: actualCurrency, // Store actual currency
-            },
-          });
+          try {
+            const addon = await billingStorage.createAddonPurchase({
+              userId,
+              organizationId: null,
+              addonType: mappedAddonType,
+              packageSku: item.packageSku,
+              billingType: 'one_time',
+              purchaseAmount: itemPaidAmount.toFixed(2), // Use actual paid amount
+              currency: actualCurrency, // Use actual currency
+              totalUnits: pkg.totalUnits || 0,
+              usedUnits: 0,
+              status: 'active',
+              startDate,
+              endDate,
+              gatewayTransactionId: gatewayTransactionId || undefined,
+              metadata: {
+                packageName: pkg.name,
+                basePrice: item.basePrice, // Keep original base price for reference
+                quantity: 1,
+                purchasedViaCart: true,
+                cartOrderId: orderId,
+                paymentId: verifiedPaymentId,
+                gatewayProvider: pendingOrder.gatewayProvider,
+                itemNumber: i + 1,
+                totalItems: item.quantity,
+                originalAddonType: item.addonType, // Store original for reference
+                actualPaidAmount: itemPaidAmount.toFixed(2), // Store actual paid amount
+                actualCurrency: actualCurrency, // Store actual currency
+              },
+            });
 
-          activatedAddons.push(addon);
+            activatedAddons.push(addon);
+          } catch (error: any) {
+            // Handle duplicate addon error gracefully
+            if (error?.code === '23505' && error?.constraint === 'unique_active_addon_per_user') {
+              console.error(`[Cart Activation] User already has active ${mappedAddonType} addon. Skipping item: ${item.packageName}`);
+              throw new Error(`You already have an active ${mappedAddonType === 'dai' ? 'Domain AI Intelligence' : mappedAddonType === 'train_me' ? 'Train Me' : mappedAddonType} subscription. Please cancel your existing subscription before purchasing a new one.`);
+            }
+            throw error; // Re-throw other errors
+          }
         }
       }
     }
@@ -394,8 +403,18 @@ async function activateCartCheckout(
       }
     }
 
-    // Mark pending order as completed
-    await billingStorage.updatePendingOrderStatus(orderId, userId, 'completed', new Date());
+    // Mark pending order as completed.
+    // For free 100% discount orders we already created the pendingOrder with
+    // status 'completed', so calling updatePendingOrderStatus again would
+    // throw an "order is already completed" error. Only transition from
+    // 'pending' → 'completed' when appropriate.
+    if (pendingOrder.status === 'pending') {
+      await billingStorage.updatePendingOrderStatus(orderId, userId, 'completed', new Date());
+    } else {
+      console.log(
+        `[Cart Activation] Skipping pending order status update for order ${orderId} (status=${pendingOrder.status})`
+      );
+    }
 
     // Clear user's cart
     await billingStorage.clearCart(userId);
@@ -728,6 +747,77 @@ export function setupBillingRoutes(app: Router) {
           return res.status(400).json({ message: "Invalid or expired promo code" });
         }
       }
+
+      // CHECK FOR 100% DISCOUNT - Skip payment gateway if price is 0
+      if (finalPrice <= 0) {
+        console.log(`[Session Minutes] 🎉 100% discount applied! Price: ${finalPrice}. Skipping payment gateway.`);
+        
+        // Get user's organization ID
+        const organizationId = await authStorage.getUserOrganizationId(userId);
+        
+        // Create the session minutes purchase directly (no payment needed)
+        const purchase = await billingStorage.createAddonPurchase({
+          userId,
+          organizationId,
+          addonType: 'session_minutes',
+          packageSku: packageId,
+          totalUnits: pkg.totalUnits || 0,
+          usedUnits: 0,
+          purchaseAmount: '0.00',
+          currency: pkg.currency || 'USD',
+          billingType: 'one-time',
+          autoRenew: false,
+          status: 'active',
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 31 * 24 * 60 * 60 * 1000), // 31 days validity
+          metadata: {
+            packageName: pkg.name,
+            freePromo: true,
+            promoCode: promoCode || null,
+            originalPrice: pkg.price.toString(),
+            discountAmount: discountAmount.toString(),
+          },
+        });
+
+        // Create payment record with status 'succeeded' (amount: 0)
+        await authStorage.createPayment({
+          userId,
+          razorpayOrderId: `FREE-SM-${Date.now()}`,
+          razorpayPaymentId: `free_${Date.now()}`,
+          amount: '0.00',
+          currency: pkg.currency || 'USD',
+          status: 'succeeded',
+          paymentMethod: 'promo_code_100%',
+          metadata: {
+            type: 'session_minutes',
+            packageSku: packageId,
+            purchaseId: purchase.id,
+            freePromo: true,
+          },
+        });
+
+        // Increment promo code usage if applicable
+        if (validatedPromo) {
+          await authStorage.incrementPromoCodeUsage(validatedPromo.id);
+        }
+
+        console.log(`[Session Minutes] ✅ Free purchase completed: ${pkg.totalUnits} minutes added`);
+
+        // Return success response (no payment gateway needed)
+        return res.json({
+          success: true,
+          freeOrder: true,
+          message: "Session minutes added successfully with 100% discount!",
+          purchase: {
+            id: purchase.id,
+            packageName: pkg.name,
+            minutes: pkg.totalUnits,
+            expiryDate: purchase.endDate,
+          },
+        });
+      }
+
+      // REGULAR PAYMENT FLOW (when price > 0)
 
       // Get user info for payment gateway
       const user = await authStorage.getUserById(userId);
@@ -2241,6 +2331,49 @@ export function setupBillingRoutes(app: Router) {
         return res.status(400).json({ message: "Item already in cart" });
       }
 
+      // IMPORTANT: Check for conflicting addon types in cart
+      // Only ONE active addon of each type (dai, train_me, platform_access) is allowed per user
+      // Prevent adding multiple items of the same addon type to cart
+      if (addonType === 'service') {
+        // For service type, check if it's DAI or Train Me based on package name
+        const packageName = pkg.name.toLowerCase();
+        let serviceCategory = 'train_me'; // default
+        
+        if (packageName.includes('dai')) {
+          serviceCategory = 'dai';
+        } else if (packageName.includes('train me')) {
+          serviceCategory = 'train_me';
+        }
+        
+        // Check if cart already has an item of this service category
+        const conflictingItem = existingCartItems.find(item => {
+          if (item.addonType !== 'service') return false;
+          const itemName = item.packageName.toLowerCase();
+          if (serviceCategory === 'dai' && itemName.includes('dai')) return true;
+          if (serviceCategory === 'train_me' && itemName.includes('train me')) return true;
+          return false;
+        });
+        
+        if (conflictingItem) {
+          const categoryName = serviceCategory === 'dai' ? 'Domain AI Intelligence' : 'Train Me';
+          return res.status(400).json({ 
+            message: `You can only have one ${categoryName} item in your cart at a time. Please remove "${conflictingItem.packageName}" first.`,
+            conflictingItem: conflictingItem.packageName
+          });
+        }
+      } else if (addonType === 'platform_access') {
+        // Check if cart already has a platform access item (in user mode)
+        if (purchaseMode === 'user') {
+          const conflictingItem = existingCartItems.find(item => item.addonType === 'platform_access' && item.purchaseMode === 'user');
+          if (conflictingItem) {
+            return res.status(400).json({ 
+              message: `You can only have one Platform Access subscription in your cart at a time. Please remove "${conflictingItem.packageName}" first.`,
+              conflictingItem: conflictingItem.packageName
+            });
+          }
+        }
+      }
+
       // Add to cart
       const cartItem = await billingStorage.addToCart({
         userId,
@@ -2393,6 +2526,128 @@ export function setupBillingRoutes(app: Router) {
       if (cartTotal.items.length === 0) {
         return res.status(400).json({ message: "Cart is empty" });
       }
+
+      // CHECK FOR 100% DISCOUNT - Skip payment gateway if total is 0 or very close to 0
+      // Use 0.01 threshold to handle floating point precision issues
+      if (cartTotal.total <= 0.01) {
+        console.log(`[Cart Checkout] 🎉 100% discount applied! Total: ${cartTotal.total}. Skipping payment gateway.`);
+        console.log(`[Cart Checkout] Breakdown - Subtotal: ${cartTotal.subtotal}, Discount: ${cartTotal.discount}, GST: ${cartTotal.gstAmount}`);
+        
+        // Create a completed order record (no payment needed)
+        const pendingOrder = await billingStorage.createPendingOrder({
+          userId,
+          packageSku: 'CART-MULTI-ITEM',
+          addonType: 'cart_checkout',
+          amount: '0.00',
+          currency: cartTotal.currency,
+          gatewayOrderId: `FREE-${Date.now()}`,
+          gatewayProvider: 'free_promo',
+          status: 'completed', // Mark as completed immediately
+          metadata: {
+            itemCount: cartTotal.items.length,
+            items: cartTotal.items.map(item => ({
+              packageSku: item.packageSku,
+              packageName: item.packageName,
+              addonType: item.addonType,
+              basePrice: item.basePrice,
+              currency: item.currency,
+              quantity: item.quantity,
+              metadata: item.metadata,
+              purchaseMode: item.purchaseMode,
+              teamManagerName: item.teamManagerName,
+              teamManagerEmail: item.teamManagerEmail,
+              companyName: item.companyName,
+            })),
+            subtotal: cartTotal.subtotal,
+            gstAmount: 0, // No GST for free items
+            discount: cartTotal.discount,
+            total: 0,
+            roundoffAmount: 0,
+            finalAmount: 0,
+            originalCurrency: cartTotal.currency,
+            finalCurrency: cartTotal.currency,
+            freePromo: true, // Flag to indicate this was a free promo
+            perItemPromoCodes: cartTotal.items.map(item => ({
+              cartItemId: item.id,
+              promoCodeId: item.promoCodeId,
+              promoCodeCode: item.promoCodeCode,
+              appliedDiscountAmount: item.appliedDiscountAmount,
+            })),
+          },
+          expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+        });
+
+        console.log(`[Cart Checkout] Created free order: ${pendingOrder.id}`);
+
+        // Create a payment record with status 'succeeded' (amount: 0)
+        await authStorage.createPayment({
+          userId,
+          razorpayOrderId: pendingOrder.gatewayOrderId,
+          razorpayPaymentId: `free_${Date.now()}`,
+          amount: '0.00',
+          currency: cartTotal.currency,
+          status: 'succeeded',
+          paymentMethod: 'promo_code_100%',
+          metadata: {
+            type: 'cart_checkout',
+            orderId: pendingOrder.id,
+            gatewayProvider: 'free_promo',
+            freePromo: true,
+            itemCount: cartTotal.items.length,
+          },
+        });
+
+        // Activate all cart items immediately
+        const result = await activateCartCheckout(pendingOrder, `free_${Date.now()}`, undefined, req);
+
+        if (!result.success) {
+          console.error(`[Cart Checkout] Failed to activate free items: ${result.message}`);
+
+          const errorMessage = (result.message || '').toLowerCase();
+
+          // Treat "already have an active subscription" style errors as a clean 400,
+          // instead of bubbling up as a 500 from the free checkout flow.
+          if (
+            errorMessage.includes('duplicate key') ||
+            errorMessage.includes('unique_active_addon_per_user') ||
+            errorMessage.includes('already have an active')
+          ) {
+            return res.status(400).json({
+              message: "You already have an active subscription for one of these items. Please check your active subscriptions in your profile.",
+              error: "DUPLICATE_ADDON",
+              details: "Only one active subscription per addon type is allowed."
+            });
+          }
+
+          return res.status(500).json({
+            message: "Failed to activate items",
+            error: result.message
+          });
+        }
+
+        // Clear the cart
+        await billingStorage.clearCart(userId);
+
+        console.log(`[Cart Checkout] ✅ Free order completed: ${result.activatedAddons.length} items activated`);
+
+        // Return success response (no payment gateway needed)
+        return res.json({
+          success: true,
+          freeOrder: true,
+          orderId: pendingOrder.id,
+          message: "Order completed successfully with 100% discount!",
+          activatedAddons: result.activatedAddons,
+          itemCount: result.activatedAddons.length,
+          breakdown: {
+            subtotal: cartTotal.subtotal,
+            discount: cartTotal.discount,
+            total: 0,
+            currency: cartTotal.currency,
+          },
+        });
+      }
+
+      // REGULAR PAYMENT FLOW (when total > 0)
 
       // Real-time currency conversion for Cashfree (only supports INR)
       let finalCurrency = cartTotal.currency;
@@ -3338,18 +3593,10 @@ export function setupBillingRoutes(app: Router) {
         const actualPaidAmount = metadata.actualPaidAmount ? parseFloat(metadata.actualPaidAmount) : totalWithGst;
         const actualCurrency = metadata.actualCurrency || currency;
         
-        if (actualCurrency === 'INR') {
-          // For INR, the amount includes GST, so calculate base amount
-          // GST = 18% of base amount, so total = base * 1.18
-          gstRate = 18;
-          baseAmount = actualPaidAmount / 1.18;
-          gstAmount = actualPaidAmount - baseAmount;
-        } else {
-          // For USD and other currencies, no GST
-          gstRate = 0;
-          baseAmount = actualPaidAmount;
-          gstAmount = 0;
-        }
+        // For USD (Razorpay), no GST is applied
+        gstRate = 0;
+        baseAmount = actualPaidAmount;
+        gstAmount = 0;
         
         const quantity = metadata.quantity || 1;
         const unitPrice = baseAmount / quantity;
@@ -3382,7 +3629,7 @@ export function setupBillingRoutes(app: Router) {
             // Use the proper breakdown from cart calculation
             const subtotal = parseFloat(metadata.subtotal?.toString() || '0');
             const gstAmount = parseFloat(metadata.gstAmount?.toString() || '0');
-            const gstRate = currency === 'INR' ? 18 : 0;
+            const gstRate = 0; // No GST for USD
             
             return {
               packageSku: pendingOrder.packageSku || 'CART-MULTI-ITEM',
@@ -3406,15 +3653,10 @@ export function setupBillingRoutes(app: Router) {
             let gstAmount: number;
             let gstRate: number;
             
-            if (currency === 'INR') {
-              gstRate = 18;
-              baseAmount = totalAmount / 1.18;
-              gstAmount = totalAmount - baseAmount;
-            } else {
-              gstRate = 0;
-              baseAmount = totalAmount;
-              gstAmount = 0;
-            }
+            // For USD (Razorpay), no GST
+            gstRate = 0;
+            baseAmount = totalAmount;
+            gstAmount = 0;
             
             return {
               packageSku: pendingOrder.packageSku || 'PENDING-ORDER',
@@ -3475,7 +3717,7 @@ export function setupBillingRoutes(app: Router) {
           address: "AI-Powered Sales Intelligence Platform\nHealthcaa Technologies Inc.",
           email: "support@revwinner.com",
           website: "https://revwinner.com",
-          gstNumber: currency === 'INR' ? "GST123456789" : null, // Add actual GST number if available
+          gstNumber: null, // No GST for USD transactions
         },
         
         // Customer Information
@@ -3506,7 +3748,7 @@ export function setupBillingRoutes(app: Router) {
           discount: parseFloat(discount.toFixed(2)), // CRITICAL FIX: Include discount
           subtotalAfterDiscount: parseFloat((subtotal - discount).toFixed(2)), // CRITICAL FIX: Show discounted subtotal
           gst: parseFloat(totalGst.toFixed(2)),
-          gstRate: currency === 'INR' ? 18 : 0,
+          gstRate: 0, // No GST for USD
           total: parseFloat(grandTotal.toFixed(2)),
           currency: currency,
           amountInWords: convertAmountToWords(grandTotal, currency),
@@ -3523,7 +3765,7 @@ export function setupBillingRoutes(app: Router) {
           "All Rev Winner services are subject to our Terms of Service available at revwinner.com/terms",
           "Refunds are processed as per our refund policy. Contact support for assistance.",
           "For technical support or billing queries, contact support@revwinner.com",
-          currency === 'INR' ? "GST is applicable as per Indian tax regulations." : "No GST applicable for international transactions.",
+          "No GST applicable for USD transactions.",
           "This invoice serves as your receipt for tax and accounting purposes.",
         ],
       };

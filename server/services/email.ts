@@ -15,9 +15,17 @@ function getAppUrl(): string {
 }
 
 // Create Gmail SMTP transporter
+// In non-production environments we intentionally DO NOT create a real
+// SMTP transporter, to avoid Gmail 534/EAUTH issues during local testing.
+// All email functions fall back to logging-only "DEV MODE" behavior when
+// transporter is null.
 let transporter: nodemailer.Transporter | null = null;
 
-if (GMAIL_APP_PASSWORD) {
+const isProductionEnv =
+  process.env.NODE_ENV === 'production' ||
+  process.env.ENVIRONMENT === 'PROD';
+
+if (isProductionEnv && GMAIL_APP_PASSWORD) {
   transporter = nodemailer.createTransport({
     service: 'gmail',
     host: 'smtp.gmail.com',
@@ -28,6 +36,10 @@ if (GMAIL_APP_PASSWORD) {
       pass: GMAIL_APP_PASSWORD,
     },
   });
+} else {
+  console.log(
+    'Email SMTP transporter disabled (non-production environment). Emails will be logged to console instead of being sent.'
+  );
 }
 
 export async function sendOTPEmail(email: string, code: string, firstName: string): Promise<void> {
@@ -74,9 +86,33 @@ export async function sendOTPEmail(email: string, code: string, firstName: strin
   try {
     const info = await transporter.sendMail(mailOptions);
     console.log(`OTP email sent to ${email} - Message ID: ${info.messageId}`);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error sending OTP email:', error);
-    throw new Error('Failed to send verification email');
+
+    const isAuthError =
+      error?.code === 'EAUTH' ||
+      String(error?.responseCode || '').startsWith('53');
+
+    // Gmail 534 errors mean the account needs browser login or app password setup.
+    // Log the OTP code clearly so it can be retrieved from logs if email fails.
+    if (isAuthError) {
+      console.error(
+        `⚠️ Gmail authentication failed for ${email}. ` +
+        `Please check Gmail account settings: enable 2FA and create an App Password. ` +
+        `OTP Code for ${email}: ${code} (expires in 10 minutes)`
+      );
+      // Don't throw - allow registration to proceed even if email fails
+      // The OTP code is logged above and stored in DB, so user can verify manually
+      return;
+    }
+
+    // For other email errors, also log but don't crash
+    console.error(
+      `⚠️ Failed to send OTP email to ${email}: ${error.message}. ` +
+      `OTP Code for ${email}: ${code} (expires in 10 minutes)`
+    );
+    // Don't throw - allow registration to proceed even if email fails
+    return;
   }
 }
 
@@ -216,9 +252,33 @@ export async function sendPasswordResetEmail(email: string, resetToken: string, 
   try {
     const info = await transporter.sendMail(mailOptions);
     console.log(`Password reset email sent to ${email} - Message ID: ${info.messageId}`);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error sending password reset email:', error);
-    throw new Error('Failed to send password reset email');
+
+    const isAuthError =
+      error?.code === 'EAUTH' ||
+      String(error?.responseCode || '').startsWith('53');
+
+    // Gmail 534 errors mean the account needs browser login or app password setup.
+    // Log the reset link clearly so it can be retrieved from logs if email fails.
+    if (isAuthError) {
+      console.error(
+        `⚠️ Gmail authentication failed for ${email}. ` +
+        `Please check Gmail account settings: enable 2FA and create an App Password. ` +
+        `Password reset link for ${email}: ${resetLink}`
+      );
+      // Don't throw - allow password reset flow to proceed even if email fails
+      // The reset link is logged above and stored in DB, so user can access manually
+      return;
+    }
+
+    // For other email errors, also log but don't crash
+    console.error(
+      `⚠️ Failed to send password reset email to ${email}: ${error.message}. ` +
+      `Password reset link for ${email}: ${resetLink}`
+    );
+    // Don't throw - allow password reset flow to proceed even if email fails
+    return;
   }
 }
 
@@ -552,9 +612,33 @@ export async function sendLicenseAssignmentEmail(
   try {
     const info = await transporter.sendMail(mailOptions);
     console.log(`License assignment email sent to ${email} - Message ID: ${info.messageId}`);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error sending license assignment email:', error);
-    throw new Error('Failed to send license assignment email');
+
+    const isAuthError =
+      error?.code === 'EAUTH' ||
+      String(error?.responseCode || '').startsWith('53');
+
+    // Gmail 534 errors mean the account needs browser login or app password setup.
+    // Even in production, we should not crash the API - log and continue.
+    if (isAuthError) {
+      console.error(
+        `⚠️ Gmail authentication failed for ${email}. ` +
+        `Please check Gmail account settings: enable 2FA and create an App Password. ` +
+        `License assignment succeeded, but email was not sent. ` +
+        `Error: ${error.response || error.message}`
+      );
+      // Don't throw - allow the API call to succeed even if email fails
+      return;
+    }
+
+    // For other email errors, also log but don't crash
+    console.error(
+      `⚠️ Failed to send license assignment email to ${email}: ${error.message}. ` +
+      `License assignment succeeded, but email was not sent.`
+    );
+    // Don't throw - allow the API call to succeed even if email fails
+    return;
   }
 }
 
@@ -622,9 +706,33 @@ export async function sendLicenseAccessNotificationEmail(
   try {
     const info = await transporter.sendMail(mailOptions);
     console.log(`License access notification sent to ${email} - Message ID: ${info.messageId}`);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error sending license access notification:', error);
-    throw new Error('Failed to send license access notification');
+
+    const isAuthError =
+      error?.code === 'EAUTH' ||
+      String(error?.responseCode || '').startsWith('53');
+
+    // Gmail 534 errors mean the account needs browser login or app password setup.
+    // Even in production, we should not crash the API - log and continue.
+    if (isAuthError) {
+      console.error(
+        `⚠️ Gmail authentication failed for ${email}. ` +
+        `Please check Gmail account settings: enable 2FA and create an App Password. ` +
+        `License assignment succeeded, but email was not sent. ` +
+        `Error: ${error.response || error.message}`
+      );
+      // Don't throw - allow the API call to succeed even if email fails
+      return;
+    }
+
+    // For other email errors, also log but don't crash
+    console.error(
+      `⚠️ Failed to send license access notification to ${email}: ${error.message}. ` +
+      `License assignment succeeded, but email was not sent.`
+    );
+    // Don't throw - allow the API call to succeed even if email fails
+    return;
   }
 }
 

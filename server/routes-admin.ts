@@ -727,7 +727,7 @@ const refreshToken = generateRefreshToken({
         paymentId: z.string().min(1, "Payment ID is required"),
         userId: z.string().min(1, "User ID is required"),
         amount: z.string().min(1, "Amount is required"),
-        currency: z.string().default("INR"),
+        currency: z.string().default("USD"),
         reason: z.string().min(1, "Reason is required"),
       });
       
@@ -1260,7 +1260,7 @@ const refreshToken = generateRefreshToken({
     try {
       const createSchema = z.object({
         code: z.string().min(3).max(50),
-        category: z.enum(['platform_subscription', 'session_minutes', 'train_me', 'dai']),
+        category: z.enum(['all', 'platform_subscription', 'session_minutes', 'train_me', 'service', 'dai']),
         allowedPlanTypes: z.array(z.string()).optional(), // Add this field
         discountType: z.enum(['percentage', 'fixed']),
         discountValue: z.string(),

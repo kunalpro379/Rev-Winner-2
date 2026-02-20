@@ -173,14 +173,17 @@ export function setupEnterpriseRoutes(app: Express) {
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
         await authStorage.createPasswordResetToken(userEmail, resetToken, expiresAt);
         
-        // Send license assignment email with password setup link
+        // Send license assignment email with password setup link (async, don't block)
         const { sendLicenseAssignmentEmail } = await import('./services/email');
-        await sendLicenseAssignmentEmail(
+        sendLicenseAssignmentEmail(
           userEmail,
           targetUser.firstName,
           resetToken,
           organization.companyName
-        );
+        ).catch(err => {
+          console.error('Error sending license assignment email:', err);
+          // Don't fail the request if email fails
+        });
         
         // Log user creation
         await eventLogger.log({
@@ -219,26 +222,34 @@ export function setupEnterpriseRoutes(app: Express) {
       const newUserNeedsPassword = !targetUser.hashedPassword || targetUser.hashedPassword === '';
       
       if (newUserNeedsPassword) {
-        // New user or user without password - send password setup email
+        // New user or user without password - send password setup email (async, don't block)
         const resetToken = randomBytes(32).toString('hex');
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
         await authStorage.createPasswordResetToken(userEmail, resetToken, expiresAt);
         
-        await sendLicenseAssignmentEmail(
+        sendLicenseAssignmentEmail(
           userEmail,
           targetUser.firstName,
           resetToken,
           organization.companyName
-        );
-        console.log(`Password setup email sent to new user ${userEmail}`);
+        ).then(() => {
+          console.log(`Password setup email sent to new user ${userEmail}`);
+        }).catch(err => {
+          console.error(`Error sending password setup email to ${userEmail}:`, err);
+          // Don't fail the request if email fails
+        });
       } else {
-        // Existing user with password - send access notification
-        await sendLicenseAccessNotificationEmail(
+        // Existing user with password - send access notification (async, don't block)
+        sendLicenseAccessNotificationEmail(
           userEmail,
           targetUser.firstName,
           organization.companyName
-        );
-        console.log(`License access notification sent to existing user ${userEmail}`);
+        ).then(() => {
+          console.log(`License access notification sent to existing user ${userEmail}`);
+        }).catch(err => {
+          console.error(`Error sending access notification to ${userEmail}:`, err);
+          // Don't fail the request if email fails
+        });
       }
       
       // Create audit log
@@ -1172,7 +1183,7 @@ export function setupEnterpriseRoutes(app: Express) {
       
       const orderResult = await paymentGateway.createOrder({
         amount: additionalCost,
-        currency: "INR",
+        currency: "USD",
         receipt: orderId,
         customerName: `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Customer",
         customerEmail: user.email || 'customer@example.com',
@@ -1195,7 +1206,7 @@ export function setupEnterpriseRoutes(app: Express) {
         razorpayKeyId: defaultGatewayProvider === 'razorpay' ? getRazorpayKeyId() : undefined,
         gateway: defaultGatewayProvider,
         amount: additionalCost,
-        currency: "INR",
+        currency: "USD",
         pricePerSeat,
         additionalSeats: seats,
         licensePackageId: activePackage.id

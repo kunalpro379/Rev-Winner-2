@@ -144,10 +144,16 @@ export default function PaymentSuccess() {
           
           // Show appropriate success message based on verification type
           let successDescription = 'Your payment has been processed successfully.';
+          let redirectPath = `/invoice?orderId=${orderIdParam}`;
+          
           if (data.minutesAdded) {
             successDescription = `You've added ${data.minutesAdded} minutes to your account.`;
           } else if (data.activatedAddons && data.activatedAddons.length > 0) {
             successDescription = `${data.activatedAddons.length} item(s) have been activated in your account.`;
+          } else if (orderType === 'enterprise' && data.organizationId) {
+            // For enterprise purchases, redirect to license manager with a flag
+            successDescription = 'Your enterprise license has been activated! Redirecting to License Manager...';
+            redirectPath = '/license-manager?fromPayment=true';
           }
           
           toast({
@@ -155,10 +161,14 @@ export default function PaymentSuccess() {
             description: successDescription,
           });
 
-          // Redirect to invoice page after 3 seconds
+          // Invalidate relevant queries to ensure fresh data
+          queryClient.invalidateQueries({ queryKey: ["/api/enterprise/overview"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+
+          // Redirect after 2 seconds
           setTimeout(() => {
-            setLocation(`/invoice?orderId=${orderIdParam}`);
-          }, 3000);
+            setLocation(redirectPath);
+          }, 2000);
         } else {
           setStatus('failed');
           setMessage(data.message || 'Payment verification failed.');
@@ -212,13 +222,34 @@ export default function PaymentSuccess() {
           {status === 'success' && (
             <div className="space-y-4">
               <Button
-                onClick={() => setLocation(`/invoice?orderId=${orderId}`)}
+                onClick={() => {
+                  const params = new URLSearchParams(window.location.search);
+                  const orderType = params.get('type');
+                  if (orderType === 'enterprise') {
+                    // Invalidate cache before navigating
+                    queryClient.invalidateQueries({ queryKey: ["/api/enterprise/overview"] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+                    setLocation('/license-manager?fromPayment=true');
+                  } else {
+                    setLocation(`/invoice?orderId=${orderId}`);
+                  }
+                }}
                 className="w-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700"
               >
-                View Invoice
+                {(() => {
+                  const params = new URLSearchParams(window.location.search);
+                  const orderType = params.get('type');
+                  return orderType === 'enterprise' ? 'Go to License Manager' : 'View Invoice';
+                })()}
               </Button>
               <div className="text-center text-sm text-muted-foreground">
-                Redirecting to invoice in 3 seconds...
+                {(() => {
+                  const params = new URLSearchParams(window.location.search);
+                  const orderType = params.get('type');
+                  return orderType === 'enterprise' 
+                    ? 'Redirecting to License Manager in 2 seconds...'
+                    : 'Redirecting to invoice in 2 seconds...';
+                })()}
               </div>
             </div>
           )}

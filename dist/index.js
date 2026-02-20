@@ -254,6 +254,7 @@ __export(schema_exports, {
   trainingDocuments: () => trainingDocuments,
   updateDomainExpertiseSchema: () => updateDomainExpertiseSchema,
   userEntitlements: () => userEntitlements,
+  userFeedback: () => userFeedback,
   userProfiles: () => userProfiles,
   users: () => users,
   verifyOtpSchema: () => verifyOtpSchema
@@ -262,7 +263,7 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, timestamp, jsonb, boolean, integer, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-var sessions, users, conversations, audioSources, messages, teamsMeetings, insertUserSchema, insertConversationSchema, insertMessageSchema, insertTeamsMeetingSchema, insertAudioSourceSchema, AUDIO_SOURCE_TYPES, productReference, USER_ROLES, authUsers, superUserOverrides, otps, passwordResetTokens, refreshTokens, addons, subscriptionPlans, subscriptionPlansHistory, addonsHistory, subscriptions, payments, promoCodes, auditLogs, sessionUsage, sessionMinutesPurchases, AI_PROVIDERS, aiTokenUsage, organizations, organizationMemberships, licensePackages, licenseAssignments, billingAdjustments, enterprisePromoCodes, enterprisePromoCodeUsages, insertAuthUserSchema, registerUserSchema, loginSchema, verifyOtpSchema, insertOtpSchema, insertPasswordResetTokenSchema, requestPasswordResetSchema, resetPasswordSchema, insertAITokenUsageSchema, insertAddonSchema, insertSubscriptionPlanSchema, insertSubscriptionPlanHistorySchema, insertAddonHistorySchema, CHANGE_TYPES, REASON_CODES, REASON_CODE_LABELS, insertSubscriptionSchema, insertPaymentSchema, insertPromoCodeSchema, insertSessionUsageSchema, insertSessionMinutesPurchaseSchema, leads, insertLeadSchema, domainExpertise, trainingDocuments, insertDomainExpertiseSchema, updateDomainExpertiseSchema, insertTrainingDocumentSchema, knowledgeCategories, knowledgeEntries, insertKnowledgeEntrySchema, systemMetrics, announcements, supportTickets, insertSystemMetricSchema, insertAnnouncementSchema, insertSupportTicketSchema, refunds, timeExtensions, insertRefundSchema, insertTimeExtensionSchema, insertOrganizationSchema, insertOrganizationMembershipSchema, insertLicensePackageSchema, insertLicenseAssignmentSchema, insertBillingAdjustmentSchema, insertEnterprisePromoCodeSchema, insertEnterprisePromoCodeUsageSchema, purchaseEnterpriseLicenseSchema, addSeatsSchema, assignLicenseSchema, reassignLicenseSchema, gatewayProviders, gatewayTransactions, gatewayWebhooks, addonPurchases, sessionMinutesUsage, daiUsageLogs, enterpriseUserAssignments, activationInvites, adminActionsLog, userEntitlements, insertGatewayProviderSchema, insertGatewayTransactionSchema, insertAddonPurchaseSchema, insertSessionMinutesUsageSchema, insertDaiUsageLogSchema, insertEnterpriseUserAssignmentSchema, insertActivationInviteSchema, insertAdminActionLogSchema, insertUserEntitlementSchema, pendingOrders, insertPendingOrderSchema, purchaseSessionMinutesSchema, purchasePlatformAccessSchema, purchaseTrainMeSchema, purchaseDaiSchema, cartItems, insertCartItemSchema, cartCheckoutSchema, caseStudies, insertCaseStudySchema, products, insertProductSchema, implementationPlaybooks, insertImplementationPlaybookSchema, promptTemplates, insertPromptTemplateSchema, conversationIntents, insertConversationIntentSchema, buyerStages, insertBuyerStageSchema, conversationMemories, insertConversationMemorySchema, userProfiles, insertUserProfileSchema, callRecordings, insertCallRecordingSchema, callMeetingMinutes, insertCallMeetingMinutesSchema, discoveryInsightsSchema, closingPitchSchema, productAnalysisSchema, salesScriptSchema, productResponseItemSchema, multiProductResponseSchema, trafficLogs, insertTrafficLogSchema, adminUpdateOrganizationSchema, adminAddSeatsSchema, adminAssignLicenseSchema, adminRevokeLicenseSchema, adminExtendSubscriptionSchema, licenseRenewalSchema, conversationMinutesBackup, insertConversationMinutesBackupSchema, SALES_INTENT_TYPES, salesIntelligenceKnowledge, salesIntelligenceSuggestions, salesIntelligenceLearningLogs, salesIntelligenceExports, insertSalesIntelligenceKnowledgeSchema, insertSalesIntelligenceSuggestionSchema, insertSalesIntelligenceLearningLogSchema, insertSalesIntelligenceExportSchema, marketingAccess, marketingUserSettings, marketingGeneratedContent, insertMarketingAccessSchema, insertMarketingUserSettingsSchema, insertMarketingGeneratedContentSchema, apiKeys, apiKeyUsageLogs, insertApiKeySchema, insertApiKeyUsageLogSchema, termsAndConditions, insertTermsAndConditionsSchema;
+var sessions, users, conversations, audioSources, messages, teamsMeetings, insertUserSchema, insertConversationSchema, insertMessageSchema, insertTeamsMeetingSchema, insertAudioSourceSchema, AUDIO_SOURCE_TYPES, productReference, USER_ROLES, authUsers, superUserOverrides, otps, passwordResetTokens, refreshTokens, addons, subscriptionPlans, subscriptionPlansHistory, addonsHistory, subscriptions, payments, promoCodes, auditLogs, sessionUsage, sessionMinutesPurchases, AI_PROVIDERS, aiTokenUsage, organizations, organizationMemberships, licensePackages, licenseAssignments, billingAdjustments, enterprisePromoCodes, enterprisePromoCodeUsages, insertAuthUserSchema, registerUserSchema, loginSchema, verifyOtpSchema, insertOtpSchema, insertPasswordResetTokenSchema, requestPasswordResetSchema, resetPasswordSchema, insertAITokenUsageSchema, insertAddonSchema, insertSubscriptionPlanSchema, insertSubscriptionPlanHistorySchema, insertAddonHistorySchema, CHANGE_TYPES, REASON_CODES, REASON_CODE_LABELS, insertSubscriptionSchema, insertPaymentSchema, insertPromoCodeSchema, insertSessionUsageSchema, insertSessionMinutesPurchaseSchema, leads, insertLeadSchema, domainExpertise, trainingDocuments, insertDomainExpertiseSchema, updateDomainExpertiseSchema, insertTrainingDocumentSchema, knowledgeCategories, knowledgeEntries, insertKnowledgeEntrySchema, systemMetrics, announcements, supportTickets, insertSystemMetricSchema, insertAnnouncementSchema, insertSupportTicketSchema, refunds, timeExtensions, insertRefundSchema, insertTimeExtensionSchema, insertOrganizationSchema, insertOrganizationMembershipSchema, insertLicensePackageSchema, insertLicenseAssignmentSchema, insertBillingAdjustmentSchema, insertEnterprisePromoCodeSchema, insertEnterprisePromoCodeUsageSchema, purchaseEnterpriseLicenseSchema, addSeatsSchema, assignLicenseSchema, reassignLicenseSchema, gatewayProviders, gatewayTransactions, gatewayWebhooks, addonPurchases, sessionMinutesUsage, daiUsageLogs, enterpriseUserAssignments, activationInvites, adminActionsLog, userEntitlements, insertGatewayProviderSchema, insertGatewayTransactionSchema, insertAddonPurchaseSchema, insertSessionMinutesUsageSchema, insertDaiUsageLogSchema, insertEnterpriseUserAssignmentSchema, insertActivationInviteSchema, insertAdminActionLogSchema, insertUserEntitlementSchema, pendingOrders, insertPendingOrderSchema, purchaseSessionMinutesSchema, purchasePlatformAccessSchema, purchaseTrainMeSchema, purchaseDaiSchema, cartItems, insertCartItemSchema, cartCheckoutSchema, caseStudies, insertCaseStudySchema, products, insertProductSchema, implementationPlaybooks, insertImplementationPlaybookSchema, promptTemplates, insertPromptTemplateSchema, conversationIntents, insertConversationIntentSchema, buyerStages, insertBuyerStageSchema, conversationMemories, insertConversationMemorySchema, userProfiles, insertUserProfileSchema, callRecordings, insertCallRecordingSchema, callMeetingMinutes, insertCallMeetingMinutesSchema, discoveryInsightsSchema, closingPitchSchema, productAnalysisSchema, salesScriptSchema, productResponseItemSchema, multiProductResponseSchema, trafficLogs, insertTrafficLogSchema, adminUpdateOrganizationSchema, adminAddSeatsSchema, adminAssignLicenseSchema, adminRevokeLicenseSchema, adminExtendSubscriptionSchema, licenseRenewalSchema, conversationMinutesBackup, insertConversationMinutesBackupSchema, SALES_INTENT_TYPES, salesIntelligenceKnowledge, salesIntelligenceSuggestions, salesIntelligenceLearningLogs, salesIntelligenceExports, insertSalesIntelligenceKnowledgeSchema, insertSalesIntelligenceSuggestionSchema, insertSalesIntelligenceLearningLogSchema, insertSalesIntelligenceExportSchema, marketingAccess, marketingUserSettings, marketingGeneratedContent, insertMarketingAccessSchema, insertMarketingUserSettingsSchema, insertMarketingGeneratedContentSchema, apiKeys, apiKeyUsageLogs, insertApiKeySchema, insertApiKeyUsageLogSchema, termsAndConditions, insertTermsAndConditionsSchema, userFeedback;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -619,7 +620,7 @@ var init_schema = __esm({
       // For usage_bundle: [{ minutes: 500, price: '6', currency: 'USD' }]
       flatPrice: varchar("flat_price", { length: 20 }),
       // For service type
-      currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+      currency: varchar("currency", { length: 10 }).notNull().default("USD"),
       features: jsonb("features").default([]),
       metadata: jsonb("metadata").default({}),
       // Additional data, Razorpay IDs, etc.
@@ -636,7 +637,7 @@ var init_schema = __esm({
       // Store as string to avoid precision issues
       listedPrice: varchar("listed_price", { length: 20 }),
       // Original/regular price (for showing strikethrough)
-      currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+      currency: varchar("currency", { length: 10 }).notNull().default("USD"),
       billingInterval: varchar("billing_interval", { length: 20 }).notNull(),
       // '3-years'
       features: jsonb("features").default([]),
@@ -741,7 +742,7 @@ var init_schema = __esm({
       razorpayPaymentId: varchar("razorpay_payment_id", { length: 255 }),
       razorpaySignature: varchar("razorpay_signature", { length: 500 }),
       amount: varchar("amount", { length: 20 }).notNull(),
-      currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+      currency: varchar("currency", { length: 10 }).notNull().default("USD"),
       status: varchar("status", { length: 20 }).notNull(),
       // 'pending', 'succeeded', 'failed', 'refunded', 'partially_refunded'
       paymentMethod: varchar("payment_method", { length: 50 }),
@@ -822,7 +823,7 @@ var init_schema = __esm({
       razorpayPaymentId: varchar("razorpay_payment_id", { length: 255 }),
       amountPaid: varchar("amount_paid", { length: 20 }).notNull(),
       // In dollars ($6, $12, etc.)
-      currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+      currency: varchar("currency", { length: 10 }).notNull().default("USD"),
       // Refund tracking fields
       refundedAt: timestamp("refunded_at"),
       refundAmount: varchar("refund_amount", { length: 20 }),
@@ -903,7 +904,7 @@ var init_schema = __esm({
       // Price per seat (stored as string like other amounts)
       totalAmount: varchar("total_amount", { length: 20 }).notNull(),
       // Total package cost
-      currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+      currency: varchar("currency", { length: 10 }).notNull().default("USD"),
       startDate: timestamp("start_date").notNull(),
       endDate: timestamp("end_date").notNull(),
       // Package expiration
@@ -952,7 +953,7 @@ var init_schema = __esm({
       razorpayPaymentId: varchar("razorpay_payment_id", { length: 255 }),
       amount: varchar("amount", { length: 20 }).notNull(),
       // Total charge for this adjustment
-      currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+      currency: varchar("currency", { length: 10 }).notNull().default("USD"),
       status: varchar("status", { length: 20 }).notNull().default("pending"),
       // 'pending', 'succeeded', 'failed'
       processedAt: timestamp("processed_at"),
@@ -1315,7 +1316,7 @@ var init_schema = __esm({
       paymentId: varchar("payment_id").references(() => payments.id).notNull(),
       userId: varchar("user_id").references(() => authUsers.id).notNull(),
       amount: varchar("amount", { length: 20 }).notNull(),
-      currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+      currency: varchar("currency", { length: 10 }).notNull().default("USD"),
       reason: text("reason"),
       status: varchar("status", { length: 20 }).notNull().default("pending"),
       // 'pending', 'processed', 'failed'
@@ -1422,7 +1423,7 @@ var init_schema = __esm({
       status: varchar("status", { length: 50 }).notNull(),
       // 'pending', 'success', 'failed', 'refunded'
       amount: varchar("amount", { length: 20 }).notNull(),
-      currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+      currency: varchar("currency", { length: 10 }).notNull().default("USD"),
       userId: varchar("user_id").references(() => authUsers.id),
       organizationId: varchar("organization_id").references(() => organizations.id),
       relatedEntity: varchar("related_entity", { length: 50 }),
@@ -1469,7 +1470,7 @@ var init_schema = __esm({
       // 'active', 'expired', 'canceled'
       // Financial
       purchaseAmount: varchar("purchase_amount", { length: 20 }).notNull(),
-      currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+      currency: varchar("currency", { length: 10 }).notNull().default("USD"),
       gatewayTransactionId: varchar("gateway_transaction_id").references(() => gatewayTransactions.id, { onDelete: "set null" }),
       // Validity period
       startDate: timestamp("start_date").notNull().defaultNow(),
@@ -2499,6 +2500,24 @@ var init_schema = __esm({
       id: true,
       createdAt: true,
       updatedAt: true
+    });
+    userFeedback = pgTable("user_feedback", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      userId: varchar("user_id").notNull().references(() => authUsers.id, { onDelete: "cascade" }),
+      category: text("category").notNull(),
+      // bug_report, feature_request, improvement, general, performance, ui_ux
+      subject: varchar("subject", { length: 255 }).notNull(),
+      message: text("message").notNull(),
+      priority: text("priority").notNull().default("medium"),
+      // low, medium, high
+      status: text("status").notNull().default("open"),
+      // open, in_progress, resolved, closed
+      page: varchar("page", { length: 255 }),
+      userPhone: varchar("user_phone", { length: 20 }),
+      screenshotUrl: text("screenshot_url"),
+      adminNotes: text("admin_notes"),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
     });
   }
 });
@@ -4687,37 +4706,59 @@ var init_storage_auth = __esm({
       }
       // Enterprise dashboard operations
       async getOrganizationOverview(organizationId) {
-        const organization = await this.getOrganizationById(organizationId);
+        const [
+          organization,
+          activePackage,
+          membershipsData,
+          assignmentsData,
+          ownerSubscriptionData
+        ] = await Promise.all([
+          // Get organization
+          this.getOrganizationById(organizationId),
+          // Get active license package
+          this.getActiveLicensePackage(organizationId),
+          // Get members with user details
+          db.select({
+            membership: organizationMemberships,
+            user: authUsers
+          }).from(organizationMemberships).innerJoin(authUsers, eq(organizationMemberships.userId, authUsers.id)).where(eq(organizationMemberships.organizationId, organizationId)),
+          // Get assignments with user details (we'll filter by package later)
+          db.select({
+            assignment: licenseAssignments,
+            user: authUsers,
+            package: licensePackages
+          }).from(licenseAssignments).innerJoin(authUsers, eq(licenseAssignments.userId, authUsers.id)).innerJoin(licensePackages, eq(licenseAssignments.licensePackageId, licensePackages.id)).where(eq(licensePackages.organizationId, organizationId)),
+          // Get owner's subscription in parallel
+          (async () => {
+            const org = await this.getOrganizationById(organizationId);
+            if (!org?.primaryManagerId) return null;
+            const [ownerSubscription] = await db.select({
+              subscription: subscriptions,
+              plan: subscriptionPlans
+            }).from(subscriptions).leftJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id)).where(eq(subscriptions.userId, org.primaryManagerId)).limit(1);
+            return ownerSubscription;
+          })()
+        ]);
         if (!organization) {
           throw new Error("Organization not found");
         }
-        const activePackage = await this.getActiveLicensePackage(organizationId);
         let subscriptionDTO = null;
-        const addonsDTO = [];
-        if (organization.primaryManagerId) {
-          const [ownerSubscription] = await db.select().from(subscriptions).where(eq(subscriptions.userId, organization.primaryManagerId)).limit(1);
-          if (ownerSubscription && ownerSubscription.planId) {
-            const [plan] = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, ownerSubscription.planId)).limit(1);
-            subscriptionDTO = {
-              id: ownerSubscription.id,
-              planId: ownerSubscription.planId,
-              plan: plan ? {
-                id: plan.id,
-                name: plan.name,
-                billingInterval: plan.billingInterval,
-                price: plan.price
-              } : null,
-              status: ownerSubscription.status,
-              createdAt: ownerSubscription.createdAt ? new Date(ownerSubscription.createdAt).toISOString() : null,
-              currentPeriodStart: ownerSubscription.currentPeriodStart ? new Date(ownerSubscription.currentPeriodStart).toISOString() : null,
-              currentPeriodEnd: ownerSubscription.currentPeriodEnd ? new Date(ownerSubscription.currentPeriodEnd).toISOString() : null
-            };
-          }
+        if (ownerSubscriptionData?.subscription && ownerSubscriptionData.subscription.planId) {
+          subscriptionDTO = {
+            id: ownerSubscriptionData.subscription.id,
+            planId: ownerSubscriptionData.subscription.planId,
+            plan: ownerSubscriptionData.plan ? {
+              id: ownerSubscriptionData.plan.id,
+              name: ownerSubscriptionData.plan.name,
+              billingInterval: ownerSubscriptionData.plan.billingInterval,
+              price: ownerSubscriptionData.plan.price
+            } : null,
+            status: ownerSubscriptionData.subscription.status,
+            createdAt: ownerSubscriptionData.subscription.createdAt ? new Date(ownerSubscriptionData.subscription.createdAt).toISOString() : null,
+            currentPeriodStart: ownerSubscriptionData.subscription.currentPeriodStart ? new Date(ownerSubscriptionData.subscription.currentPeriodStart).toISOString() : null,
+            currentPeriodEnd: ownerSubscriptionData.subscription.currentPeriodEnd ? new Date(ownerSubscriptionData.subscription.currentPeriodEnd).toISOString() : null
+          };
         }
-        const membershipsData = await db.select({
-          membership: organizationMemberships,
-          user: authUsers
-        }).from(organizationMemberships).innerJoin(authUsers, eq(organizationMemberships.userId, authUsers.id)).where(eq(organizationMemberships.organizationId, organizationId));
         const membersDTO = membershipsData.map((row) => ({
           id: row.membership.id,
           organizationId: row.membership.organizationId,
@@ -4738,11 +4779,10 @@ var init_storage_auth = __esm({
         let assignedSeats = 0;
         let availableSeats = 0;
         if (activePackage) {
-          const assignmentsData = await db.select({
-            assignment: licenseAssignments,
-            user: authUsers
-          }).from(licenseAssignments).innerJoin(authUsers, eq(licenseAssignments.userId, authUsers.id)).where(eq(licenseAssignments.licensePackageId, activePackage.id));
-          assignmentsDTO = assignmentsData.map((row) => ({
+          const activePackageAssignments = assignmentsData.filter(
+            (row) => row.assignment.licensePackageId === activePackage.id
+          );
+          assignmentsDTO = activePackageAssignments.map((row) => ({
             id: row.assignment.id,
             licensePackageId: row.assignment.licensePackageId,
             userId: row.assignment.userId,
@@ -4771,6 +4811,7 @@ var init_storage_auth = __esm({
           createdAt: organization.createdAt ? new Date(organization.createdAt).toISOString() : (/* @__PURE__ */ new Date()).toISOString(),
           updatedAt: organization.updatedAt ? new Date(organization.updatedAt).toISOString() : (/* @__PURE__ */ new Date()).toISOString()
         };
+        const addonsDTO = [];
         return {
           organization: organizationDTO,
           activePackage: activePackage ? {
@@ -7432,106 +7473,86 @@ function parseAIResponse(responseText) {
     const patterns = [
       /```(?:json)?\s*([\s\S]*?)```/,
       // Markdown code blocks
-      /\{\s*"entries"\s*:\s*\[[\s\S]*\]\s*\}/,
-      // Direct JSON object with entries
-      /\[\s*\{[\s\S]*\}\s*\]/,
-      // Direct JSON array
-      /\{[\s\S]*"category"[\s\S]*\}/
-      // Single entry object
+      /\{\s*"entries"\s*:\s*\[([\s\S]*)\]\s*\}/,
+      // {"entries": [...]}
+      /\[\s*\{[\s\S]*\}\s*\]/
+      // Direct array
     ];
     for (const pattern of patterns) {
       const match = responseText.match(pattern);
       if (match) {
         try {
-          const cleanJson = match[1] || match[0];
-          parsed = JSON.parse(cleanJson);
+          let jsonStr = match[1] || match[0];
+          if (pattern === patterns[1]) {
+            jsonStr = `{"entries": [${jsonStr}]}`;
+          }
+          jsonStr = jsonStr.trim();
+          parsed = JSON.parse(jsonStr);
           if (parsed.entries) parsed = parsed.entries;
           if (!Array.isArray(parsed)) parsed = [parsed];
-          console.log(`\u2705 Successfully parsed JSON using pattern: ${pattern.source.substring(0, 30)}...`);
+          console.log(`\u2705 Successfully parsed JSON from pattern ${patterns.indexOf(pattern) + 1}`);
           return parsed;
         } catch (innerError) {
+          console.log(`\u26A0\uFE0F Pattern ${patterns.indexOf(pattern) + 1} matched but parse failed`);
           continue;
         }
       }
     }
-    console.error("No valid JSON found in response:", responseText.substring(0, 500));
-    return [];
-  }
-}
-async function extractFromChunkWithClaude(chunk, chunkIndex, totalChunks, isFirstChunk) {
-  if (!anthropic) {
-    console.error("\u274C Anthropic API not available for extraction");
-    return [];
-  }
-  const prompt = isFirstChunk ? COMPREHENSIVE_EXTRACTION_PROMPT + chunk : CHUNK_EXTRACTION_PROMPT + chunk;
-  console.log(`[Claude] Chunk ${chunkIndex + 1}/${totalChunks}: Sending to Claude (${chunk.length} chars)...`);
-  try {
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 16e3,
-      // Increased from 8000 to match DeepSeek
-      messages: [
-        {
-          role: "user",
-          content: `You are an EXPERT knowledge extraction AI. Your mission: Extract MAXIMUM depth and detail from documents.
-Always respond with valid JSON only: {"entries": [...]}
-Each entry MUST have: category, title (descriptive), content (10-20 detailed sentences with ALL specifics), details (every data point), keywords (10-20), confidence.
-Create multiple entries to cover all information comprehensively. Extract EVERYTHING - numbers, metrics, specifications, examples, processes, features.
-NEVER summarize - preserve all details. If information exists in the document, it MUST be extracted.
-
-${prompt}`
-        }
-      ]
-    });
-    const responseText = response.content[0].type === "text" ? response.content[0].text : "[]";
-    console.log(`[Claude] Chunk ${chunkIndex + 1}/${totalChunks}: Received ${responseText.length} chars`);
-    const entries = parseAIResponse(responseText);
-    console.log(` [Claude] Chunk ${chunkIndex + 1}/${totalChunks}: Extracted ${entries.length} entries`);
-    return entries;
-  } catch (error) {
-    console.error(`\u274C [Claude] Chunk ${chunkIndex + 1} extraction failed:`, error.message);
+    console.error("\u274C Failed to parse AI response as JSON. Response preview:", responseText.substring(0, 300));
     return [];
   }
 }
 async function extractFromChunk(chunk, chunkIndex, totalChunks, isFirstChunk) {
-  if (deepseek2) {
-    const prompt = isFirstChunk ? COMPREHENSIVE_EXTRACTION_PROMPT + chunk : CHUNK_EXTRACTION_PROMPT + chunk;
-    console.log(`Chunk ${chunkIndex + 1}/${totalChunks}: Sending to DeepSeek (${chunk.length} chars)...`);
-    try {
-      const response = await deepseek2.chat.completions.create({
-        model: "deepseek-chat",
-        messages: [
-          {
-            role: "system",
-            content: `You are an EXPERT knowledge extraction AI. Your mission: Extract MAXIMUM depth and detail from documents.
-Always respond with valid JSON: {"entries": [...]}
-Each entry MUST have: category, title (descriptive), content (10-20 detailed sentences with ALL specifics), details (every data point), keywords (10-20), confidence.
-Create multiple entries to cover all information comprehensively. Extract EVERYTHING - numbers, metrics, specifications, examples, processes, features.
-NEVER summarize - preserve all details. If information exists in the document, it MUST be extracted.`
-          },
-          { role: "user", content: prompt }
-        ],
-        temperature: 0.1,
-        // Lower temperature for more focused extraction
-        max_tokens: 16e3
-        // Increased from 12000 for maximum comprehensiveness
-      });
-      const responseText = response.choices[0]?.message?.content || "[]";
-      console.log(`Chunk ${chunkIndex + 1}/${totalChunks}: Received ${responseText.length} chars from DeepSeek`);
-      const entries = parseAIResponse(responseText);
-      console.log(` Chunk ${chunkIndex + 1}/${totalChunks}: Extracted ${entries.length} entries`);
-      if (entries.length > 0) {
-        return entries;
-      }
-      console.log(`\u26A0\uFE0F DeepSeek returned no entries, trying Claude...`);
-    } catch (error) {
-      console.error(`\u274C DeepSeek failed for chunk ${chunkIndex + 1}: ${error.message}`);
-      console.log(`Falling back to Claude...`);
-    }
+  if (!deepseek2) {
+    console.error("\u274C DeepSeek API not configured for knowledge extraction");
+    return [];
   }
-  return extractFromChunkWithClaude(chunk, chunkIndex, totalChunks, isFirstChunk);
+  const prompt = isFirstChunk ? COMPREHENSIVE_EXTRACTION_PROMPT + chunk : CHUNK_EXTRACTION_PROMPT + chunk;
+  console.log(`\u{1F504} Chunk ${chunkIndex + 1}/${totalChunks}: Sending to DeepSeek (${chunk.length} chars)...`);
+  try {
+    const response = await deepseek2.chat.completions.create({
+      model: "deepseek-chat",
+      messages: [
+        {
+          role: "system",
+          content: `You are an ELITE knowledge extraction AI for a sales intelligence platform.
+
+CRITICAL: Respond with ONLY valid JSON. NO markdown, NO code blocks, NO explanations.
+Format: {"entries": [...]}
+
+ULTRA-COMPREHENSIVE EXTRACTION REQUIREMENTS:
+- Each entry MUST have: category, title (descriptive, max 150 chars), content (8-20 detailed sentences with ALL specifics), details (structured JSON with ALL data points), keywords (15-30 including synonyms, acronyms, industry terms), confidence (0-100)
+- Create SEPARATE entries for each distinct topic/tier/feature
+- For pricing: one entry per tier with {productName, tierName, price, currency, billingCycle, seatsIncluded, maxSeats, featuresIncluded:[], addOns:[], discounts:[], setupFee, minimumCommitment, supportLevel, sla}
+- For products/features: {productName, featureName, howItWorks, benefits:[], useCases:[], limitations:[], integrations:[], technicalSpecs:{}, supportedPlatforms:[], requirements:[], deployment:[], security:[], compliance:[]}
+- For case studies: {companyName, industry, companySize, challenge, solution, results:{}, timeline, roi, testimonialQuote, contactPerson, beforeMetrics:{}, afterMetrics:{}}
+- Extract data from tables, charts, statistics, graphs, sidebars, footnotes, appendices
+- NEVER summarize - preserve EVERY number, name, metric, quote, date, percentage, and data point
+- Create 3-5 entries per page of content (be granular)
+- Include ALL context and background information
+- Preserve exact terminology, product names, version numbers
+
+RESPONSE FORMAT (NO MARKDOWN):
+{"entries": [{"category": "pricing", "title": "...", "content": "...", "details": {...}, "keywords": [...], "confidence": 85}]}`
+        },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.1,
+      max_tokens: 8e3,
+      response_format: { type: "json_object" }
+      // Force JSON response
+    });
+    const responseText = response.choices[0]?.message?.content || "[]";
+    console.log(`\u2705 Chunk ${chunkIndex + 1}/${totalChunks}: Received ${responseText.length} chars from DeepSeek`);
+    const entries = parseAIResponse(responseText);
+    console.log(`\u{1F4CA} Chunk ${chunkIndex + 1}/${totalChunks}: Extracted ${entries.length} entries`);
+    return entries;
+  } catch (error) {
+    console.error(`\u274C DeepSeek failed for chunk ${chunkIndex + 1}: ${error.message}`);
+    return [];
+  }
 }
-async function extractKnowledgeFromDocument(document, existingHashes) {
+async function extractKnowledgeFromDocument(document, existingHashes, progressCallback) {
   if (!document.content || document.content.trim().length < 50) {
     console.log(`\u23ED\uFE0F Skipping document ${document.fileName}: insufficient content`);
     return [];
@@ -7541,19 +7562,47 @@ async function extractKnowledgeFromDocument(document, existingHashes) {
     return [];
   }
   const content = document.content.trim();
-  console.log(`Processing document: ${document.fileName} (${content.length} chars)`);
+  console.log(`\u{1F4DA} Processing document: ${document.fileName} (${content.length} chars)`);
   try {
     const chunks = splitIntoChunks(content, CHUNK_SIZE);
     console.log(`\u{1F4D1} Split into ${chunks.length} chunks for comprehensive extraction`);
-    const allParsedEntries = [];
-    for (let i = 0; i < chunks.length; i++) {
-      const chunkEntries = await extractFromChunk(chunks[i], i, chunks.length, i === 0);
-      allParsedEntries.push(...chunkEntries);
-      if (i < chunks.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
+    if (progressCallback) {
+      progressCallback({
+        current: 0,
+        total: chunks.length,
+        percentage: 0,
+        message: `Split into ${chunks.length} chunks, starting extraction...`,
+        phase: "chunking"
+      });
     }
-    console.log(` Total raw entries extracted: ${allParsedEntries.length}`);
+    const allParsedEntries = [];
+    const chunkPromises = chunks.map(async (chunk, i) => {
+      if (progressCallback) {
+        progressCallback({
+          current: i,
+          total: chunks.length,
+          percentage: Math.round(i / chunks.length * 100),
+          message: `Processing chunk ${i + 1}/${chunks.length}...`,
+          phase: "extracting"
+        });
+      }
+      const result = await extractFromChunk(chunk, i, chunks.length, i === 0);
+      if (progressCallback) {
+        progressCallback({
+          current: i + 1,
+          total: chunks.length,
+          percentage: Math.round((i + 1) / chunks.length * 100),
+          message: `Completed chunk ${i + 1}/${chunks.length} (${result.length} entries)`,
+          phase: "extracting"
+        });
+      }
+      return result;
+    });
+    const chunkResults = await Promise.all(chunkPromises);
+    chunkResults.forEach((entries) => {
+      allParsedEntries.push(...entries);
+    });
+    console.log(`\u{1F4CA} Total raw entries extracted: ${allParsedEntries.length}`);
     const validEntries = [];
     const seenTitles = /* @__PURE__ */ new Set();
     for (const entry of allParsedEntries) {
@@ -7561,9 +7610,9 @@ async function extractKnowledgeFromDocument(document, existingHashes) {
       if (!knowledgeCategories.includes(entry.category)) {
         entry.category = "product";
       }
-      const minLength = 50;
-      if (entry.content.length < minLength) {
-        console.log(`\u23ED\uFE0F Skipping short entry: "${entry.title}" (${entry.content.length} chars, min: ${minLength})`);
+      if (entry.content.length < 50) continue;
+      if (entry.content.length < 100 && entry.category !== "faq") {
+        console.log(`\u26A0\uFE0F Skipping short entry: "${entry.title}" (${entry.content.length} chars)`);
         continue;
       }
       const titleNormalized = entry.title.toLowerCase().trim();
@@ -7582,33 +7631,134 @@ async function extractKnowledgeFromDocument(document, existingHashes) {
       existingHashes.add(contentHash);
       seenTitles.add(titleNormalized);
     }
-    const categoryBreakdown = validEntries.reduce((acc, entry) => {
-      acc[entry.category] = (acc[entry.category] || 0) + 1;
-      return acc;
-    }, {});
-    console.log(`Extracted ${validEntries.length} comprehensive knowledge entries from ${document.fileName}`);
-    console.log(`Category breakdown:`, categoryBreakdown);
-    if (categoryBreakdown.pricing) {
-      console.log(`\u2705 ${categoryBreakdown.pricing} pricing entries extracted`);
-    } else {
-      console.warn(`\u26A0\uFE0F No pricing entries extracted - check if document contains pricing data`);
-    }
+    console.log(`\u2705 Extracted ${validEntries.length} comprehensive knowledge entries from ${document.fileName}`);
     return validEntries;
   } catch (error) {
     console.error(`\u274C Knowledge extraction failed for ${document.fileName}:`, error.message);
     return [];
   }
 }
-async function processDocumentForKnowledge(document, domainExpertiseId, userId) {
+function isPricingDocument(document) {
+  const fileNameLower = (document.fileName || "").toLowerCase();
+  const pricingFilePatterns = /pric(e|ing|es|elist)|rate\s*card|rate\s*sheet|tariff|cost\s*sheet|plan|subscription|billing|quote|proposal/i;
+  if (pricingFilePatterns.test(fileNameLower)) return true;
+  const content = (document.content || "").toLowerCase();
+  const pricingKeywords = [
+    "pricing",
+    "price",
+    "cost",
+    "rate card",
+    "per user",
+    "per seat",
+    "per month",
+    "annual",
+    "monthly",
+    "subscription",
+    "tier",
+    "plan",
+    "enterprise",
+    "professional",
+    "starter",
+    "basic plan",
+    "premium",
+    "free trial",
+    "billing",
+    "discount",
+    "volume pricing",
+    "add-on",
+    "mrp",
+    "$/user",
+    "\u20B9",
+    "usd",
+    "inr",
+    "eur"
+  ];
+  const matchCount = pricingKeywords.filter((kw) => content.includes(kw)).length;
+  return matchCount >= 4;
+}
+function extractProductIdentifier(entry) {
+  const details = entry.details || {};
+  const productName = details.productName || details.product_name || details.product || details.tierName || details.tier || details.planName || details.plan;
+  if (productName) return String(productName).toLowerCase().trim();
+  const titleMatch = entry.title.match(/^(.+?)[\s\-–:]+(?:pricing|price|cost|plan|tier|rate)/i);
+  if (titleMatch) return titleMatch[1].toLowerCase().trim();
+  return entry.title.toLowerCase().trim();
+}
+async function supersedePricingEntries(storage2, existingEntries, newPricingEntries, userId) {
+  let superseded = 0;
+  const existingPricingEntries = existingEntries.filter((e) => e.category === "pricing");
+  if (existingPricingEntries.length === 0) return { superseded: 0 };
+  const newProductIds = new Set(
+    newPricingEntries.map((e) => extractProductIdentifier(e)).filter(Boolean)
+  );
+  for (const existing of existingPricingEntries) {
+    const existingProductId = extractProductIdentifier({
+      category: existing.category,
+      title: existing.title,
+      content: existing.content,
+      details: existing.details || {},
+      keywords: existing.keywords || [],
+      confidence: existing.confidence || 80
+    });
+    if (!existingProductId) continue;
+    const hasExactProductMatch = newProductIds.has(existingProductId);
+    const hasTitleMatch = newPricingEntries.some((newEntry) => {
+      const similarity = calculateSimilarity(existing.title, newEntry.title);
+      return similarity > 0.7;
+    });
+    const shouldSupersede = hasExactProductMatch || hasTitleMatch;
+    if (shouldSupersede) {
+      try {
+        await storage2.deleteKnowledgeEntry(existing.id, userId);
+        superseded++;
+        console.log(`\u{1F504} Superseded old pricing entry: "${existing.title}"`);
+      } catch (err) {
+        console.error(`Failed to supersede entry: ${err.message}`);
+      }
+    }
+  }
+  return { superseded };
+}
+async function processDocumentForKnowledge(document, domainExpertiseId, userId, progressCallback) {
   const { storage: storage2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
+  if (progressCallback) {
+    progressCallback({
+      current: 0,
+      total: 100,
+      percentage: 0,
+      message: "Loading existing knowledge base...",
+      phase: "initializing"
+    });
+  }
   const existingEntries = await storage2.getKnowledgeEntriesByDomain(domainExpertiseId, userId);
   const existingHashes = new Set(existingEntries.map((e) => e.contentHash).filter(Boolean));
-  const extracted = await extractKnowledgeFromDocument(document, existingHashes);
+  const extracted = await extractKnowledgeFromDocument(document, existingHashes, progressCallback);
+  const isPricing = isPricingDocument(document);
+  let pricingSuperseded = 0;
+  if (isPricing) {
+    const newPricingEntries = extracted.filter((e) => e.category === "pricing");
+    if (newPricingEntries.length > 0) {
+      console.log(`\u{1F4B0} Pricing document detected: "${document.fileName}". Superseding ${newPricingEntries.length} old pricing entries...`);
+      const result = await supersedePricingEntries(storage2, existingEntries, newPricingEntries, userId);
+      pricingSuperseded = result.superseded;
+      console.log(`\u{1F504} Superseded ${pricingSuperseded} old pricing entries`);
+    }
+  }
   let newEntriesAdded = 0;
   let duplicatesSkipped = 0;
+  const refreshedEntries = pricingSuperseded > 0 ? await storage2.getKnowledgeEntriesByDomain(domainExpertiseId, userId) : existingEntries;
+  if (progressCallback) {
+    progressCallback({
+      current: 0,
+      total: extracted.length,
+      percentage: 95,
+      message: `Saving ${extracted.length} entries to knowledge base...`,
+      phase: "saving"
+    });
+  }
   for (const entry of extracted) {
     const contentHash = generateContentHash(entry.title + entry.content);
-    const isDuplicate = existingEntries.some((existing) => {
+    const isDuplicate = refreshedEntries.some((existing) => {
       if (existing.contentHash === contentHash) return true;
       const similarity = calculateSimilarity(
         existing.title + " " + existing.content,
@@ -7644,7 +7794,16 @@ async function processDocumentForKnowledge(document, domainExpertiseId, userId) 
       console.error(`Failed to save knowledge entry: ${error.message}`);
     }
   }
-  console.log(`Knowledge extraction complete: ${newEntriesAdded} added, ${duplicatesSkipped} duplicates skipped`);
+  if (progressCallback) {
+    progressCallback({
+      current: extracted.length,
+      total: extracted.length,
+      percentage: 100,
+      message: `Complete! Added ${newEntriesAdded} entries, skipped ${duplicatesSkipped} duplicates`,
+      phase: "complete"
+    });
+  }
+  console.log(`\u{1F4DA} Knowledge extraction complete: ${newEntriesAdded} added, ${duplicatesSkipped} duplicates skipped${pricingSuperseded > 0 ? `, ${pricingSuperseded} pricing entries superseded` : ""}`);
   return {
     entries: extracted,
     duplicatesSkipped,
@@ -7666,7 +7825,7 @@ async function rebuildKnowledgeBase(domainExpertiseId, userId, forceFullRebuild 
     return false;
   });
   if (unprocessedDocs.length === 0 && !forceFullRebuild) {
-    console.log(`All ${completedDocs.length} documents already processed. No new extraction needed.`);
+    console.log(`\u2705 All ${completedDocs.length} documents already processed. No new extraction needed.`);
     return {
       entries: [],
       duplicatesSkipped: 0,
@@ -7677,7 +7836,7 @@ async function rebuildKnowledgeBase(domainExpertiseId, userId, forceFullRebuild 
     console.log(`\u{1F5D1}\uFE0F Full rebuild requested - clearing existing ${existingEntries.length} entries`);
     await storage2.deleteKnowledgeEntriesByDomain(domainExpertiseId, userId);
   }
-  console.log(`Processing ${unprocessedDocs.length} unprocessed documents (${completedDocs.length - unprocessedDocs.length} already done)`);
+  console.log(`\u{1F4DA} Processing ${unprocessedDocs.length} unprocessed documents (${completedDocs.length - unprocessedDocs.length} already done)`);
   let totalAdded = 0;
   let totalDuplicates = 0;
   const allEntries = [];
@@ -7685,10 +7844,29 @@ async function rebuildKnowledgeBase(domainExpertiseId, userId, forceFullRebuild 
     forceFullRebuild ? [] : existingEntries.map((e) => e.contentHash).filter(Boolean)
   );
   const newlyCreatedEntries = [];
+  let totalPricingSuperseded = 0;
   for (const doc of unprocessedDocs) {
     console.log(`\u{1F4C4} Extracting knowledge from: ${doc.fileName}`);
     const extracted = await extractKnowledgeFromDocument(doc, existingHashes);
     let docEntriesAdded = 0;
+    if (!forceFullRebuild && isPricingDocument(doc)) {
+      const newPricingEntries = extracted.filter((e) => e.category === "pricing");
+      if (newPricingEntries.length > 0) {
+        const currentEntries = await storage2.getKnowledgeEntriesByDomain(domainExpertiseId, userId);
+        const result = await supersedePricingEntries(storage2, currentEntries, newPricingEntries, userId);
+        totalPricingSuperseded += result.superseded;
+        if (result.superseded > 0) {
+          const refreshed = await storage2.getKnowledgeEntriesByDomain(domainExpertiseId, userId);
+          existingEntries.length = 0;
+          existingEntries.push(...refreshed);
+          existingHashes.clear();
+          refreshed.forEach((e) => {
+            if (e.contentHash) existingHashes.add(e.contentHash);
+          });
+        }
+        console.log(`\u{1F4B0} Superseded ${result.superseded} old pricing entries for "${doc.fileName}"`);
+      }
+    }
     for (const entry of extracted) {
       const contentHash = generateContentHash(entry.title + entry.content);
       const isDuplicateOfExisting = !forceFullRebuild && existingEntries.some((existing) => {
@@ -7745,11 +7923,11 @@ async function rebuildKnowledgeBase(domainExpertiseId, userId, forceFullRebuild 
         knowledgeExtractedAt: /* @__PURE__ */ new Date(),
         contentHash: docContentHash
       });
-      console.log(`Marked ${doc.fileName} as processed (${docEntriesAdded} entries added)`);
+      console.log(`\u2705 Marked ${doc.fileName} as processed (${docEntriesAdded} entries added)`);
     }
   }
-  const totalEntries = forceFullRebuild ? totalAdded : existingEntries.length + totalAdded;
-  console.log(`Knowledge base updated: ${totalAdded} new entries added (${totalEntries} total), ${totalDuplicates} duplicates skipped`);
+  const totalEntries = forceFullRebuild ? totalAdded : existingEntries.length + totalAdded - totalPricingSuperseded;
+  console.log(`\u{1F504} Knowledge base updated: ${totalAdded} new entries added (${totalEntries} total), ${totalDuplicates} duplicates skipped${totalPricingSuperseded > 0 ? `, ${totalPricingSuperseded} pricing entries superseded` : ""}`);
   return {
     entries: allEntries,
     duplicatesSkipped: totalDuplicates,
@@ -7770,8 +7948,8 @@ function buildStructuredKnowledgeContext(entries) {
 
 `;
   const categoryLabels = {
-    product: " PRODUCTS & SERVICES",
-    pricing: " PRICING INFORMATION",
+    product: "\u{1F4E6} PRODUCTS & SERVICES",
+    pricing: "\u{1F4B0} PRICING INFORMATION",
     process: "\u{1F4CB} PROCESSES & WORKFLOWS",
     faq: "\u2753 FREQUENTLY ASKED QUESTIONS",
     case_study: "\u{1F4C8} CASE STUDIES & SUCCESS STORIES",
@@ -7802,7 +7980,7 @@ function buildStructuredKnowledgeContext(entries) {
       if (entry.details && Object.keys(entry.details).length > 0) {
         const details = entry.details;
         context += `
-   DETAILS:
+  \u{1F4CA} DETAILS:
 `;
         for (const [key, value] of Object.entries(details)) {
           if (value === null || value === void 0) continue;
@@ -7839,7 +8017,7 @@ function buildStructuredKnowledgeContext(entries) {
   context += `
 ${"\u2550".repeat(60)}
 `;
-  context += `KNOWLEDGE BASE SUMMARY:
+  context += `\u{1F4DA} KNOWLEDGE BASE SUMMARY:
 `;
   context += `   Total Entries: ${entries.length}
 `;
@@ -7859,14 +8037,10 @@ async function generateEmbedding(text2) {
     return null;
   }
   try {
-    const embeddingPromise = openaiForEmbeddings.embeddings.create({
+    const response = await openaiForEmbeddings.embeddings.create({
       model: EMBEDDING_MODEL,
       input: text2.slice(0, 8e3)
     });
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Embedding generation timeout after 10s")), 1e4);
-    });
-    const response = await Promise.race([embeddingPromise, timeoutPromise]);
     return response.data[0].embedding;
   } catch (error) {
     console.error(`\u274C Embedding generation failed: ${error.message}`);
@@ -7888,22 +8062,7 @@ function cosineSimilarity(a, b) {
 }
 async function semanticSearch(query, entries, limit = DEFAULT_SEMANTIC_SEARCH_LIMIT) {
   if (entries.length === 0) return [];
-  const cacheKey = query.toLowerCase().trim();
-  const cached = queryEmbeddingCache.get(cacheKey);
-  let queryEmbedding = null;
-  if (cached && Date.now() - cached.timestamp < QUERY_EMBEDDING_CACHE_TTL) {
-    queryEmbedding = cached.embedding;
-    console.log(`\u26A1 Using cached query embedding (age: ${Date.now() - cached.timestamp}ms)`);
-  } else {
-    queryEmbedding = await generateEmbedding(query);
-    if (queryEmbedding) {
-      queryEmbeddingCache.set(cacheKey, { embedding: queryEmbedding, timestamp: Date.now() });
-      if (queryEmbeddingCache.size > 100) {
-        const oldestKey = Array.from(queryEmbeddingCache.entries()).sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
-        queryEmbeddingCache.delete(oldestKey);
-      }
-    }
-  }
+  const queryEmbedding = await generateEmbedding(query);
   if (!queryEmbedding) {
     console.warn("\u26A0\uFE0F Could not generate query embedding, falling back to enhanced keyword match");
     const queryWords = query.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
@@ -7966,13 +8125,13 @@ async function generateMissingEmbeddings(storage2, userId) {
       failed++;
     }
     if (generated % 10 === 0) {
-      console.log(`Generated embeddings: ${generated}/${entries.length}`);
+      console.log(`\u{1F504} Generated embeddings: ${generated}/${entries.length}`);
     }
   }
-  console.log(`Embedding generation complete: ${generated} generated, ${failed} failed`);
+  console.log(`\u2705 Embedding generation complete: ${generated} generated, ${failed} failed`);
   return { generated, failed };
 }
-var EMBEDDING_MODEL, DEFAULT_SEMANTIC_SEARCH_LIMIT, openaiForEmbeddings, deepseek2, anthropic, COMPREHENSIVE_EXTRACTION_PROMPT, CHUNK_EXTRACTION_PROMPT, CHUNK_SIZE, MAX_CHUNKS, queryEmbeddingCache, QUERY_EMBEDDING_CACHE_TTL;
+var EMBEDDING_MODEL, DEFAULT_SEMANTIC_SEARCH_LIMIT, openaiForEmbeddings, deepseek2, anthropic, COMPREHENSIVE_EXTRACTION_PROMPT, CHUNK_EXTRACTION_PROMPT, CHUNK_SIZE, MAX_CHUNKS;
 var init_knowledgeExtraction = __esm({
   "server/services/knowledgeExtraction.ts"() {
     "use strict";
@@ -7986,180 +8145,174 @@ var init_knowledgeExtraction = __esm({
       timeout: 6e4
     }) : null;
     anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic2({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
-    COMPREHENSIVE_EXTRACTION_PROMPT = `You are an EXPERT knowledge extraction AI for Rev Winner, a sales intelligence platform.
+    COMPREHENSIVE_EXTRACTION_PROMPT = `You are an ELITE knowledge extraction AI for a sales intelligence platform. Your extraction directly powers real-time AI responses during live sales calls. EVERY missed detail = a failed sales conversation.
 
-Your mission: Extract EVERY piece of valuable information from this document with MAXIMUM depth and detail. This knowledge base is the ONLY source the AI will use during live sales calls - missing information means the sales rep cannot help their customer.
+\u{1F3AF} MISSION: Extract EVERY SINGLE piece of knowledge from this document. Be EXHAUSTIVE and GRANULAR. This is the ONLY data source the AI will use.
 
-For EACH distinct piece of knowledge, create a detailed entry with:
+For EACH entry, provide:
 - category: One of: product, pricing, process, faq, case_study, competitor, pain_point, objection, feature, integration
-- title: Clear, descriptive title (max 150 chars)
-- content: EXTREMELY DETAILED content (10-20 sentences minimum with ALL specifics, numbers, examples)
-- details: Structured JSON with EVERY data point (numbers, metrics, features, steps, comparisons, specifications)
-- keywords: 10-20 relevant keywords including synonyms, acronyms, related terms
-- confidence: Your confidence (0-100)
+- title: Clear, descriptive title (max 150 chars). For pricing: "{Product/Tier} - Pricing Details"
+- content: ULTRA-COMPREHENSIVE content (8-20 sentences with COMPLETE details, exact numbers, specific names, full context)
+- details: Structured JSON object with ALL data points. REQUIRED fields by category:
+  * pricing: {productName, tierName, price, currency, billingCycle, seatsIncluded, maxSeats, featuresIncluded:[], addOns:[], discounts:[], effectiveDate, comparedTo, setupFee, minimumCommitment, overage, supportLevel, sla}
+  * product/feature: {productName, featureName, howItWorks, benefits:[], useCases:[], limitations:[], integrations:[], technicalSpecs:{}, supportedPlatforms:[], requirements:[], deployment:[], security:[], compliance:[]}
+  * case_study: {companyName, industry, companySize, challenge, solution, results:{}, timeline, roi, testimonialQuote, contactPerson, implementationDetails, beforeMetrics:{}, afterMetrics:{}}
+  * competitor: {competitorName, comparedProduct, strengthsUs:[], strengthsThem:[], pricingComparison:{}, migrationPath:[], winReasons:[], lossReasons:[], marketPosition, customerOverlap}
+  * process: {processName, steps:[], prerequisites:[], timeline, decisionCriteria:[], dependencies:[], stakeholders:[], approvalLevels:[], documentation:[], tools:[]}
+  * pain_point: {painDescription, affectedRole:[], impact:{}, solution, quantifiedBenefit:{}, beforeAfter:{}, frequency, severity, industrySpecific}
+  * objection: {objection, response, evidence:[], proofPoints:[], statistics:[], caseStudies:[], competitorComparison, riskMitigation}
+  * feature: {featureName, description, benefits:[], technicalDetails:{}, useCases:[], pricing, availability, roadmap, integrations:[]}
+  * integration: {partnerName, integrationType, capabilities:[], setupSteps:[], requirements:[], limitations:[], pricing, supportLevel, documentation}
+- keywords: 15-30 relevant keywords (include synonyms, abbreviations, related terms, industry jargon, acronyms, alternative names)
+- confidence: 0-100
 
-\u{1F3AF} EXTRACTION PHILOSOPHY: "If it's in the document, it MUST be in the knowledge base"
+\u{1F525} ULTRA-DEEP EXTRACTION RULES:
 
-\u{1F4E6} PRODUCTS & SERVICES - EXTRACT EVERYTHING:
-- Product names, versions, SKUs, model numbers
-- EVERY feature with complete technical description
-- How each feature works (architecture, technology, methodology)
-- Benefits and business value for each feature
-- Use cases with specific examples and scenarios
-- Supported platforms, OS, browsers, devices
-- System requirements (CPU, RAM, storage, network)
-- Integrations with other tools (APIs, connectors, plugins)
-- Limitations, constraints, known issues
-- Deployment models (cloud, on-premise, hybrid)
-- Scalability limits and performance benchmarks
+\u{1F4E6} PRODUCTS & FEATURES (Extract EVERYTHING):
+- Every single feature with complete description
+- Technical specifications (versions, compatibility, requirements)
+- Benefits with quantified outcomes
+- Use cases with industry examples
+- Integrations with setup details
+- Limitations and workarounds
+- Supported platforms and devices
+- Deployment options (cloud, on-premise, hybrid)
 - Security features and compliance certifications
-- Screenshots, UI descriptions, workflow diagrams
+- Performance metrics and benchmarks
+- Scalability limits and recommendations
+- API capabilities and documentation
+- Mobile app features
+- Admin/user roles and permissions
 
-\u{1F4B0} PRICING - CAPTURE ALL FINANCIAL DATA:
-- ALL pricing tiers with EXACT amounts ($, \u20B9, \u20AC, \xA3, \xA5)
-- What's included in each tier (list EVERY feature)
-- User/seat/license counts and limits
-- Add-ons, modules, optional features with individual costs
-- Volume discounts, enterprise pricing, custom quotes
-- Payment terms (monthly, annual, one-time, perpetual)
-- Free trial details (duration, limitations, features)
-- Setup fees, implementation costs, training costs
-- Support tier pricing (basic, premium, enterprise)
+\uFFFD PRICING (CRITICAL - EXTRACT EVERY SINGLE PRICE POINT):
+- ALL tiers/plans with EXACT amounts and currencies
+- What's included vs excluded in EACH tier (list every feature)
+- Per-user/per-seat pricing with volume breakpoints
+- Add-ons with individual costs and descriptions
+- Discounts (volume tiers, annual vs monthly, promotional codes, early bird)
+- Payment terms, billing cycles, contract lengths
+- Free trial details (duration, limitations, credit card required?)
+- Enterprise/custom pricing indicators and typical ranges
+- Setup fees, onboarding costs, implementation fees
+- Support tiers and their costs
+- Overage charges and rate limits
+- Minimum commitments and penalties
 - Renewal terms and price lock guarantees
-- Regional pricing variations
-- Minimum commitments, contract lengths
-- Cancellation policies and refund terms
+- Refund policies and cancellation terms
+- Currency options and international pricing
+- Educational/nonprofit/startup discounts
+- Create SEPARATE entries for EACH pricing tier/plan
 
-\u{1F3D7}\uFE0F TECHNICAL SPECIFICATIONS - FULL DETAILS:
-- Architecture diagrams and component descriptions
-- API endpoints, methods, parameters, responses
-- Database schemas, data models, relationships
-- Network requirements (ports, protocols, bandwidth)
-- Security protocols (encryption, authentication, authorization)
-- Performance metrics (throughput, latency, concurrency)
-- Capacity limits (users, transactions, storage)
-- Backup and disaster recovery procedures
-- Monitoring and logging capabilities
-- Upgrade and migration procedures
-
-\u{1F4CA} CASE STUDIES & SUCCESS STORIES - COMPLETE NARRATIVES:
-- Company name, industry, size, location
-- Initial situation and business challenges
-- Specific pain points with quantified impact
-- Solution implemented with timeline
-- Implementation process and methodology
-- Challenges faced during implementation
-- Results achieved with EXACT metrics (%, $, time saved)
-- ROI calculations and payback period
-- Customer quotes and testimonials (verbatim)
+\u{1F4CA} CASE STUDIES & SUCCESS STORIES (Extract ALL metrics):
+- Company names with full details (size, industry, location)
+- Specific challenges with quantified pain points
+- Solution implementation details (timeline, team size, approach)
+- Results with EXACT metrics (percentages, dollar amounts, time saved)
+- ROI calculations with methodology
+- Testimonial quotes with attribution
+- Before/after comparisons with numbers
+- Implementation timeline and milestones
+- Key stakeholders and their roles
 - Lessons learned and best practices
-- Future plans and expansion opportunities
 
-\u{1F3C6} COMPETITIVE INTELLIGENCE - DETAILED COMPARISONS:
-- Competitor names, products, versions
-- Feature-by-feature comparison tables
-- Pricing comparisons with exact amounts
-- Performance benchmarks and test results
-- Strengths and weaknesses of each competitor
-- Market positioning and target customers
-- Win/loss analysis and reasons
-- Migration paths from competitor products
-- Competitive talking points and responses
-- Analyst reports and third-party reviews
+\u{1F4C8} DATA, GRAPHS, CHARTS, STATISTICS (Extract ALL data points):
+- Every number, percentage, and metric
+- Trends over time with specific dates
+- Comparisons between products/competitors
+- Market share data
+- Growth rates and projections
+- Survey results with sample sizes
+- Benchmark data and industry averages
+- Performance metrics and KPIs
+- User statistics and demographics
 
-\u{1F3AF} PAIN POINTS & SOLUTIONS - DEEP ANALYSIS:
-- Customer problems with specific examples
-- Root causes and contributing factors
-- Business impact (cost, time, risk, opportunity)
-- How the product solves each problem
+\u{1F3C6} COMPETITIVE INTELLIGENCE (Deep comparison):
+- Competitor names and products
+- Feature-by-feature detailed comparisons
+- Pricing differences with exact amounts
+- Strengths and weaknesses (ours vs theirs)
+- Migration paths with step-by-step guides
+- Win/loss reasons with frequency data
+- Market positioning and differentiation
+- Customer overlap and switching patterns
+- Integration capabilities comparison
+- Support and service level comparison
+- Roadmap and future plans comparison
+
+\u{1F3AF} PAIN POINTS & SOLUTIONS (Comprehensive):
+- Detailed problem descriptions
+- Affected roles and departments
+- Business impact (cost, time, efficiency)
+- Our solution approach
+- Quantified benefits with ROI
 - Before/after scenarios with metrics
-- Alternative solutions and why they fail
-- Quantified benefits and ROI
-- Implementation timeline and effort
-- Success factors and prerequisites
+- Industry-specific variations
+- Frequency and severity ratings
+- Related pain points and dependencies
 
-\u{1F4AC} OBJECTIONS & RESPONSES - COMPREHENSIVE HANDLING:
-- Common customer concerns and questions
-- Root cause of each objection
-- Detailed counter-arguments with evidence
-- Supporting data, case studies, testimonials
-- Competitive responses
+\u{1F4AC} OBJECTION HANDLING (Complete responses):
+- Common objections word-for-word
+- Detailed counter-arguments
+- Supporting evidence and data
+- Proof points (case studies, testimonials)
+- Statistics and research citations
+- Competitor comparisons
 - Risk mitigation strategies
-- Proof points and validation
 - Success stories addressing the objection
 
-\u{1F4CB} PROCESSES & WORKFLOWS - STEP-BY-STEP:
-- Complete workflow from start to finish
-- Each step with detailed instructions
-- Decision points and criteria
-- Required inputs and expected outputs
-- Roles and responsibilities
-- Tools and systems used
-- Timeline and duration estimates
-- Dependencies and prerequisites
-- Error handling and troubleshooting
-- Best practices and tips
-- Common mistakes to avoid
+\u{1F4CB} PROCESSES & WORKFLOWS (Step-by-step):
+- Complete process descriptions
+- Every step with detailed instructions
+- Prerequisites and requirements
+- Timeline with duration estimates
+- Decision criteria and approval gates
+- Stakeholders and their responsibilities
+- Dependencies and sequencing
+- Tools and systems required
+- Documentation and templates
+- Common pitfalls and how to avoid them
 
-\u{1F527} IMPLEMENTATION & DEPLOYMENT - FULL PROCEDURES:
-- Pre-implementation requirements
-- Installation steps (detailed, numbered)
-- Configuration options and settings
-- Integration procedures
-- Testing and validation steps
-- Go-live checklist
-- Post-deployment tasks
-- Training requirements
-- Support and maintenance procedures
+\u{1F517} INTEGRATIONS & PARTNERSHIPS (Full details):
+- Partner/platform names
+- Integration types (API, native, third-party)
+- Capabilities and features enabled
+- Setup instructions step-by-step
+- Requirements and prerequisites
+- Limitations and known issues
+- Pricing and licensing
+- Support level and SLAs
+- Documentation links
 
-\u{1F4DA} TRAINING & DOCUMENTATION - COMPLETE RESOURCES:
-- Training programs and curricula
-- Certification requirements
-- User guides and manuals
-- Video tutorials and webinars
-- Knowledge base articles
-- FAQs and troubleshooting guides
-- Best practices and tips
-- Community resources and forums
+\u{1F50D} ADDITIONAL EXTRACTION TARGETS:
+- Company information (history, mission, values, team)
+- Industry trends and market analysis
+- Regulatory compliance and certifications
+- Security and privacy policies
+- Terms of service and SLAs
+- Training and onboarding programs
+- Support channels and response times
+- Roadmap and upcoming features
+- Partnership opportunities
+- Geographic availability and restrictions
+- Language support
+- Accessibility features
+- System requirements and compatibility
+- Backup and disaster recovery
+- Data migration services
+- Professional services offerings
+- Community and user resources
 
-\u{1F512} COMPLIANCE & SECURITY - ALL CERTIFICATIONS:
-- Compliance standards (GDPR, HIPAA, SOC2, ISO)
-- Security certifications and audits
-- Data privacy policies
-- Encryption standards
-- Access controls and authentication
-- Audit logging and monitoring
-- Incident response procedures
-- Vulnerability management
-
-\u26A0\uFE0F CRITICAL RULES - NEVER SKIP:
-- Extract EVERY number, metric, percentage, dollar amount
-- Capture ALL technical specifications and requirements
-- Include EVERY feature, even if briefly mentioned
-- Preserve exact terminology, acronyms, product names
-- Extract tables, lists, and structured data completely
-- Include examples, scenarios, and use cases
-- Capture quotes, testimonials, and customer feedback
-- Document limitations, constraints, and known issues
-- Extract version numbers, dates, and timelines
-- Include URLs, references, and citations
-
-\u{1F3A8} QUALITY STANDARDS:
-- Each entry should be 10-20 sentences minimum (not 5-15)
-- Include specific examples and scenarios
-- Use exact numbers and metrics from document
-- Preserve technical terminology
-- Create separate entries for complex topics
-- Don't summarize - extract verbatim when valuable
-- Include context and background information
-
-\u{1F4A1} EXTRACTION STRATEGY:
-1. Read the entire document section carefully
-2. Identify ALL distinct topics and subtopics
-3. Create separate entries for each topic
-4. Include ALL details, examples, and specifications
-5. Cross-reference related information
-6. Validate completeness before moving to next section
+CRITICAL RULES:
+- Create SEPARATE entries for each distinct topic (NEVER combine)
+- NEVER summarize - preserve ALL specifics (numbers, names, dates, percentages, quotes)
+- Extract data from tables, charts, graphs, infographics, sidebars, footnotes, appendices
+- If document contains "[DEEP ANALYSIS]" or "[TABLE STRUCTURE]" sections, extract those as separate entries
+- Create 3-5 entries per page of content (be granular)
+- For complex topics, create multiple related entries
+- Include context and background for each entry
+- Cross-reference related entries in keywords
+- Preserve exact terminology and product names
+- Include version numbers and dates where mentioned
 
 Return JSON format: {"entries": [...]}
 
@@ -8167,23 +8320,43 @@ DOCUMENT TO ANALYZE:
 `;
     CHUNK_EXTRACTION_PROMPT = `Continue extracting knowledge from this document chunk. This is part of a larger document.
 
-CRITICAL INSTRUCTIONS: 
-- Extract EVERY piece of information with maximum depth
-- Create entries with 10-20 sentences minimum
-- Include ALL numbers, metrics, specifications, examples
-- Don't skip anything - if it's in the document, extract it
-- Create separate entries for each distinct topic
-- Preserve exact terminology and technical details
-- Include context and background information
+\u{1F525} ULTRA-CRITICAL RULES FOR CONTINUATION:
+- Extract ALL new information not covered in previous chunks
+- Be ULTRA-EXHAUSTIVE - every number, price, feature, metric, name, quote, and data point matters
+- Create DETAILED entries (8-20 sentences each) with COMPREHENSIVE "details" JSON
+- For pricing data: create SEPARATE entries per product/tier with {productName, tierName, price, currency, billingCycle, seatsIncluded, maxSeats, featuresIncluded:[], addOns:[], discounts:[], setupFee, minimumCommitment, supportLevel}
+- For tables/charts: extract ALL rows, columns, and data points - NEVER summarize
+- For processes/workflows: capture EVERY step with prerequisites, outcomes, timelines, stakeholders
+- For case studies: extract ALL metrics, quotes, company details, before/after data
+- For features: include technical specs, benefits, use cases, limitations, integrations
+- For competitors: detailed comparisons, pricing differences, strengths/weaknesses
+- Include 15-30 keywords per entry including synonyms, acronyms, and industry terms
+- Extract information from headers, footers, sidebars, callout boxes, footnotes
+- Preserve exact terminology, product names, version numbers, dates
+- Create 3-5 entries per page of content (be granular, not broad)
+
+EXTRACTION TARGETS IN THIS CHUNK:
+- Products, features, capabilities
+- Pricing (all tiers, add-ons, discounts)
+- Technical specifications
+- Case studies and success stories
+- Statistics, metrics, benchmarks
+- Competitive comparisons
+- Pain points and solutions
+- Objections and responses
+- Processes and workflows
+- Integrations and partnerships
+- Company information
+- Compliance and certifications
+- Support and SLAs
+- Training and resources
 
 Return JSON format: {"entries": [...]}
 
 DOCUMENT CHUNK:
 `;
-    CHUNK_SIZE = 25e3;
-    MAX_CHUNKS = 10;
-    queryEmbeddingCache = /* @__PURE__ */ new Map();
-    QUERY_EMBEDDING_CACHE_TTL = 60 * 60 * 1e3;
+    CHUNK_SIZE = 2e4;
+    MAX_CHUNKS = 15;
   }
 });
 
@@ -13283,7 +13456,9 @@ STRICT RULES:
         }
       ],
       temperature: 0.5,
-      max_tokens: 300
+      max_tokens: 400,
+      timeout: 3e4
+      // 30 second timeout instead of 10
     });
     const answer = response.choices[0]?.message?.content?.trim() || "I couldn't generate an answer. Please try rephrasing your question.";
     return answer;
@@ -14823,6 +14998,675 @@ var init_openai = __esm({
   }
 });
 
+// server/storage-billing.ts
+var storage_billing_exports = {};
+__export(storage_billing_exports, {
+  BillingStorage: () => BillingStorage,
+  billingStorage: () => billingStorage
+});
+import { eq as eq8, and as and6, gte as gte2, desc as desc4, sql as sql5, lte as lte2, or as or4, isNull } from "drizzle-orm";
+var BillingStorage, billingStorage;
+var init_storage_billing = __esm({
+  "server/storage-billing.ts"() {
+    "use strict";
+    init_db();
+    init_schema();
+    BillingStorage = class {
+      // Gateway Provider Management
+      async createGatewayProvider(data) {
+        const [provider] = await db.insert(gatewayProviders).values(data).returning();
+        return provider;
+      }
+      async getDefaultGatewayProvider() {
+        const [provider] = await db.select().from(gatewayProviders).where(and6(eq8(gatewayProviders.isDefault, true), eq8(gatewayProviders.isActive, true))).limit(1);
+        return provider || null;
+      }
+      async getGatewayProviderByName(name) {
+        const [provider] = await db.select().from(gatewayProviders).where(eq8(gatewayProviders.providerName, name)).limit(1);
+        return provider || null;
+      }
+      // Gateway Transaction Management
+      async createGatewayTransaction(data) {
+        const [transaction] = await db.insert(gatewayTransactions).values(data).returning();
+        return transaction;
+      }
+      async getGatewayTransaction(id) {
+        const [transaction] = await db.select().from(gatewayTransactions).where(eq8(gatewayTransactions.id, id)).limit(1);
+        return transaction || null;
+      }
+      async getGatewayTransactionsByUser(userId, limit = 50) {
+        return db.select().from(gatewayTransactions).where(eq8(gatewayTransactions.userId, userId)).orderBy(desc4(gatewayTransactions.createdAt)).limit(limit);
+      }
+      async updateGatewayTransactionStatus(id, status) {
+        const [transaction] = await db.update(gatewayTransactions).set({ status }).where(eq8(gatewayTransactions.id, id)).returning();
+        return transaction;
+      }
+      // Gateway Webhook Management
+      async createGatewayWebhook(data) {
+        const [webhook] = await db.insert(gatewayWebhooks).values(data).returning();
+        return webhook;
+      }
+      async markWebhookProcessed(id, success, errorMessage) {
+        await db.update(gatewayWebhooks).set({
+          processed: true,
+          processedAt: /* @__PURE__ */ new Date(),
+          verified: success,
+          errorMessage: errorMessage || null
+        }).where(eq8(gatewayWebhooks.id, id));
+      }
+      // Pending Orders Management (Secure Payment Verification)
+      async createPendingOrder(data) {
+        const [order] = await db.insert(pendingOrders).values(data).returning();
+        return order;
+      }
+      async getPendingOrder(id) {
+        if (id.length === 36) {
+          const [order2] = await db.select().from(pendingOrders).where(eq8(pendingOrders.id, id)).limit(1);
+          if (order2) return order2;
+        }
+        const [order] = await db.select().from(pendingOrders).where(eq8(pendingOrders.gatewayOrderId, id)).limit(1);
+        return order || null;
+      }
+      async getPendingOrderById(orderId, userId) {
+        const [order] = await db.select().from(pendingOrders).where(
+          and6(
+            eq8(pendingOrders.id, orderId),
+            eq8(pendingOrders.userId, userId)
+          )
+        ).limit(1);
+        return order || null;
+      }
+      async updatePendingOrderGatewayId(pendingOrderId, gatewayOrderId) {
+        const [order] = await db.update(pendingOrders).set({ gatewayOrderId }).where(eq8(pendingOrders.id, pendingOrderId)).returning();
+        if (!order) {
+          throw new Error("Pending order not found");
+        }
+        return order;
+      }
+      async updatePendingOrderStatus(id, userId, newStatus, completedAt) {
+        let order = await this.getPendingOrder(id);
+        if (!order) {
+          throw new Error("Pending order not found");
+        }
+        if (order.status !== "pending") {
+          throw new Error(`Invalid status transition: order is already ${order.status}`);
+        }
+        if (order.userId !== userId) {
+          throw new Error("Order does not belong to user");
+        }
+        if (newStatus !== "expired" && /* @__PURE__ */ new Date() > new Date(order.expiresAt)) {
+          throw new Error("Order has expired");
+        }
+        const updates = { status: newStatus };
+        if (completedAt) {
+          updates.completedAt = completedAt;
+        }
+        const [updatedOrder] = await db.update(pendingOrders).set(updates).where(
+          and6(
+            eq8(pendingOrders.id, order.id),
+            eq8(pendingOrders.status, "pending")
+          )
+        ).returning();
+        if (!updatedOrder) {
+          throw new Error("Failed to update order status - concurrent modification detected");
+        }
+        return updatedOrder;
+      }
+      async expirePendingOrders() {
+        const result = await db.update(pendingOrders).set({ status: "expired" }).where(
+          and6(
+            eq8(pendingOrders.status, "pending"),
+            lte2(pendingOrders.expiresAt, /* @__PURE__ */ new Date())
+          )
+        );
+        return result.rowCount || 0;
+      }
+      // Addon Purchase Management
+      async createAddonPurchase(data) {
+        const [purchase] = await db.insert(addonPurchases).values(data).returning();
+        return purchase;
+      }
+      async getAddonPurchase(id) {
+        const [purchase] = await db.select().from(addonPurchases).where(eq8(addonPurchases.id, id)).limit(1);
+        return purchase || null;
+      }
+      async getActiveAddonPurchase(userId, addonType) {
+        const [purchase] = await db.select().from(addonPurchases).where(
+          and6(
+            eq8(addonPurchases.userId, userId),
+            eq8(addonPurchases.addonType, addonType),
+            eq8(addonPurchases.status, "active"),
+            or4(
+              isNull(addonPurchases.endDate),
+              gte2(addonPurchases.endDate, /* @__PURE__ */ new Date())
+            )
+          )
+        ).orderBy(desc4(addonPurchases.createdAt)).limit(1);
+        return purchase || null;
+      }
+      async getUserAddonPurchases(userId, addonType) {
+        const conditions = [eq8(addonPurchases.userId, userId)];
+        if (addonType) {
+          conditions.push(eq8(addonPurchases.addonType, addonType));
+        }
+        return db.select().from(addonPurchases).where(and6(...conditions)).orderBy(desc4(addonPurchases.createdAt));
+      }
+      async updateAddonPurchaseStatus(id, status) {
+        const [purchase] = await db.update(addonPurchases).set({ status, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(addonPurchases.id, id)).returning();
+        return purchase;
+      }
+      async updateAddonPurchaseUsage(id, usedUnits) {
+        const [purchase] = await db.update(addonPurchases).set({ usedUnits, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(addonPurchases.id, id)).returning();
+        return purchase;
+      }
+      async updateAddonPurchaseRefund(id, data) {
+        const updateData = {
+          refundAmount: data.refundAmount,
+          refundReason: data.refundReason,
+          gatewayRefundId: data.gatewayRefundId,
+          refundedBy: data.refundedBy,
+          status: data.status,
+          updatedAt: /* @__PURE__ */ new Date()
+        };
+        if (data.refundedAt) {
+          updateData.refundedAt = data.refundedAt;
+        }
+        if (data.metadata) {
+          updateData.metadata = data.metadata;
+        }
+        const [purchase] = await db.update(addonPurchases).set(updateData).where(eq8(addonPurchases.id, id)).returning();
+        return purchase;
+      }
+      async expireAddonPurchases() {
+        const result = await db.update(addonPurchases).set({ status: "expired", updatedAt: /* @__PURE__ */ new Date() }).where(
+          and6(
+            eq8(addonPurchases.status, "active"),
+            lte2(addonPurchases.endDate, /* @__PURE__ */ new Date())
+          )
+        );
+        return result.rowCount || 0;
+      }
+      // Session Minutes Management
+      async trackSessionMinutesUsage(data) {
+        const [usage] = await db.insert(sessionMinutesUsage).values(data).returning();
+        await db.update(addonPurchases).set({
+          usedUnits: sql5`${addonPurchases.usedUnits} + ${data.minutesConsumed}`,
+          updatedAt: /* @__PURE__ */ new Date()
+        }).where(eq8(addonPurchases.id, data.purchaseId));
+        return usage;
+      }
+      async getSessionMinutesBalance(userId) {
+        const activePurchases = await db.select().from(addonPurchases).where(
+          and6(
+            eq8(addonPurchases.userId, userId),
+            eq8(addonPurchases.addonType, "session_minutes"),
+            eq8(addonPurchases.status, "active"),
+            or4(
+              isNull(addonPurchases.endDate),
+              gte2(addonPurchases.endDate, /* @__PURE__ */ new Date())
+            )
+          )
+        );
+        const totalMinutes = activePurchases.reduce((sum, p) => sum + (p.totalUnits || 0), 0);
+        const usedMinutes = activePurchases.reduce((sum, p) => sum + (p.usedUnits || 0), 0);
+        const remainingMinutes = totalMinutes - usedMinutes;
+        const expiryDates = activePurchases.map((p) => p.endDate).filter((d) => d !== null).sort((a, b) => a < b ? -1 : 1);
+        let expiresAt = expiryDates[0] || null;
+        if (!expiresAt && remainingMinutes > 0 && activePurchases.length > 0) {
+          const startDates = activePurchases.map((p) => p.startDate).filter((d) => d !== null).sort((a, b) => a > b ? -1 : 1);
+          if (startDates.length > 0 && startDates[0]) {
+            const latestStartDate = startDates[0];
+            expiresAt = new Date(latestStartDate);
+            expiresAt.setDate(expiresAt.getDate() + 30);
+          }
+        }
+        return {
+          totalMinutes,
+          usedMinutes,
+          remainingMinutes: Math.max(0, remainingMinutes),
+          expiresAt
+        };
+      }
+      async getUserSessionMinutesUsage(userId, limit = 100) {
+        return db.select().from(sessionMinutesUsage).where(eq8(sessionMinutesUsage.userId, userId)).orderBy(desc4(sessionMinutesUsage.consumedAt)).limit(limit);
+      }
+      async trackSessionMinutesUsageTransactional(userId, conversationId, minutesUsed) {
+        return await db.transaction(async (tx) => {
+          const [activePurchase] = await tx.select().from(addonPurchases).where(
+            and6(
+              eq8(addonPurchases.userId, userId),
+              eq8(addonPurchases.addonType, "session_minutes"),
+              eq8(addonPurchases.status, "active"),
+              or4(
+                isNull(addonPurchases.endDate),
+                gte2(addonPurchases.endDate, /* @__PURE__ */ new Date())
+              )
+            )
+          ).orderBy(desc4(addonPurchases.createdAt)).limit(1).for("update");
+          if (!activePurchase) {
+            throw new Error("No active session minutes package found");
+          }
+          const remainingMinutes = activePurchase.totalUnits - activePurchase.usedUnits;
+          if (remainingMinutes < minutesUsed) {
+            throw new Error(`Insufficient session minutes balance. Available: ${remainingMinutes}, Required: ${minutesUsed}`);
+          }
+          await tx.update(addonPurchases).set({
+            usedUnits: sql5`${addonPurchases.usedUnits} + ${minutesUsed}`,
+            updatedAt: /* @__PURE__ */ new Date()
+          }).where(eq8(addonPurchases.id, activePurchase.id));
+          const [usageLog] = await tx.insert(sessionMinutesUsage).values({
+            userId,
+            purchaseId: activePurchase.id,
+            conversationId,
+            minutesConsumed: minutesUsed,
+            consumedAt: /* @__PURE__ */ new Date()
+          }).returning();
+          return usageLog;
+        });
+      }
+      // DAI Management
+      async trackDaiUsage(data) {
+        const [usage] = await db.insert(daiUsageLogs).values(data).returning();
+        await db.update(addonPurchases).set({
+          usedUnits: sql5`${addonPurchases.usedUnits} + ${data.tokensConsumed}`,
+          updatedAt: /* @__PURE__ */ new Date()
+        }).where(eq8(addonPurchases.id, data.purchaseId));
+        return usage;
+      }
+      async getDaiTokenBalance(userId) {
+        const activePurchases = await db.select().from(addonPurchases).where(
+          and6(
+            eq8(addonPurchases.userId, userId),
+            eq8(addonPurchases.addonType, "dai"),
+            eq8(addonPurchases.status, "active"),
+            or4(
+              isNull(addonPurchases.endDate),
+              gte2(addonPurchases.endDate, /* @__PURE__ */ new Date())
+            )
+          )
+        );
+        const totalTokens = activePurchases.reduce((sum, p) => sum + (p.totalUnits || 0), 0);
+        const usedTokens = activePurchases.reduce((sum, p) => sum + (p.usedUnits || 0), 0);
+        const remainingTokens = totalTokens - usedTokens;
+        const expiryDates = activePurchases.map((p) => p.endDate).filter((d) => d !== null).sort((a, b) => a < b ? -1 : 1);
+        return {
+          totalTokens,
+          usedTokens,
+          remainingTokens: Math.max(0, remainingTokens),
+          expiresAt: expiryDates[0] || null
+        };
+      }
+      async getUserDaiUsage(userId, limit = 100) {
+        return db.select().from(daiUsageLogs).where(eq8(daiUsageLogs.userId, userId)).orderBy(desc4(daiUsageLogs.consumedAt)).limit(limit);
+      }
+      async trackDaiUsageTransactional(userId, feature, tokensUsed, conversationId) {
+        return await db.transaction(async (tx) => {
+          const [activePurchase] = await tx.select().from(addonPurchases).where(
+            and6(
+              eq8(addonPurchases.userId, userId),
+              eq8(addonPurchases.addonType, "dai"),
+              eq8(addonPurchases.status, "active"),
+              or4(
+                isNull(addonPurchases.endDate),
+                gte2(addonPurchases.endDate, /* @__PURE__ */ new Date())
+              )
+            )
+          ).orderBy(desc4(addonPurchases.createdAt)).limit(1).for("update");
+          if (!activePurchase) {
+            throw new Error("No active DAI token package found");
+          }
+          const remainingTokens = activePurchase.totalUnits - activePurchase.usedUnits;
+          if (remainingTokens < tokensUsed) {
+            throw new Error(`Insufficient DAI token balance. Available: ${remainingTokens}, Required: ${tokensUsed}`);
+          }
+          await tx.update(addonPurchases).set({
+            usedUnits: sql5`${addonPurchases.usedUnits} + ${tokensUsed}`,
+            updatedAt: /* @__PURE__ */ new Date()
+          }).where(eq8(addonPurchases.id, activePurchase.id));
+          const [usageLog] = await tx.insert(daiUsageLogs).values({
+            userId,
+            purchaseId: activePurchase.id,
+            conversationId: conversationId || null,
+            featureUsed: feature,
+            tokensConsumed: tokensUsed,
+            consumedAt: /* @__PURE__ */ new Date()
+          }).returning();
+          return usageLog;
+        });
+      }
+      // Enterprise User Assignment Management
+      async createEnterpriseUserAssignment(data) {
+        const [assignment] = await db.insert(enterpriseUserAssignments).values(data).returning();
+        return assignment;
+      }
+      async getEnterpriseUserAssignment(id) {
+        const [assignment] = await db.select().from(enterpriseUserAssignments).where(eq8(enterpriseUserAssignments.id, id)).limit(1);
+        return assignment || null;
+      }
+      async getEnterpriseAssignmentsByOrg(organizationId) {
+        return db.select().from(enterpriseUserAssignments).where(eq8(enterpriseUserAssignments.organizationId, organizationId)).orderBy(desc4(enterpriseUserAssignments.createdAt));
+      }
+      async getEnterpriseAssignmentByUser(userId) {
+        const [assignment] = await db.select().from(enterpriseUserAssignments).where(
+          and6(
+            eq8(enterpriseUserAssignments.userId, userId),
+            eq8(enterpriseUserAssignments.status, "active")
+          )
+        ).orderBy(desc4(enterpriseUserAssignments.createdAt)).limit(1);
+        return assignment || null;
+      }
+      async updateEnterpriseAssignmentStatus(id, status) {
+        const [assignment] = await db.update(enterpriseUserAssignments).set({ status, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(enterpriseUserAssignments.id, id)).returning();
+        return assignment;
+      }
+      async revokeEnterpriseAssignment(id, revokedBy) {
+        const [assignment] = await db.update(enterpriseUserAssignments).set({
+          status: "revoked",
+          revokedBy,
+          revokedAt: /* @__PURE__ */ new Date(),
+          updatedAt: /* @__PURE__ */ new Date()
+        }).where(eq8(enterpriseUserAssignments.id, id)).returning();
+        return assignment;
+      }
+      async activateEnterpriseUser(token, userId) {
+        const [assignment] = await db.update(enterpriseUserAssignments).set({
+          userId,
+          status: "active",
+          activatedAt: /* @__PURE__ */ new Date(),
+          updatedAt: /* @__PURE__ */ new Date()
+        }).where(
+          and6(
+            eq8(enterpriseUserAssignments.activationToken, token),
+            gte2(enterpriseUserAssignments.activationTokenExpiresAt, /* @__PURE__ */ new Date())
+          )
+        ).returning();
+        if (!assignment) {
+          throw new Error("Invalid or expired activation token");
+        }
+        return assignment;
+      }
+      // Activation Invite Management
+      async createActivationInvite(data) {
+        const [invite] = await db.insert(activationInvites).values(data).returning();
+        return invite;
+      }
+      async getActivationInviteByToken(token) {
+        const [invite] = await db.select().from(activationInvites).where(eq8(activationInvites.token, token)).limit(1);
+        return invite || null;
+      }
+      async updateActivationInviteStatus(id, status) {
+        const [invite] = await db.update(activationInvites).set({ status, acceptedAt: status === "accepted" ? /* @__PURE__ */ new Date() : void 0 }).where(eq8(activationInvites.id, id)).returning();
+        return invite;
+      }
+      // Admin Action Logging
+      async logAdminAction(data) {
+        const [log2] = await db.insert(adminActionsLog).values(data).returning();
+        return log2;
+      }
+      async getAdminActions(adminId, limit = 100) {
+        const query = db.select().from(adminActionsLog);
+        if (adminId) {
+          return query.where(eq8(adminActionsLog.adminId, adminId)).orderBy(desc4(adminActionsLog.createdAt)).limit(limit);
+        }
+        return query.orderBy(desc4(adminActionsLog.createdAt)).limit(limit);
+      }
+      // User Entitlements Cache
+      async calculateUserEntitlements(userId) {
+        const platformAccess = await this.getActiveAddonPurchase(userId, "platform_access");
+        const hasPlatformAccess = !!platformAccess;
+        const platformAccessExpiresAt = platformAccess?.endDate || null;
+        const sessionMinutes = await this.getSessionMinutesBalance(userId);
+        const trainMe = await this.getActiveAddonPurchase(userId, "train_me");
+        const hasTrainMe = !!trainMe;
+        const trainMeExpiresAt = trainMe?.endDate || null;
+        const daiBalance = await this.getDaiTokenBalance(userId);
+        const enterpriseAssignment = await this.getEnterpriseAssignmentByUser(userId);
+        const isEnterpriseUser = !!enterpriseAssignment;
+        const enterpriseTrainMeEnabled = enterpriseAssignment?.trainMeEnabled || false;
+        const enterpriseDaiEnabled = enterpriseAssignment?.daiEnabled || false;
+        return {
+          hasPlatformAccess,
+          platformAccessExpiresAt,
+          sessionMinutesBalance: sessionMinutes.remainingMinutes,
+          sessionMinutesExpiresAt: sessionMinutes.expiresAt,
+          hasTrainMe: hasTrainMe || enterpriseTrainMeEnabled,
+          trainMeExpiresAt,
+          hasDai: daiBalance.remainingTokens > 0 || enterpriseDaiEnabled,
+          daiTokensBalance: daiBalance.remainingTokens,
+          daiExpiresAt: daiBalance.expiresAt,
+          isEnterpriseUser,
+          enterpriseTrainMeEnabled,
+          enterpriseDaiEnabled
+        };
+      }
+      async refreshUserEntitlements(userId) {
+        const entitlements = await this.calculateUserEntitlements(userId);
+        const [existing] = await db.select().from(userEntitlements).where(eq8(userEntitlements.userId, userId)).limit(1);
+        if (existing) {
+          const [updated] = await db.update(userEntitlements).set({
+            ...entitlements,
+            lastCalculatedAt: /* @__PURE__ */ new Date(),
+            updatedAt: /* @__PURE__ */ new Date()
+          }).where(eq8(userEntitlements.userId, userId)).returning();
+          return updated;
+        } else {
+          const assignment = await this.getEnterpriseAssignmentByUser(userId);
+          const [created] = await db.insert(userEntitlements).values({
+            userId,
+            organizationId: assignment?.organizationId || null,
+            ...entitlements
+          }).returning();
+          return created;
+        }
+      }
+      async getUserEntitlements(userId) {
+        const [entitlement] = await db.select().from(userEntitlements).where(eq8(userEntitlements.userId, userId)).limit(1);
+        return entitlement || null;
+      }
+      // Shopping Cart Management
+      async addToCart(data) {
+        const [item] = await db.insert(cartItems).values(data).returning();
+        return item;
+      }
+      async removeFromCart(userId, cartItemId) {
+        await db.delete(cartItems).where(and6(eq8(cartItems.id, cartItemId), eq8(cartItems.userId, userId)));
+      }
+      async getCartItems(userId) {
+        return await db.select().from(cartItems).where(eq8(cartItems.userId, userId)).orderBy(desc4(cartItems.addedAt));
+      }
+      async clearCart(userId) {
+        await db.delete(cartItems).where(eq8(cartItems.userId, userId));
+      }
+      async applyPromoCodeToCartItem(userId, cartItemId, promoCodeInput) {
+        const [item] = await db.select().from(cartItems).where(and6(eq8(cartItems.id, cartItemId), eq8(cartItems.userId, userId))).limit(1);
+        if (!item) {
+          return { success: false, message: "Cart item not found" };
+        }
+        const [promo] = await db.select().from(promoCodes).where(sql5`UPPER(${promoCodes.code}) = UPPER(${promoCodeInput})`).limit(1);
+        if (!promo) {
+          return { success: false, message: "Invalid promo code" };
+        }
+        if (!promo.isActive) {
+          return { success: false, message: "Promo code is not active" };
+        }
+        if (promo.expiresAt && promo.expiresAt < /* @__PURE__ */ new Date()) {
+          return { success: false, message: "Promo code has expired" };
+        }
+        if (promo.maxUses && parseInt(promo.usesCount) >= parseInt(promo.maxUses)) {
+          return { success: false, message: "Promo code usage limit reached" };
+        }
+        if (!promo.category || promo.category.trim() === "") {
+          return {
+            success: false,
+            message: "Invalid promo code configuration - no category set"
+          };
+        }
+        if (promo.category === "all") {
+        } else {
+          const categoryMap = {
+            "platform_access": "platform_subscription",
+            "platform_subscription": "platform_subscription",
+            "session_minutes": "session_minutes",
+            "usage_bundle": "session_minutes",
+            "train_me": "train_me",
+            "dai": "dai"
+          };
+          let itemCategory = categoryMap[item.addonType] || item.addonType;
+          if (item.addonType === "service") {
+            const packageName = (item.packageName || "").toLowerCase();
+            if (packageName.includes("dai")) {
+              itemCategory = "dai";
+            } else if (packageName.includes("train me")) {
+              itemCategory = "train_me";
+            } else {
+              itemCategory = "train_me";
+            }
+          }
+          const promoCategory = categoryMap[promo.category] || promo.category;
+          if (promoCategory !== itemCategory) {
+            console.log(`\u26A0\uFE0F Promo category mismatch: promo.category="${promo.category}" (mapped: "${promoCategory}"), itemCategory="${itemCategory}", addonType="${item.addonType}", packageName="${item.packageName}"`);
+            const categoryNames = {
+              "train_me": "Train Me",
+              "dai": "Domain AI Intelligence",
+              "service": "Professional Services",
+              "session_minutes": "Session Minutes",
+              "platform_subscription": "Platform Access"
+            };
+            const friendlyPromoCategory = categoryNames[promo.category] || promo.category;
+            const friendlyItemCategory = categoryNames[item.addonType] || item.addonType;
+            return {
+              success: false,
+              message: `This promo code is only valid for ${friendlyPromoCategory} purchases, not ${friendlyItemCategory}`
+            };
+          }
+        }
+        if (promo.allowedPlanTypes && Array.isArray(promo.allowedPlanTypes) && promo.allowedPlanTypes.length > 0) {
+          const itemMetadata = item.metadata || {};
+          const itemPlanType = itemMetadata.planType;
+          if (item.addonType === "session_minutes") {
+            const allowedPlans = promo.allowedPlanTypes;
+            const itemPackageName = item.packageName;
+            const isAllowed = allowedPlans.some((allowedPlan) => {
+              return itemPackageName.includes(allowedPlan) || allowedPlan.includes(itemPackageName);
+            });
+            if (!isAllowed) {
+              return {
+                success: false,
+                message: `This promo code is only valid for: ${allowedPlans.join(", ")}`
+              };
+            }
+          } else if (item.addonType === "platform_access" && itemPlanType) {
+            const allowedPlanTypes = promo.allowedPlanTypes;
+            if (!allowedPlanTypes.includes(itemPlanType)) {
+              return {
+                success: false,
+                message: `This promo code is only valid for: ${allowedPlanTypes.join(", ")} plans`
+              };
+            }
+          }
+        }
+        const itemTotal = parseFloat(item.basePrice) * item.quantity;
+        let discountAmount = 0;
+        if (promo.discountType === "percentage") {
+          const percentage = parseFloat(promo.discountValue);
+          discountAmount = itemTotal * (percentage / 100);
+        } else if (promo.discountType === "fixed") {
+          discountAmount = parseFloat(promo.discountValue);
+          if (discountAmount > itemTotal) {
+            discountAmount = itemTotal;
+          }
+        }
+        const [updated] = await db.update(cartItems).set({
+          promoCodeId: promo.id,
+          promoCodeCode: promo.code,
+          appliedDiscountAmount: discountAmount.toFixed(2)
+        }).where(and6(eq8(cartItems.id, cartItemId), eq8(cartItems.userId, userId))).returning();
+        return { success: true, message: "Promo code applied successfully", cartItem: updated };
+      }
+      async removePromoCodeFromCartItem(userId, cartItemId) {
+        const [updated] = await db.update(cartItems).set({
+          promoCodeId: null,
+          promoCodeCode: null,
+          appliedDiscountAmount: null
+        }).where(and6(eq8(cartItems.id, cartItemId), eq8(cartItems.userId, userId))).returning();
+        if (!updated) {
+          return { success: false, message: "Cart item not found" };
+        }
+        return { success: true, message: "Promo code removed successfully" };
+      }
+      async calculateCartTotal(userId, promoCode) {
+        const items = await this.getCartItems(userId);
+        if (items.length === 0) {
+          return {
+            items: [],
+            subtotal: 0,
+            gstAmount: 0,
+            discount: 0,
+            total: 0,
+            currency: "USD",
+            itemCount: 0
+          };
+        }
+        const subtotal = items.reduce((sum, item) => {
+          return sum + parseFloat(item.basePrice) * item.quantity;
+        }, 0);
+        const discount = items.reduce((sum, item) => {
+          if (item.appliedDiscountAmount) {
+            return sum + parseFloat(item.appliedDiscountAmount);
+          }
+          return sum;
+        }, 0);
+        const currency = items[0]?.currency || "USD";
+        const GST_RATE = currency === "INR" ? 0.18 : 0;
+        const gstAmount = (subtotal - discount) * GST_RATE;
+        const total = subtotal - discount + gstAmount;
+        return {
+          items,
+          subtotal,
+          gstAmount,
+          discount,
+          total,
+          currency,
+          itemCount: items.length
+        };
+      }
+      async checkItemAvailability(userId, packageSku, addonType) {
+        const activeAddon = await this.getActiveAddonPurchase(userId, addonType);
+        if (activeAddon) {
+          const now = /* @__PURE__ */ new Date();
+          const isExpired = activeAddon.endDate && activeAddon.endDate < now;
+          const isExpiringSoon = activeAddon.endDate && activeAddon.endDate < new Date(now.getTime() + 7 * 24 * 60 * 60 * 1e3);
+          if (isExpired) {
+            return { available: true };
+          } else if (isExpiringSoon && addonType === "platform_access") {
+            return { available: true };
+          } else {
+            return {
+              available: false,
+              reason: `You already have an active ${addonType.replace("_", " ")} subscription valid until ${activeAddon.endDate?.toLocaleDateString() || "N/A"}`
+            };
+          }
+        }
+        if (addonType === "session_minutes" || addonType === "dai") {
+          return { available: true };
+        }
+        return { available: true };
+      }
+      async getPublishedAddons() {
+        return db.select().from(addons).where(and6(eq8(addons.publishedOnWebsite, true), eq8(addons.isActive, true))).orderBy(desc4(addons.createdAt));
+      }
+      async getAddonById(id) {
+        const [addon] = await db.select().from(addons).where(eq8(addons.id, id)).limit(1);
+        return addon || null;
+      }
+      async getPublishedSubscriptionPlans() {
+        return db.select().from(subscriptionPlans).where(and6(eq8(subscriptionPlans.publishedOnWebsite, true), eq8(subscriptionPlans.isActive, true))).orderBy(desc4(subscriptionPlans.createdAt));
+      }
+    };
+    billingStorage = new BillingStorage();
+  }
+});
+
 // server/services/email.ts
 var email_exports = {};
 __export(email_exports, {
@@ -16085,667 +16929,6 @@ var init_event_logger = __esm({
   }
 });
 
-// server/storage-billing.ts
-var storage_billing_exports = {};
-__export(storage_billing_exports, {
-  BillingStorage: () => BillingStorage,
-  billingStorage: () => billingStorage2
-});
-import { eq as eq9, and as and7, gte as gte2, desc as desc4, sql as sql5, lte as lte2, or as or4, isNull } from "drizzle-orm";
-var BillingStorage, billingStorage2;
-var init_storage_billing = __esm({
-  "server/storage-billing.ts"() {
-    "use strict";
-    init_db();
-    init_schema();
-    BillingStorage = class {
-      // Gateway Provider Management
-      async createGatewayProvider(data) {
-        const [provider] = await db.insert(gatewayProviders).values(data).returning();
-        return provider;
-      }
-      async getDefaultGatewayProvider() {
-        const [provider] = await db.select().from(gatewayProviders).where(and7(eq9(gatewayProviders.isDefault, true), eq9(gatewayProviders.isActive, true))).limit(1);
-        return provider || null;
-      }
-      async getGatewayProviderByName(name) {
-        const [provider] = await db.select().from(gatewayProviders).where(eq9(gatewayProviders.providerName, name)).limit(1);
-        return provider || null;
-      }
-      // Gateway Transaction Management
-      async createGatewayTransaction(data) {
-        const [transaction] = await db.insert(gatewayTransactions).values(data).returning();
-        return transaction;
-      }
-      async getGatewayTransaction(id) {
-        const [transaction] = await db.select().from(gatewayTransactions).where(eq9(gatewayTransactions.id, id)).limit(1);
-        return transaction || null;
-      }
-      async getGatewayTransactionsByUser(userId, limit = 50) {
-        return db.select().from(gatewayTransactions).where(eq9(gatewayTransactions.userId, userId)).orderBy(desc4(gatewayTransactions.createdAt)).limit(limit);
-      }
-      async updateGatewayTransactionStatus(id, status) {
-        const [transaction] = await db.update(gatewayTransactions).set({ status }).where(eq9(gatewayTransactions.id, id)).returning();
-        return transaction;
-      }
-      // Gateway Webhook Management
-      async createGatewayWebhook(data) {
-        const [webhook] = await db.insert(gatewayWebhooks).values(data).returning();
-        return webhook;
-      }
-      async markWebhookProcessed(id, success, errorMessage) {
-        await db.update(gatewayWebhooks).set({
-          processed: true,
-          processedAt: /* @__PURE__ */ new Date(),
-          verified: success,
-          errorMessage: errorMessage || null
-        }).where(eq9(gatewayWebhooks.id, id));
-      }
-      // Pending Orders Management (Secure Payment Verification)
-      async createPendingOrder(data) {
-        const [order] = await db.insert(pendingOrders).values(data).returning();
-        return order;
-      }
-      async getPendingOrder(id) {
-        if (id.length === 36) {
-          const [order2] = await db.select().from(pendingOrders).where(eq9(pendingOrders.id, id)).limit(1);
-          if (order2) return order2;
-        }
-        const [order] = await db.select().from(pendingOrders).where(eq9(pendingOrders.gatewayOrderId, id)).limit(1);
-        return order || null;
-      }
-      async getPendingOrderById(orderId, userId) {
-        const [order] = await db.select().from(pendingOrders).where(
-          and7(
-            eq9(pendingOrders.id, orderId),
-            eq9(pendingOrders.userId, userId)
-          )
-        ).limit(1);
-        return order || null;
-      }
-      async updatePendingOrderGatewayId(pendingOrderId, gatewayOrderId) {
-        const [order] = await db.update(pendingOrders).set({ gatewayOrderId }).where(eq9(pendingOrders.id, pendingOrderId)).returning();
-        if (!order) {
-          throw new Error("Pending order not found");
-        }
-        return order;
-      }
-      async updatePendingOrderStatus(id, userId, newStatus, completedAt) {
-        let order = await this.getPendingOrder(id);
-        if (!order) {
-          throw new Error("Pending order not found");
-        }
-        if (order.status !== "pending") {
-          throw new Error(`Invalid status transition: order is already ${order.status}`);
-        }
-        if (order.userId !== userId) {
-          throw new Error("Order does not belong to user");
-        }
-        if (newStatus !== "expired" && /* @__PURE__ */ new Date() > new Date(order.expiresAt)) {
-          throw new Error("Order has expired");
-        }
-        const updates = { status: newStatus };
-        if (completedAt) {
-          updates.completedAt = completedAt;
-        }
-        const [updatedOrder] = await db.update(pendingOrders).set(updates).where(
-          and7(
-            eq9(pendingOrders.id, order.id),
-            eq9(pendingOrders.status, "pending")
-          )
-        ).returning();
-        if (!updatedOrder) {
-          throw new Error("Failed to update order status - concurrent modification detected");
-        }
-        return updatedOrder;
-      }
-      async expirePendingOrders() {
-        const result = await db.update(pendingOrders).set({ status: "expired" }).where(
-          and7(
-            eq9(pendingOrders.status, "pending"),
-            lte2(pendingOrders.expiresAt, /* @__PURE__ */ new Date())
-          )
-        );
-        return result.rowCount || 0;
-      }
-      // Addon Purchase Management
-      async createAddonPurchase(data) {
-        const [purchase] = await db.insert(addonPurchases).values(data).returning();
-        return purchase;
-      }
-      async getAddonPurchase(id) {
-        const [purchase] = await db.select().from(addonPurchases).where(eq9(addonPurchases.id, id)).limit(1);
-        return purchase || null;
-      }
-      async getActiveAddonPurchase(userId, addonType) {
-        const [purchase] = await db.select().from(addonPurchases).where(
-          and7(
-            eq9(addonPurchases.userId, userId),
-            eq9(addonPurchases.addonType, addonType),
-            eq9(addonPurchases.status, "active"),
-            or4(
-              isNull(addonPurchases.endDate),
-              gte2(addonPurchases.endDate, /* @__PURE__ */ new Date())
-            )
-          )
-        ).orderBy(desc4(addonPurchases.createdAt)).limit(1);
-        return purchase || null;
-      }
-      async getUserAddonPurchases(userId, addonType) {
-        const conditions = [eq9(addonPurchases.userId, userId)];
-        if (addonType) {
-          conditions.push(eq9(addonPurchases.addonType, addonType));
-        }
-        return db.select().from(addonPurchases).where(and7(...conditions)).orderBy(desc4(addonPurchases.createdAt));
-      }
-      async updateAddonPurchaseStatus(id, status) {
-        const [purchase] = await db.update(addonPurchases).set({ status, updatedAt: /* @__PURE__ */ new Date() }).where(eq9(addonPurchases.id, id)).returning();
-        return purchase;
-      }
-      async updateAddonPurchaseUsage(id, usedUnits) {
-        const [purchase] = await db.update(addonPurchases).set({ usedUnits, updatedAt: /* @__PURE__ */ new Date() }).where(eq9(addonPurchases.id, id)).returning();
-        return purchase;
-      }
-      async updateAddonPurchaseRefund(id, data) {
-        const updateData = {
-          refundAmount: data.refundAmount,
-          refundReason: data.refundReason,
-          gatewayRefundId: data.gatewayRefundId,
-          refundedBy: data.refundedBy,
-          status: data.status,
-          updatedAt: /* @__PURE__ */ new Date()
-        };
-        if (data.refundedAt) {
-          updateData.refundedAt = data.refundedAt;
-        }
-        if (data.metadata) {
-          updateData.metadata = data.metadata;
-        }
-        const [purchase] = await db.update(addonPurchases).set(updateData).where(eq9(addonPurchases.id, id)).returning();
-        return purchase;
-      }
-      async expireAddonPurchases() {
-        const result = await db.update(addonPurchases).set({ status: "expired", updatedAt: /* @__PURE__ */ new Date() }).where(
-          and7(
-            eq9(addonPurchases.status, "active"),
-            lte2(addonPurchases.endDate, /* @__PURE__ */ new Date())
-          )
-        );
-        return result.rowCount || 0;
-      }
-      // Session Minutes Management
-      async trackSessionMinutesUsage(data) {
-        const [usage] = await db.insert(sessionMinutesUsage).values(data).returning();
-        await db.update(addonPurchases).set({
-          usedUnits: sql5`${addonPurchases.usedUnits} + ${data.minutesConsumed}`,
-          updatedAt: /* @__PURE__ */ new Date()
-        }).where(eq9(addonPurchases.id, data.purchaseId));
-        return usage;
-      }
-      async getSessionMinutesBalance(userId) {
-        const activePurchases = await db.select().from(addonPurchases).where(
-          and7(
-            eq9(addonPurchases.userId, userId),
-            eq9(addonPurchases.addonType, "session_minutes"),
-            eq9(addonPurchases.status, "active"),
-            or4(
-              isNull(addonPurchases.endDate),
-              gte2(addonPurchases.endDate, /* @__PURE__ */ new Date())
-            )
-          )
-        );
-        const totalMinutes = activePurchases.reduce((sum, p) => sum + (p.totalUnits || 0), 0);
-        const usedMinutes = activePurchases.reduce((sum, p) => sum + (p.usedUnits || 0), 0);
-        const remainingMinutes = totalMinutes - usedMinutes;
-        const expiryDates = activePurchases.map((p) => p.endDate).filter((d) => d !== null).sort((a, b) => a < b ? -1 : 1);
-        let expiresAt = expiryDates[0] || null;
-        if (!expiresAt && remainingMinutes > 0 && activePurchases.length > 0) {
-          const startDates = activePurchases.map((p) => p.startDate).filter((d) => d !== null).sort((a, b) => a > b ? -1 : 1);
-          if (startDates.length > 0 && startDates[0]) {
-            const latestStartDate = startDates[0];
-            expiresAt = new Date(latestStartDate);
-            expiresAt.setDate(expiresAt.getDate() + 30);
-          }
-        }
-        return {
-          totalMinutes,
-          usedMinutes,
-          remainingMinutes: Math.max(0, remainingMinutes),
-          expiresAt
-        };
-      }
-      async getUserSessionMinutesUsage(userId, limit = 100) {
-        return db.select().from(sessionMinutesUsage).where(eq9(sessionMinutesUsage.userId, userId)).orderBy(desc4(sessionMinutesUsage.consumedAt)).limit(limit);
-      }
-      async trackSessionMinutesUsageTransactional(userId, conversationId, minutesUsed) {
-        return await db.transaction(async (tx) => {
-          const [activePurchase] = await tx.select().from(addonPurchases).where(
-            and7(
-              eq9(addonPurchases.userId, userId),
-              eq9(addonPurchases.addonType, "session_minutes"),
-              eq9(addonPurchases.status, "active"),
-              or4(
-                isNull(addonPurchases.endDate),
-                gte2(addonPurchases.endDate, /* @__PURE__ */ new Date())
-              )
-            )
-          ).orderBy(desc4(addonPurchases.createdAt)).limit(1).for("update");
-          if (!activePurchase) {
-            throw new Error("No active session minutes package found");
-          }
-          const remainingMinutes = activePurchase.totalUnits - activePurchase.usedUnits;
-          if (remainingMinutes < minutesUsed) {
-            throw new Error(`Insufficient session minutes balance. Available: ${remainingMinutes}, Required: ${minutesUsed}`);
-          }
-          await tx.update(addonPurchases).set({
-            usedUnits: sql5`${addonPurchases.usedUnits} + ${minutesUsed}`,
-            updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq9(addonPurchases.id, activePurchase.id));
-          const [usageLog] = await tx.insert(sessionMinutesUsage).values({
-            userId,
-            purchaseId: activePurchase.id,
-            conversationId,
-            minutesConsumed: minutesUsed,
-            consumedAt: /* @__PURE__ */ new Date()
-          }).returning();
-          return usageLog;
-        });
-      }
-      // DAI Management
-      async trackDaiUsage(data) {
-        const [usage] = await db.insert(daiUsageLogs).values(data).returning();
-        await db.update(addonPurchases).set({
-          usedUnits: sql5`${addonPurchases.usedUnits} + ${data.tokensConsumed}`,
-          updatedAt: /* @__PURE__ */ new Date()
-        }).where(eq9(addonPurchases.id, data.purchaseId));
-        return usage;
-      }
-      async getDaiTokenBalance(userId) {
-        const activePurchases = await db.select().from(addonPurchases).where(
-          and7(
-            eq9(addonPurchases.userId, userId),
-            eq9(addonPurchases.addonType, "dai"),
-            eq9(addonPurchases.status, "active"),
-            or4(
-              isNull(addonPurchases.endDate),
-              gte2(addonPurchases.endDate, /* @__PURE__ */ new Date())
-            )
-          )
-        );
-        const totalTokens = activePurchases.reduce((sum, p) => sum + (p.totalUnits || 0), 0);
-        const usedTokens = activePurchases.reduce((sum, p) => sum + (p.usedUnits || 0), 0);
-        const remainingTokens = totalTokens - usedTokens;
-        const expiryDates = activePurchases.map((p) => p.endDate).filter((d) => d !== null).sort((a, b) => a < b ? -1 : 1);
-        return {
-          totalTokens,
-          usedTokens,
-          remainingTokens: Math.max(0, remainingTokens),
-          expiresAt: expiryDates[0] || null
-        };
-      }
-      async getUserDaiUsage(userId, limit = 100) {
-        return db.select().from(daiUsageLogs).where(eq9(daiUsageLogs.userId, userId)).orderBy(desc4(daiUsageLogs.consumedAt)).limit(limit);
-      }
-      async trackDaiUsageTransactional(userId, feature, tokensUsed, conversationId) {
-        return await db.transaction(async (tx) => {
-          const [activePurchase] = await tx.select().from(addonPurchases).where(
-            and7(
-              eq9(addonPurchases.userId, userId),
-              eq9(addonPurchases.addonType, "dai"),
-              eq9(addonPurchases.status, "active"),
-              or4(
-                isNull(addonPurchases.endDate),
-                gte2(addonPurchases.endDate, /* @__PURE__ */ new Date())
-              )
-            )
-          ).orderBy(desc4(addonPurchases.createdAt)).limit(1).for("update");
-          if (!activePurchase) {
-            throw new Error("No active DAI token package found");
-          }
-          const remainingTokens = activePurchase.totalUnits - activePurchase.usedUnits;
-          if (remainingTokens < tokensUsed) {
-            throw new Error(`Insufficient DAI token balance. Available: ${remainingTokens}, Required: ${tokensUsed}`);
-          }
-          await tx.update(addonPurchases).set({
-            usedUnits: sql5`${addonPurchases.usedUnits} + ${tokensUsed}`,
-            updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq9(addonPurchases.id, activePurchase.id));
-          const [usageLog] = await tx.insert(daiUsageLogs).values({
-            userId,
-            purchaseId: activePurchase.id,
-            conversationId: conversationId || null,
-            featureUsed: feature,
-            tokensConsumed: tokensUsed,
-            consumedAt: /* @__PURE__ */ new Date()
-          }).returning();
-          return usageLog;
-        });
-      }
-      // Enterprise User Assignment Management
-      async createEnterpriseUserAssignment(data) {
-        const [assignment] = await db.insert(enterpriseUserAssignments).values(data).returning();
-        return assignment;
-      }
-      async getEnterpriseUserAssignment(id) {
-        const [assignment] = await db.select().from(enterpriseUserAssignments).where(eq9(enterpriseUserAssignments.id, id)).limit(1);
-        return assignment || null;
-      }
-      async getEnterpriseAssignmentsByOrg(organizationId) {
-        return db.select().from(enterpriseUserAssignments).where(eq9(enterpriseUserAssignments.organizationId, organizationId)).orderBy(desc4(enterpriseUserAssignments.createdAt));
-      }
-      async getEnterpriseAssignmentByUser(userId) {
-        const [assignment] = await db.select().from(enterpriseUserAssignments).where(
-          and7(
-            eq9(enterpriseUserAssignments.userId, userId),
-            eq9(enterpriseUserAssignments.status, "active")
-          )
-        ).orderBy(desc4(enterpriseUserAssignments.createdAt)).limit(1);
-        return assignment || null;
-      }
-      async updateEnterpriseAssignmentStatus(id, status) {
-        const [assignment] = await db.update(enterpriseUserAssignments).set({ status, updatedAt: /* @__PURE__ */ new Date() }).where(eq9(enterpriseUserAssignments.id, id)).returning();
-        return assignment;
-      }
-      async revokeEnterpriseAssignment(id, revokedBy) {
-        const [assignment] = await db.update(enterpriseUserAssignments).set({
-          status: "revoked",
-          revokedBy,
-          revokedAt: /* @__PURE__ */ new Date(),
-          updatedAt: /* @__PURE__ */ new Date()
-        }).where(eq9(enterpriseUserAssignments.id, id)).returning();
-        return assignment;
-      }
-      async activateEnterpriseUser(token, userId) {
-        const [assignment] = await db.update(enterpriseUserAssignments).set({
-          userId,
-          status: "active",
-          activatedAt: /* @__PURE__ */ new Date(),
-          updatedAt: /* @__PURE__ */ new Date()
-        }).where(
-          and7(
-            eq9(enterpriseUserAssignments.activationToken, token),
-            gte2(enterpriseUserAssignments.activationTokenExpiresAt, /* @__PURE__ */ new Date())
-          )
-        ).returning();
-        if (!assignment) {
-          throw new Error("Invalid or expired activation token");
-        }
-        return assignment;
-      }
-      // Activation Invite Management
-      async createActivationInvite(data) {
-        const [invite] = await db.insert(activationInvites).values(data).returning();
-        return invite;
-      }
-      async getActivationInviteByToken(token) {
-        const [invite] = await db.select().from(activationInvites).where(eq9(activationInvites.token, token)).limit(1);
-        return invite || null;
-      }
-      async updateActivationInviteStatus(id, status) {
-        const [invite] = await db.update(activationInvites).set({ status, acceptedAt: status === "accepted" ? /* @__PURE__ */ new Date() : void 0 }).where(eq9(activationInvites.id, id)).returning();
-        return invite;
-      }
-      // Admin Action Logging
-      async logAdminAction(data) {
-        const [log2] = await db.insert(adminActionsLog).values(data).returning();
-        return log2;
-      }
-      async getAdminActions(adminId, limit = 100) {
-        const query = db.select().from(adminActionsLog);
-        if (adminId) {
-          return query.where(eq9(adminActionsLog.adminId, adminId)).orderBy(desc4(adminActionsLog.createdAt)).limit(limit);
-        }
-        return query.orderBy(desc4(adminActionsLog.createdAt)).limit(limit);
-      }
-      // User Entitlements Cache
-      async calculateUserEntitlements(userId) {
-        const platformAccess = await this.getActiveAddonPurchase(userId, "platform_access");
-        const hasPlatformAccess = !!platformAccess;
-        const platformAccessExpiresAt = platformAccess?.endDate || null;
-        const sessionMinutes = await this.getSessionMinutesBalance(userId);
-        const trainMe = await this.getActiveAddonPurchase(userId, "train_me");
-        const hasTrainMe = !!trainMe;
-        const trainMeExpiresAt = trainMe?.endDate || null;
-        const daiBalance = await this.getDaiTokenBalance(userId);
-        const enterpriseAssignment = await this.getEnterpriseAssignmentByUser(userId);
-        const isEnterpriseUser = !!enterpriseAssignment;
-        const enterpriseTrainMeEnabled = enterpriseAssignment?.trainMeEnabled || false;
-        const enterpriseDaiEnabled = enterpriseAssignment?.daiEnabled || false;
-        return {
-          hasPlatformAccess,
-          platformAccessExpiresAt,
-          sessionMinutesBalance: sessionMinutes.remainingMinutes,
-          sessionMinutesExpiresAt: sessionMinutes.expiresAt,
-          hasTrainMe: hasTrainMe || enterpriseTrainMeEnabled,
-          trainMeExpiresAt,
-          hasDai: daiBalance.remainingTokens > 0 || enterpriseDaiEnabled,
-          daiTokensBalance: daiBalance.remainingTokens,
-          daiExpiresAt: daiBalance.expiresAt,
-          isEnterpriseUser,
-          enterpriseTrainMeEnabled,
-          enterpriseDaiEnabled
-        };
-      }
-      async refreshUserEntitlements(userId) {
-        const entitlements = await this.calculateUserEntitlements(userId);
-        const [existing] = await db.select().from(userEntitlements).where(eq9(userEntitlements.userId, userId)).limit(1);
-        if (existing) {
-          const [updated] = await db.update(userEntitlements).set({
-            ...entitlements,
-            lastCalculatedAt: /* @__PURE__ */ new Date(),
-            updatedAt: /* @__PURE__ */ new Date()
-          }).where(eq9(userEntitlements.userId, userId)).returning();
-          return updated;
-        } else {
-          const assignment = await this.getEnterpriseAssignmentByUser(userId);
-          const [created] = await db.insert(userEntitlements).values({
-            userId,
-            organizationId: assignment?.organizationId || null,
-            ...entitlements
-          }).returning();
-          return created;
-        }
-      }
-      async getUserEntitlements(userId) {
-        const [entitlement] = await db.select().from(userEntitlements).where(eq9(userEntitlements.userId, userId)).limit(1);
-        return entitlement || null;
-      }
-      // Shopping Cart Management
-      async addToCart(data) {
-        const [item] = await db.insert(cartItems).values(data).returning();
-        return item;
-      }
-      async removeFromCart(userId, cartItemId) {
-        await db.delete(cartItems).where(and7(eq9(cartItems.id, cartItemId), eq9(cartItems.userId, userId)));
-      }
-      async getCartItems(userId) {
-        return await db.select().from(cartItems).where(eq9(cartItems.userId, userId)).orderBy(desc4(cartItems.addedAt));
-      }
-      async clearCart(userId) {
-        await db.delete(cartItems).where(eq9(cartItems.userId, userId));
-      }
-      async applyPromoCodeToCartItem(userId, cartItemId, promoCodeInput) {
-        const [item] = await db.select().from(cartItems).where(and7(eq9(cartItems.id, cartItemId), eq9(cartItems.userId, userId))).limit(1);
-        if (!item) {
-          return { success: false, message: "Cart item not found" };
-        }
-        const [promo] = await db.select().from(promoCodes).where(sql5`UPPER(${promoCodes.code}) = UPPER(${promoCodeInput})`).limit(1);
-        if (!promo) {
-          return { success: false, message: "Invalid promo code" };
-        }
-        if (!promo.isActive) {
-          return { success: false, message: "Promo code is not active" };
-        }
-        if (promo.expiresAt && promo.expiresAt < /* @__PURE__ */ new Date()) {
-          return { success: false, message: "Promo code has expired" };
-        }
-        if (promo.maxUses && parseInt(promo.usesCount) >= parseInt(promo.maxUses)) {
-          return { success: false, message: "Promo code usage limit reached" };
-        }
-        if (!promo.category || promo.category.trim() === "") {
-          return {
-            success: false,
-            message: "Invalid promo code configuration - no category set"
-          };
-        }
-        if (promo.category === "all") {
-        } else {
-          const categoryMap = {
-            "platform_access": "platform_subscription",
-            "platform_subscription": "platform_subscription",
-            "session_minutes": "session_minutes",
-            "usage_bundle": "session_minutes",
-            "train_me": "train_me",
-            "dai": "dai",
-            "service": "train_me"
-            // Map service to train_me (Train Me purchases are categorized as service)
-          };
-          const itemCategory = categoryMap[item.addonType] || item.addonType;
-          const promoCategory = categoryMap[promo.category] || promo.category;
-          if (promoCategory !== itemCategory) {
-            console.log(`\u26A0\uFE0F Promo category mismatch: promo.category="${promo.category}" (mapped: "${promoCategory}"), itemCategory="${itemCategory}", addonType="${item.addonType}"`);
-            const categoryNames = {
-              "train_me": "Train Me",
-              "dai": "Domain AI Intelligence",
-              "service": "Professional Services",
-              "session_minutes": "Session Minutes",
-              "platform_subscription": "Platform Access"
-            };
-            const friendlyPromoCategory = categoryNames[promo.category] || promo.category;
-            const friendlyItemCategory = categoryNames[item.addonType] || item.addonType;
-            return {
-              success: false,
-              message: `This promo code is only valid for ${friendlyPromoCategory} purchases, not ${friendlyItemCategory}`
-            };
-          }
-        }
-        if (promo.allowedPlanTypes && Array.isArray(promo.allowedPlanTypes) && promo.allowedPlanTypes.length > 0) {
-          const itemMetadata = item.metadata || {};
-          const itemPlanType = itemMetadata.planType;
-          if (item.addonType === "session_minutes") {
-            const allowedPlans = promo.allowedPlanTypes;
-            const itemPackageName = item.packageName;
-            const isAllowed = allowedPlans.some((allowedPlan) => {
-              return itemPackageName.includes(allowedPlan) || allowedPlan.includes(itemPackageName);
-            });
-            if (!isAllowed) {
-              return {
-                success: false,
-                message: `This promo code is only valid for: ${allowedPlans.join(", ")}`
-              };
-            }
-          } else if (item.addonType === "platform_access" && itemPlanType) {
-            const allowedPlanTypes = promo.allowedPlanTypes;
-            if (!allowedPlanTypes.includes(itemPlanType)) {
-              return {
-                success: false,
-                message: `This promo code is only valid for: ${allowedPlanTypes.join(", ")} plans`
-              };
-            }
-          }
-        }
-        const itemTotal = parseFloat(item.basePrice) * item.quantity;
-        let discountAmount = 0;
-        if (promo.discountType === "percentage") {
-          const percentage = parseFloat(promo.discountValue);
-          discountAmount = itemTotal * (percentage / 100);
-        } else if (promo.discountType === "fixed") {
-          discountAmount = parseFloat(promo.discountValue);
-          if (discountAmount > itemTotal) {
-            discountAmount = itemTotal;
-          }
-        }
-        const [updated] = await db.update(cartItems).set({
-          promoCodeId: promo.id,
-          promoCodeCode: promo.code,
-          appliedDiscountAmount: discountAmount.toFixed(2)
-        }).where(and7(eq9(cartItems.id, cartItemId), eq9(cartItems.userId, userId))).returning();
-        return { success: true, message: "Promo code applied successfully", cartItem: updated };
-      }
-      async removePromoCodeFromCartItem(userId, cartItemId) {
-        const [updated] = await db.update(cartItems).set({
-          promoCodeId: null,
-          promoCodeCode: null,
-          appliedDiscountAmount: null
-        }).where(and7(eq9(cartItems.id, cartItemId), eq9(cartItems.userId, userId))).returning();
-        if (!updated) {
-          return { success: false, message: "Cart item not found" };
-        }
-        return { success: true, message: "Promo code removed successfully" };
-      }
-      async calculateCartTotal(userId, promoCode) {
-        const items = await this.getCartItems(userId);
-        if (items.length === 0) {
-          return {
-            items: [],
-            subtotal: 0,
-            gstAmount: 0,
-            discount: 0,
-            total: 0,
-            currency: "USD",
-            itemCount: 0
-          };
-        }
-        const subtotal = items.reduce((sum, item) => {
-          return sum + parseFloat(item.basePrice) * item.quantity;
-        }, 0);
-        const discount = items.reduce((sum, item) => {
-          if (item.appliedDiscountAmount) {
-            return sum + parseFloat(item.appliedDiscountAmount);
-          }
-          return sum;
-        }, 0);
-        const GST_RATE = 0.18;
-        const gstAmount = (subtotal - discount) * GST_RATE;
-        const total = subtotal - discount + gstAmount;
-        return {
-          items,
-          subtotal,
-          gstAmount,
-          discount,
-          total,
-          currency: items[0].currency,
-          // Assuming all items have the same currency
-          itemCount: items.length
-        };
-      }
-      async checkItemAvailability(userId, packageSku, addonType) {
-        const activeAddon = await this.getActiveAddonPurchase(userId, addonType);
-        if (activeAddon) {
-          const now = /* @__PURE__ */ new Date();
-          const isExpired = activeAddon.endDate && activeAddon.endDate < now;
-          const isExpiringSoon = activeAddon.endDate && activeAddon.endDate < new Date(now.getTime() + 7 * 24 * 60 * 60 * 1e3);
-          if (isExpired) {
-            return { available: true };
-          } else if (isExpiringSoon && addonType === "platform_access") {
-            return { available: true };
-          } else {
-            return {
-              available: false,
-              reason: `You already have an active ${addonType.replace("_", " ")} subscription valid until ${activeAddon.endDate?.toLocaleDateString() || "N/A"}`
-            };
-          }
-        }
-        if (addonType === "session_minutes" || addonType === "dai") {
-          return { available: true };
-        }
-        return { available: true };
-      }
-      async getPublishedAddons() {
-        return db.select().from(addons).where(and7(eq9(addons.publishedOnWebsite, true), eq9(addons.isActive, true))).orderBy(desc4(addons.createdAt));
-      }
-      async getAddonById(id) {
-        const [addon] = await db.select().from(addons).where(eq9(addons.id, id)).limit(1);
-        return addon || null;
-      }
-      async getPublishedSubscriptionPlans() {
-        return db.select().from(subscriptionPlans).where(and7(eq9(subscriptionPlans.publishedOnWebsite, true), eq9(subscriptionPlans.isActive, true))).orderBy(desc4(subscriptionPlans.createdAt));
-      }
-    };
-    billingStorage2 = new BillingStorage();
-  }
-});
-
 // server/services/billing-reconciliation.ts
 var billing_reconciliation_exports = {};
 __export(billing_reconciliation_exports, {
@@ -17344,7 +17527,7 @@ var init_CashfreeAdapter = __esm({
           }
           const request = {
             order_amount: options.amount,
-            order_currency: options.currency || "INR",
+            order_currency: options.currency || "USD",
             order_id: orderId,
             customer_details: {
               customer_id: options.metadata?.userId || `cust_${Date.now()}`,
@@ -17379,7 +17562,7 @@ var init_CashfreeAdapter = __esm({
           return {
             orderId: order.order_id || orderId,
             amount: options.amount,
-            currency: order.order_currency || options.currency || "INR",
+            currency: order.order_currency || options.currency || "USD",
             status: order.order_status || "ACTIVE",
             providerOrderId: order.order_id || orderId,
             paymentSessionId: order.payment_session_id,
@@ -17422,7 +17605,7 @@ var init_CashfreeAdapter = __esm({
             paymentId: payment.cf_payment_id?.toString() || options.paymentId,
             orderId: payment.order_id,
             amount: payment.payment_amount || 0,
-            currency: payment.payment_currency || "INR",
+            currency: payment.payment_currency || "USD",
             status: payment.payment_status || "UNKNOWN",
             providerPaymentId: payment.cf_payment_id?.toString() || options.paymentId,
             method: payment.payment_group || void 0,
@@ -17454,7 +17637,7 @@ var init_CashfreeAdapter = __esm({
             refundId: refund.refund_id || refundId,
             paymentId: options.paymentId,
             amount: refund.refund_amount || options.amount || 0,
-            currency: refund.refund_currency || "INR",
+            currency: refund.refund_currency || "USD",
             status: refund.refund_status || "pending",
             providerRefundId: refund.cf_refund_id?.toString() || refundId,
             reason: options.reason,
@@ -17493,7 +17676,7 @@ var init_CashfreeAdapter = __esm({
             paymentId: order.order_id || paymentId,
             status: order.order_status || "UNKNOWN",
             amount: order.order_amount || 0,
-            currency: order.order_currency || "INR",
+            currency: order.order_currency || "USD",
             method: void 0,
             errorCode: void 0,
             errorDescription: void 0,
@@ -17600,7 +17783,7 @@ var init_RazorpayAdapter = __esm({
         const razorpay = this.ensureInitialized();
         try {
           const amountInSmallestUnit = Math.round(options.amount * 100);
-          const currency = options.currency || "INR";
+          const currency = options.currency || "USD";
           console.log(`[Razorpay] Creating order: amount=${amountInSmallestUnit}, currency=${currency}, receipt=${options.receipt}`);
           const order = await razorpay.orders.create({
             amount: amountInSmallestUnit,
@@ -17631,7 +17814,7 @@ var init_RazorpayAdapter = __esm({
             }
           }
           if (error.error?.description?.includes("currency") || error.error?.code === "BAD_REQUEST_CURRENCY") {
-            throw new Error(`Currency ${options.currency || "INR"} is not supported by your Razorpay account. Please use INR or enable USD in your Razorpay dashboard.`);
+            throw new Error(`Currency ${options.currency || "USD"} is not supported by your Razorpay account. Please enable USD in your Razorpay dashboard.`);
           }
           throw new Error(`Failed to create Razorpay order: ${error.error?.description || error.message || "Unknown error"}`);
         }
@@ -17725,7 +17908,7 @@ var init_RazorpayAdapter = __esm({
             refundId: refund.id,
             paymentId: options.paymentId,
             amount: (refund.amount || 0) / 100,
-            currency: refund.currency || "INR",
+            currency: refund.currency || "USD",
             status: refund.status || "pending",
             providerRefundId: refund.id,
             reason: options.reason,
@@ -18893,7 +19076,7 @@ var init_refund_service = __esm({
           if (paymentId) {
             console.log(`[Refund Service] Specific payment ID requested: ${paymentId}`);
           }
-          const addonPurchase = await billingStorage2.getAddonPurchase(addonPurchaseId);
+          const addonPurchase = await billingStorage.getAddonPurchase(addonPurchaseId);
           if (!addonPurchase) {
             return {
               success: false,
@@ -18984,7 +19167,7 @@ var init_refund_service = __esm({
             const refundedItems = metadata?.refundedItems || [];
             refundedItems.push(paymentId);
             const allRefunded = purchaseHistory.every((h) => refundedItems.includes(h.paymentId));
-            await billingStorage2.updateAddonPurchaseRefund(addonPurchaseId, {
+            await billingStorage.updateAddonPurchaseRefund(addonPurchaseId, {
               refundedAt: allRefunded ? /* @__PURE__ */ new Date() : void 0,
               refundAmount: refundAmount.toString(),
               refundReason: reason,
@@ -19010,7 +19193,7 @@ var init_refund_service = __esm({
               }
             });
           } else {
-            await billingStorage2.updateAddonPurchaseRefund(addonPurchaseId, {
+            await billingStorage.updateAddonPurchaseRefund(addonPurchaseId, {
               refundedAt: /* @__PURE__ */ new Date(),
               refundAmount: refundAmount.toString(),
               refundReason: reason,
@@ -21170,31 +21353,7 @@ __export(mind_map_extraction_exports, {
   extractTechEnvironment: () => extractTechEnvironment
 });
 import { eq as eq23, desc as desc13 } from "drizzle-orm";
-function getCategoryDescription(category) {
-  const descriptions = {
-    users_access: "User or access point in the system",
-    endpoints: "System endpoint or API",
-    network: "Network infrastructure component",
-    infrastructure: "Infrastructure element",
-    applications: "Application in the technology stack",
-    data_flow: "Data flow or integration point",
-    security: "Security mechanism or policy",
-    operations: "Operational process or tool",
-    cloud: "Cloud service or platform",
-    database: "Database or data storage",
-    integration: "System integration",
-    people: "Key person in the organization",
-    projects: "Active project or initiative",
-    pain_point: "Identified pain point or challenge",
-    vendor: "Vendor or external provider",
-    decision_maker: "Key decision maker in the buying process",
-    process: "Business process or workflow",
-    timeline: "Key moment in the conversation timeline",
-    compliance: "Compliance or regulatory requirement",
-    follow_up: "Suggested follow-up question to complete the picture"
-  };
-  return descriptions[category] || "Element in the customer environment";
-}
+import OpenAI7 from "openai";
 function cleanJSONResponse2(text2) {
   let cleaned = text2.trim();
   if (cleaned.startsWith("```json")) {
@@ -21218,7 +21377,7 @@ async function getTrainMeKnowledge(userId, domainName) {
     const results = await db.select({
       content: knowledgeEntries.content,
       domainName: domainExpertise.name
-    }).from(knowledgeEntries).innerJoin(domainExpertise, eq23(knowledgeEntries.domainExpertiseId, domainExpertise.id)).where(eq23(domainExpertise.userId, userId)).orderBy(desc13(knowledgeEntries.createdAt)).limit(10);
+    }).from(knowledgeEntries).innerJoin(domainExpertise, eq23(knowledgeEntries.domainExpertiseId, domainExpertise.id)).where(eq23(domainExpertise.userId, userId)).orderBy(desc13(knowledgeEntries.createdAt)).limit(5);
     if (results.length === 0) {
       trainMeCache.set(cacheKey, { data: "", timestamp: Date.now() });
       return "";
@@ -21232,11 +21391,63 @@ async function getTrainMeKnowledge(userId, domainName) {
     return "";
   }
 }
+function buildSectionNode(node, index2) {
+  return {
+    id: node.id || `node_${index2}_${Date.now()}`,
+    label: node.label || "Unknown",
+    category: allValidCategories.includes(node.category) ? node.category : "applications",
+    details: node.details || "",
+    hoverText: node.hoverText || node.details || node.label,
+    confidence: typeof node.confidence === "number" ? Math.min(100, Math.max(0, node.confidence)) : 80,
+    status: ["confirmed", "assumed", "suggested", "preemptive"].includes(node.status) ? node.status : "assumed",
+    painPointType: node.category === "pain_point" && validPainPointTypes.includes(node.painPointType) ? node.painPointType : void 0,
+    whyItMatters: node.whyItMatters || void 0,
+    recommendation: node.recommendation || void 0,
+    source: node.source || "",
+    hierarchyLevel: typeof node.hierarchyLevel === "number" ? node.hierarchyLevel : void 0,
+    sequenceOrder: typeof node.sequenceOrder === "number" ? node.sequenceOrder : void 0,
+    problemDetected: node.problemDetected === true ? true : void 0,
+    problemSummary: node.problemSummary || void 0,
+    problemImpact: node.problemImpact || void 0,
+    recommendedSolution: node.recommendedSolution || void 0,
+    solutionSource: node.solutionSource || void 0,
+    sellerPositioning: node.sellerPositioning || void 0,
+    preemptiveReason: node.preemptiveReason || void 0,
+    discoveryQuestion: node.discoveryQuestion || void 0,
+    iconName: node.iconName || void 0
+  };
+}
+function buildSectionEdges(rawEdges, nodeIds) {
+  return (rawEdges || []).filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)).map((edge, index2) => ({
+    id: edge.id || `edge_${index2}_${Date.now()}`,
+    source: edge.source,
+    target: edge.target,
+    label: edge.label || "",
+    type: validEdgeTypes.includes(edge.type) ? edge.type : "default"
+  }));
+}
+function buildSection(rawSection) {
+  if (!rawSection || !rawSection.nodes?.length && !rawSection.length) {
+    return { nodes: [], edges: [], sectionEmpty: true, emptyReason: "Not discussed in conversation" };
+  }
+  const rawNodes = Array.isArray(rawSection) ? rawSection : rawSection.nodes || [];
+  const rawEdges = Array.isArray(rawSection) ? [] : rawSection.edges || [];
+  const nodes = rawNodes.map((n, i) => buildSectionNode(n, i));
+  const nodeIds = new Set(nodes.map((n) => n.id));
+  const edges = buildSectionEdges(rawEdges, nodeIds);
+  return {
+    nodes,
+    edges,
+    sectionEmpty: nodes.length === 0,
+    emptyReason: nodes.length === 0 ? "Not discussed in conversation" : void 0
+  };
+}
 async function extractTechEnvironment(sessionId, transcript, domainExpertiseInput, userId, sellerIntent) {
   const startTime = Date.now();
   const isReferenceMode = !transcript || transcript.trim().length < 50;
   if (!userId) {
     console.log("\u274C Map/Flow: No userId provided");
+    const emptySection = { nodes: [], edges: [], sectionEmpty: true, emptyReason: "No user context" };
     return {
       sessionId,
       nodes: [],
@@ -21244,89 +21455,170 @@ async function extractTechEnvironment(sessionId, transcript, domainExpertiseInpu
       lastUpdated: (/* @__PURE__ */ new Date()).toISOString(),
       version: 1,
       isReferenceArchitecture: isReferenceMode,
-      viewMode: "current"
+      viewMode: "current",
+      sections: {
+        techEnvironment: emptySection,
+        decisionMakers: emptySection,
+        businessProcesses: emptySection,
+        callTimeline: emptySection,
+        compliance: emptySection
+      }
     };
   }
   try {
     console.log(`\u{1F5FA}\uFE0F Map/Flow extraction: Starting for session ${sessionId}, userId ${userId}`);
-    const [aiConfig, trainMeKnowledge] = await Promise.all([
-      getAIClient(userId),
-      getTrainMeKnowledge(userId, domainExpertiseInput)
-    ]);
-    const { client, model, engine } = aiConfig;
-    console.log(`\u{1F5FA}\uFE0F Map/Flow: Using user's AI engine: ${engine}, model: ${model}`);
-    const systemPrompt = `Sales intelligence analyst. Extract key elements from conversation. Output JSON only.
+    let client;
+    let model;
+    let engine;
+    const trainMeKnowledge = await getTrainMeKnowledge(userId, domainExpertiseInput);
+    try {
+      const aiConfig = await getAIClient(userId);
+      client = aiConfig.client;
+      model = aiConfig.model;
+      engine = aiConfig.engine;
+      console.log(`\u{1F5FA}\uFE0F Map/Flow: Using user's AI engine: ${engine}, model: ${model}`);
+    } catch (aiError) {
+      console.warn(`\u26A0\uFE0F Map/Flow: User AI key failed (${aiError.message}), falling back to DeepSeek`);
+      if (!deepseekFallback) {
+        throw new Error("AI engine not available - please configure your API key in Settings");
+      }
+      client = deepseekFallback;
+      model = "deepseek-chat";
+      engine = "deepseek";
+      console.log(`\u{1F5FA}\uFE0F Map/Flow: Using DeepSeek fallback`);
+    }
+    const systemPrompt = `You are a consulting intelligence system analyzing sales conversations. Extract technology, people, processes, timeline, and compliance into 5 SEPARATE JSON sections.
+${trainMeKnowledge ? "DOMAIN KNOWLEDGE:\n" + trainMeKnowledge.substring(0, 600) + "\n" : ""}
+RULES:
+- Extract confirmed info from transcript, infer missing components as "assumed" based on industry context
+- Detect pain points: set problemDetected:true with problemSummary and recommendedSolution
+- Add preemptive nodes for undiscussed but likely components with discoveryQuestion
+- Keep details SHORT (under 15 words). Be concise.
+- Edges within SAME section only
 
-${trainMeKnowledge ? "DOMAIN KNOWLEDGE:\n" + trainMeKnowledge.substring(0, 500) + "...\n\n" : ""}EXTRACT:
+OUTPUT FORMAT - Return JSON with exactly these 5 keys:
+{"techEnvironment":{"nodes":[...],"edges":[...]},"decisionMakers":{"nodes":[...],"edges":[...]},"businessProcesses":{"nodes":[...],"edges":[...]},"callTimeline":{"nodes":[...],"edges":[...]},"compliance":{"nodes":[...],"edges":[...]}}
 
-1. TECH STACK: Current systems, tools, infrastructure mentioned
-2. PEOPLE: Decision makers with roles and influence
-3. PAIN POINTS: Challenges, issues, inefficiencies
-4. PROCESSES: Key workflows or business processes
-5. FOLLOW-UPS: Questions to ask if info is incomplete
+SECTION RULES:
+1."techEnvironment" - systems/tools/platforms/infra/security/cloud/networking. Max 6 nodes. Categories: users_access|endpoints|network|infrastructure|applications|security|operations|cloud|database|integration|vendor|pain_point
+2."decisionMakers" - people/roles only. Max 3 nodes. Category: decision_maker. Include hierarchyLevel(1=top,2=mid,3=eval)
+3."businessProcesses" - workflows only. Max 3 nodes. Category: process. Include sequenceOrder
+4."callTimeline" - conversation moments. Max 4 nodes. Category: timeline. Include sequenceOrder
+5."compliance" - regulations/frameworks. Max 2 nodes. Category: compliance
 
-CATEGORIES: users_access, endpoints, network, infrastructure, applications, data_flow, security, operations, cloud, database, integration, vendor, decision_maker, process, pain_point, follow_up
-
-STATUS: "confirmed" (explicit) | "assumed" (inferred) | "suggested" (AI-recommended)
-
-OUTPUT:
-{"nodes":[{"id":"str","label":"str","category":"str","details":"str","confidence":0-100,"status":"confirmed|assumed|suggested"}],"edges":[{"id":"str","source":"id","target":"id","label":"relationship","type":"default|integration|dependency|data_flow|reports_to"}]}`;
+Node schema: {"id":"str","label":"str","category":"str","details":"short str","confidence":80,"status":"confirmed|assumed|preemptive","iconName":"Server|Shield|Cloud|Database|Users|Monitor|Wifi|AppWindow|Settings|Building2|User|UserCheck|Clock|Scale|Lock|Globe|HardDrive|Cpu|Workflow|Target","problemDetected":false,"problemSummary":"opt","recommendedSolution":"opt","preemptiveReason":"opt","discoveryQuestion":"opt","hierarchyLevel":"opt","sequenceOrder":"opt"}
+Edge schema: {"id":"str","source":"nodeId","target":"nodeId","label":"str","type":"default|integration|dependency|reports_to|sequence"}`;
     let userPrompt;
     if (isReferenceMode) {
-      userPrompt = `Reference architecture for ${domainExpertiseInput || "enterprise IT"}. Include typical infrastructure, apps, security, pain points. All nodes "assumed". JSON only.`;
+      userPrompt = `Generate consulting-grade reference architecture for ${domainExpertiseInput || "enterprise IT"}. Include typical tech stack, common decision-making hierarchy, standard procurement processes, and likely compliance requirements. All nodes "assumed". Apply industry context intelligence. Provide all 5 sections. JSON only.`;
     } else {
-      const maxTranscriptLength = 3e3;
+      const maxTranscriptLength = 2500;
       const truncatedTranscript = transcript.length > maxTranscriptLength ? "..." + transcript.slice(-maxTranscriptLength) : transcript;
-      userPrompt = `Analyze sales conversation:
-${domainExpertiseInput ? `Domain: ${domainExpertiseInput}` : ""}
-
+      userPrompt = `Analyze this sales conversation.${domainExpertiseInput ? ` Domain: ${domainExpertiseInput}.` : ""}${sellerIntent ? ` Intent: ${sellerIntent}.` : ""} Return all 5 sections as JSON.
 TRANSCRIPT:
-${truncatedTranscript}
-
-Extract: tech stack, decision makers, pain points, processes, follow-up questions. JSON only.`;
+${truncatedTranscript}`;
     }
     console.log(`\u{1F9E0} Map/Flow: ${isReferenceMode ? "Reference mode" : "Live extraction"} for ${transcript?.length || 0} chars`);
-    const fastModel = model.includes("gpt-4") ? "gpt-4o-mini" : model.includes("claude") ? "claude-3-5-haiku-20241022" : model.includes("gemini") ? "gemini-2.0-flash" : model.includes("deepseek") ? "deepseek-chat" : model.includes("grok") ? "grok-3" : model.includes("kimi") ? model : model;
+    const fastModel = model.includes("gpt-4") ? "gpt-4o-mini" : model.includes("claude") ? "claude-3-5-haiku-latest" : model.includes("gemini") ? "gemini-2.0-flash" : model.includes("deepseek") ? "deepseek-chat" : model.includes("grok") ? "grok-3" : model.includes("kimi") ? model : model;
     console.log(`\u{1F5FA}\uFE0F Map/Flow: Engine=${engine}, Original model=${model}, Fast model=${fastModel}`);
     let response;
     let lastError;
-    const maxRetries = 2;
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const modelsToTry = fastModel !== model ? [fastModel, model] : [model];
+    for (const tryModel of modelsToTry) {
       try {
-        const aiCallPromise = client.chat.completions.create({
-          model: fastModel,
+        console.log(`\u{1F5FA}\uFE0F Map/Flow: Trying model ${tryModel}...`);
+        const supportsJsonFormat = !tryModel.includes("claude") && !tryModel.includes("gemini") && !tryModel.includes("grok") && !tryModel.includes("kimi");
+        const requestParams = {
+          model: tryModel,
           messages: [
-            { role: "system", content: systemPrompt },
+            { role: "system", content: systemPrompt + (supportsJsonFormat ? "" : "\nRespond with ONLY valid JSON, no other text.") },
             { role: "user", content: userPrompt }
           ],
-          response_format: { type: "json_object" },
           temperature: 0.1,
-          max_tokens: 1500
-          // Reduced from 2000 for even faster response
-        });
-        const timeoutPromise = new Promise(
-          (_, reject) => setTimeout(() => reject(new Error("AI call timeout after 45 seconds")), 45e3)
-        );
-        response = await Promise.race([aiCallPromise, timeoutPromise]);
+          max_tokens: 3500
+        };
+        if (supportsJsonFormat) {
+          requestParams.response_format = { type: "json_object" };
+        }
+        response = await client.chat.completions.create(requestParams);
+        console.log(`\u2705 Map/Flow: Model ${tryModel} succeeded, finish_reason: ${response.choices?.[0]?.finish_reason}`);
         break;
       } catch (apiError) {
         lastError = apiError;
-        console.warn(`\u26A0\uFE0F Map/Flow: API attempt ${attempt}/${maxRetries} failed: ${apiError.message}`);
-        if (attempt < maxRetries) {
-          await new Promise((r) => setTimeout(r, 1e3));
+        console.warn(`\u26A0\uFE0F Map/Flow: Model ${tryModel} failed: ${apiError.message}`);
+        if (apiError.message?.includes("response_format") || apiError.message?.includes("json_object")) {
+          console.log(`\u{1F504} Map/Flow: Retrying ${tryModel} without response_format...`);
+          try {
+            response = await client.chat.completions.create({
+              model: tryModel,
+              messages: [
+                { role: "system", content: systemPrompt + "\nRespond with ONLY valid JSON, no other text." },
+                { role: "user", content: userPrompt }
+              ],
+              temperature: 0.1,
+              max_tokens: 3500
+            });
+            console.log(`\u2705 Map/Flow: Model ${tryModel} succeeded without json format`);
+            break;
+          } catch (retryError) {
+            lastError = retryError;
+            console.warn(`\u26A0\uFE0F Map/Flow: Model ${tryModel} retry also failed: ${retryError.message}`);
+          }
+        }
+        if (tryModel !== modelsToTry[modelsToTry.length - 1]) {
+          console.log(`\u{1F504} Map/Flow: Falling back to next model...`);
+          await new Promise((r) => setTimeout(r, 500));
         }
       }
     }
     if (!response) {
-      throw lastError || new Error("API call failed after retries");
+      console.error(`\u274C Map/Flow: All models failed. Last error: ${lastError?.message}`);
+      const emptySection = { nodes: [], edges: [], sectionEmpty: true, emptyReason: "AI generation failed - please try again" };
+      return {
+        sessionId,
+        nodes: [],
+        edges: [],
+        lastUpdated: (/* @__PURE__ */ new Date()).toISOString(),
+        version: 1,
+        isReferenceArchitecture: isReferenceMode,
+        viewMode: "current",
+        sections: {
+          techEnvironment: emptySection,
+          decisionMakers: emptySection,
+          businessProcesses: emptySection,
+          callTimeline: emptySection,
+          compliance: emptySection
+        }
+      };
     }
     console.log(`\u26A1 Map/Flow AI call: ${Date.now() - startTime}ms | Model: ${fastModel}`);
     if (userId && engine) {
       await recordTokenUsage(userId, mapEngineToProvider(engine), response, "mind_map");
     }
+    const finishReason = response.choices?.[0]?.finish_reason;
+    if (finishReason === "length") {
+      console.warn(`\u26A0\uFE0F Map/Flow: Response truncated (finish_reason=length). Will attempt JSON repair.`);
+    }
     const messageContent = response.choices?.[0]?.message?.content;
     if (!messageContent) {
-      throw new Error("No content in AI response");
+      console.warn("\u26A0\uFE0F Map/Flow: No content in AI response, returning empty sections");
+      const emptySection = { nodes: [], edges: [], sectionEmpty: true, emptyReason: "No AI response - please try again" };
+      return {
+        sessionId,
+        nodes: [],
+        edges: [],
+        lastUpdated: (/* @__PURE__ */ new Date()).toISOString(),
+        version: 1,
+        isReferenceArchitecture: isReferenceMode,
+        viewMode: "current",
+        sections: {
+          techEnvironment: emptySection,
+          decisionMakers: emptySection,
+          businessProcesses: emptySection,
+          callTimeline: emptySection,
+          compliance: emptySection
+        }
+      };
     }
     const cleanedContent = cleanJSONResponse2(messageContent);
     let result;
@@ -21334,115 +21626,188 @@ Extract: tech stack, decision makers, pain points, processes, follow-up question
       result = JSON.parse(cleanedContent);
     } catch (parseError) {
       console.warn(`\u26A0\uFE0F Map/Flow: JSON parse failed, attempting repair. Error: ${parseError.message}`);
+      console.warn(`\u26A0\uFE0F Map/Flow: Raw content length: ${cleanedContent.length}, last 100 chars: ${cleanedContent.slice(-100)}`);
       let repairedJson = cleanedContent;
-      if (parseError.message.includes("Unterminated") || parseError.message.includes("Unexpected end")) {
-        const nodesMatch = repairedJson.match(/"nodes"\s*:\s*\[([\s\S]*)/);
-        if (nodesMatch) {
-          const nodesContent = nodesMatch[1];
-          const completeNodes = [];
+      const sectionNames = ["techEnvironment", "decisionMakers", "businessProcesses", "callTimeline", "compliance"];
+      const extractedSections = {};
+      for (const section of sectionNames) {
+        const sectionRegex = new RegExp(`"${section}"\\s*:\\s*\\{`);
+        const match = repairedJson.match(sectionRegex);
+        if (match && match.index !== void 0) {
           let depth = 0;
-          let currentNode = "";
-          let inString = false;
-          let escapeNext = false;
-          for (let i = 0; i < nodesContent.length; i++) {
-            const char = nodesContent[i];
-            if (escapeNext) {
-              currentNode += char;
-              escapeNext = false;
+          let start = match.index + match[0].length - 1;
+          let end = -1;
+          let inStr = false;
+          let esc = false;
+          for (let i = start; i < repairedJson.length; i++) {
+            const c = repairedJson[i];
+            if (esc) {
+              esc = false;
               continue;
             }
-            if (char === "\\") {
-              currentNode += char;
-              escapeNext = true;
+            if (c === "\\") {
+              esc = true;
               continue;
             }
-            if (char === '"' && !escapeNext) {
-              inString = !inString;
+            if (c === '"') {
+              inStr = !inStr;
+              continue;
             }
-            if (!inString) {
-              if (char === "{") depth++;
-              if (char === "}") {
-                depth--;
-                if (depth === 0) {
-                  currentNode += char;
-                  completeNodes.push(currentNode.trim());
-                  currentNode = "";
-                  continue;
-                }
+            if (inStr) continue;
+            if (c === "{") depth++;
+            if (c === "}") {
+              depth--;
+              if (depth === 0) {
+                end = i + 1;
+                break;
               }
             }
-            if (depth > 0) {
-              currentNode += char;
-            }
           }
-          if (completeNodes.length > 0) {
-            repairedJson = `{"nodes":[${completeNodes.join(",")}],"edges":[]}`;
-            console.log(`Map/Flow: Repaired JSON with ${completeNodes.length} complete nodes`);
+          if (end > start) {
+            try {
+              extractedSections[section] = JSON.parse(repairedJson.substring(start, end));
+            } catch {
+            }
           }
         }
       }
-      try {
-        result = JSON.parse(repairedJson);
-      } catch (repairError) {
-        console.error(`\u274C Map/Flow: JSON repair also failed, returning empty result`);
-        return {
-          sessionId,
-          nodes: [],
-          edges: [],
-          lastUpdated: (/* @__PURE__ */ new Date()).toISOString(),
-          version: 1,
-          isReferenceArchitecture: isReferenceMode,
-          viewMode: "current"
+      if (Object.keys(extractedSections).length > 0) {
+        console.log(`\u2705 Map/Flow: Repaired ${Object.keys(extractedSections).length} sections: ${Object.keys(extractedSections).join(", ")}`);
+        const emptySec = { nodes: [], edges: [] };
+        result = {
+          techEnvironment: extractedSections.techEnvironment || emptySec,
+          decisionMakers: extractedSections.decisionMakers || emptySec,
+          businessProcesses: extractedSections.businessProcesses || emptySec,
+          callTimeline: extractedSections.callTimeline || emptySec,
+          compliance: extractedSections.compliance || emptySec
         };
+      } else {
+        const nodesRegex = /"nodes"\s*:\s*\[/;
+        const nodesMatch = repairedJson.match(nodesRegex);
+        if (nodesMatch) {
+          const completeObjects = repairedJson.match(/\{[^{}]*"id"\s*:\s*"[^"]+",\s*"label"\s*:\s*"[^"]+"[^{}]*\}/g);
+          if (completeObjects && completeObjects.length > 0) {
+            const nodes = completeObjects.map((obj) => {
+              try {
+                return JSON.parse(obj);
+              } catch {
+                return null;
+              }
+            }).filter(Boolean);
+            if (nodes.length > 0) {
+              console.log(`\u2705 Map/Flow: Extracted ${nodes.length} individual nodes from broken JSON`);
+              result = { nodes, edges: [] };
+            }
+          }
+        }
+        if (!result) {
+          console.error(`\u274C Map/Flow: JSON repair failed, returning empty result`);
+          const emptySection = { nodes: [], edges: [], sectionEmpty: true, emptyReason: "Parse error" };
+          return {
+            sessionId,
+            nodes: [],
+            edges: [],
+            lastUpdated: (/* @__PURE__ */ new Date()).toISOString(),
+            version: 1,
+            isReferenceArchitecture: isReferenceMode,
+            viewMode: "current",
+            sections: {
+              techEnvironment: emptySection,
+              decisionMakers: emptySection,
+              businessProcesses: emptySection,
+              callTimeline: emptySection,
+              compliance: emptySection
+            }
+          };
+        }
       }
     }
-    const nodes = (result.nodes || []).map((node, index2) => ({
-      id: node.id || `node_${index2}`,
-      label: node.label || "Unknown",
-      category: validCategories.includes(node.category) ? node.category : "applications",
-      details: node.details || "",
-      hoverText: node.hoverText || node.details || `${node.label}: ${getCategoryDescription(node.category)}`,
-      confidence: typeof node.confidence === "number" ? Math.min(100, Math.max(0, node.confidence)) : 80,
-      status: ["confirmed", "assumed", "suggested"].includes(node.status) ? node.status : "assumed",
-      painPointType: node.category === "pain_point" && validPainPointTypes.includes(node.painPointType) ? node.painPointType : void 0,
-      whyItMatters: node.whyItMatters || void 0,
-      recommendation: node.recommendation || void 0,
-      source: node.source || "",
-      hierarchyLevel: typeof node.hierarchyLevel === "number" ? node.hierarchyLevel : void 0,
-      sequenceOrder: typeof node.sequenceOrder === "number" ? node.sequenceOrder : void 0
-    }));
-    const nodeIds = new Set(nodes.map((n) => n.id));
-    const validEdgeTypes = ["default", "integration", "dependency", "replacement", "data_flow", "reports_to", "sequence"];
-    const edges = (result.edges || []).filter(
-      (edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target)
-    ).map((edge, index2) => ({
-      id: edge.id || `edge_${index2}`,
-      source: edge.source,
-      target: edge.target,
-      label: edge.label || "",
-      type: validEdgeTypes.includes(edge.type) ? edge.type : "default"
-    }));
-    console.log(`Map/Flow: Extracted ${nodes.length} nodes, ${edges.length} edges in ${Date.now() - startTime}ms`);
-    if (nodes.length === 0) {
-      console.warn("\u26A0\uFE0F Map/Flow: AI returned 0 nodes. Raw response:", messageContent?.substring(0, 500));
-      console.warn("\u26A0\uFE0F Map/Flow: Parsed result:", JSON.stringify(result).substring(0, 500));
+    let sections;
+    if (result.techEnvironment || result.decisionMakers || result.businessProcesses || result.callTimeline || result.compliance) {
+      sections = {
+        techEnvironment: buildSection(result.techEnvironment),
+        decisionMakers: buildSection(result.decisionMakers),
+        businessProcesses: buildSection(result.businessProcesses),
+        callTimeline: buildSection(result.callTimeline),
+        compliance: buildSection(result.compliance)
+      };
+    } else if (result.nodes) {
+      const allNodes2 = (result.nodes || []).map((n, i) => buildSectionNode(n, i));
+      const allEdges2 = result.edges || [];
+      const techNodes = allNodes2.filter((n) => techCategories.includes(n.category));
+      const dmNodes = allNodes2.filter((n) => n.category === "decision_maker");
+      const procNodes = allNodes2.filter((n) => n.category === "process");
+      const tlNodes = allNodes2.filter((n) => n.category === "timeline");
+      const compNodes = allNodes2.filter((n) => n.category === "compliance");
+      const makeEdges = (sectionNodes) => {
+        const ids = new Set(sectionNodes.map((n) => n.id));
+        return buildSectionEdges(allEdges2, ids);
+      };
+      sections = {
+        techEnvironment: { nodes: techNodes, edges: makeEdges(techNodes), sectionEmpty: techNodes.length === 0 },
+        decisionMakers: { nodes: dmNodes, edges: makeEdges(dmNodes), sectionEmpty: dmNodes.length === 0 },
+        businessProcesses: { nodes: procNodes, edges: makeEdges(procNodes), sectionEmpty: procNodes.length === 0 },
+        callTimeline: { nodes: tlNodes, edges: makeEdges(tlNodes), sectionEmpty: tlNodes.length === 0 },
+        compliance: { nodes: compNodes, edges: makeEdges(compNodes), sectionEmpty: compNodes.length === 0 }
+      };
+    } else {
+      const emptySection = { nodes: [], edges: [], sectionEmpty: true, emptyReason: "No data returned" };
+      sections = {
+        techEnvironment: emptySection,
+        decisionMakers: emptySection,
+        businessProcesses: emptySection,
+        callTimeline: emptySection,
+        compliance: emptySection
+      };
     }
+    const allNodes = [
+      ...sections.techEnvironment.nodes,
+      ...sections.decisionMakers.nodes,
+      ...sections.businessProcesses.nodes,
+      ...sections.callTimeline.nodes,
+      ...sections.compliance.nodes
+    ];
+    const allEdges = [
+      ...sections.techEnvironment.edges,
+      ...sections.decisionMakers.edges,
+      ...sections.businessProcesses.edges,
+      ...sections.callTimeline.edges,
+      ...sections.compliance.edges
+    ];
+    console.log(`\u2705 Map/Flow: Extracted ${allNodes.length} nodes (Tech:${sections.techEnvironment.nodes.length} DM:${sections.decisionMakers.nodes.length} Proc:${sections.businessProcesses.nodes.length} TL:${sections.callTimeline.nodes.length} Comp:${sections.compliance.nodes.length}), ${allEdges.length} edges in ${Date.now() - startTime}ms`);
     return {
       sessionId,
-      nodes,
-      edges,
+      nodes: allNodes,
+      edges: allEdges,
       lastUpdated: (/* @__PURE__ */ new Date()).toISOString(),
       version: 1,
       isReferenceArchitecture: isReferenceMode,
-      viewMode: "current"
+      viewMode: "current",
+      sections
     };
   } catch (error) {
     console.error("\u274C Map/Flow extraction error:", error);
     console.error("\u274C Map/Flow error details:", error.message, error.stack);
-    throw new Error(`AI extraction failed: ${error.message || "Unknown error"}`);
+    const emptySection = { nodes: [], edges: [], sectionEmpty: true, emptyReason: error.message || "Generation error - please try again" };
+    return {
+      sessionId,
+      nodes: [],
+      edges: [],
+      lastUpdated: (/* @__PURE__ */ new Date()).toISOString(),
+      version: 1,
+      isReferenceArchitecture: !transcript || transcript.trim().length < 50,
+      viewMode: "current",
+      sections: {
+        techEnvironment: emptySection,
+        decisionMakers: emptySection,
+        businessProcesses: emptySection,
+        callTimeline: emptySection,
+        compliance: emptySection
+      }
+    };
   }
 }
-var trainMeCache, TRAIN_ME_CACHE_TTL, validCategories, validPainPointTypes;
+var deepseekFallback, trainMeCache, TRAIN_ME_CACHE_TTL, techCategories, allValidCategories, validPainPointTypes, validEdgeTypes;
 var init_mind_map_extraction = __esm({
   "server/services/mind-map-extraction.ts"() {
     "use strict";
@@ -21450,9 +21815,14 @@ var init_mind_map_extraction = __esm({
     init_token_tracker();
     init_db();
     init_schema();
+    deepseekFallback = process.env.DEEPSEEK_API_KEY ? new OpenAI7({
+      apiKey: process.env.DEEPSEEK_API_KEY,
+      baseURL: "https://api.deepseek.com",
+      timeout: 6e4
+    }) : null;
     trainMeCache = /* @__PURE__ */ new Map();
     TRAIN_ME_CACHE_TTL = 5 * 60 * 1e3;
-    validCategories = [
+    techCategories = [
       "users_access",
       "endpoints",
       "network",
@@ -21467,8 +21837,10 @@ var init_mind_map_extraction = __esm({
       "people",
       "projects",
       "pain_point",
-      "vendor",
-      // New categories for enhanced mapping
+      "vendor"
+    ];
+    allValidCategories = [
+      ...techCategories,
       "decision_maker",
       "process",
       "timeline",
@@ -21481,6 +21853,7 @@ var init_mind_map_extraction = __esm({
       "scalability_limitation",
       "cost_inefficiency"
     ];
+    validEdgeTypes = ["default", "integration", "dependency", "replacement", "data_flow", "reports_to", "sequence", "preemptive_link"];
   }
 });
 
@@ -22321,7 +22694,7 @@ import ExcelJS from "exceljs";
 import axios from "axios";
 import * as cheerio from "cheerio";
 import { readFile as readFile2 } from "fs/promises";
-import OpenAI7 from "openai";
+import OpenAI8 from "openai";
 async function processDocument(filePath, fileType, isUrl = false) {
   try {
     if (isUrl) {
@@ -22528,7 +22901,7 @@ async function processImage(filePath) {
       "bmp": "image/bmp"
     };
     const mimeType = mimeTypeMap[ext] || "image/png";
-    const openai = new OpenAI7({ apiKey: process.env.OPENAI_API_KEY });
+    const openai = new OpenAI8({ apiKey: process.env.OPENAI_API_KEY });
     const timeoutPromise = new Promise(
       (_, reject) => setTimeout(() => reject(new Error("Image analysis timed out after 30 seconds")), VISION_TIMEOUT)
     );
@@ -22792,7 +23165,7 @@ async function sendExpiryWarnings() {
 async function expireAddons() {
   try {
     console.log("Running add-on expiration job...");
-    const expiredCount = await billingStorage3.expireAddonPurchases();
+    const expiredCount = await billingStorage2.expireAddonPurchases();
     if (expiredCount > 0) {
       console.log(`Expired ${expiredCount} add-on(s)`);
     } else {
@@ -22807,7 +23180,7 @@ async function expireAddons() {
 async function cleanupPendingOrders() {
   try {
     console.log("Running pending order cleanup job...");
-    const expiredCount = await billingStorage3.expirePendingOrders();
+    const expiredCount = await billingStorage2.expirePendingOrders();
     if (expiredCount > 0) {
       console.log(`Cleaned up ${expiredCount} expired pending order(s)`);
     } else {
@@ -22970,7 +23343,7 @@ function initializeScheduledJobs() {
   }, 3e4);
   console.log("Scheduled jobs initialized successfully");
 }
-var authStorage2, billingStorage3;
+var authStorage2, billingStorage2;
 var init_scheduled_jobs = __esm({
   "server/services/scheduled-jobs.ts"() {
     "use strict";
@@ -22983,7 +23356,7 @@ var init_scheduled_jobs = __esm({
     init_meeting_minutes_backup();
     init_email();
     authStorage2 = new AuthStorage();
-    billingStorage3 = new BillingStorage();
+    billingStorage2 = new BillingStorage();
   }
 });
 
@@ -22998,7 +23371,7 @@ async function initializeDefaultGateway() {
     const { PaymentGatewayFactory: PaymentGatewayFactory2 } = await Promise.resolve().then(() => (init_PaymentGatewayFactory(), PaymentGatewayFactory_exports));
     PaymentGatewayFactory2.setDefaultProvider(DEFAULT_PAYMENT_GATEWAY);
     console.log(`\u{1F527} PaymentGatewayFactory default provider set to: ${DEFAULT_PAYMENT_GATEWAY}`);
-    const existingProvider = await billingStorage2.getGatewayProviderByName(DEFAULT_PAYMENT_GATEWAY);
+    const existingProvider = await billingStorage.getGatewayProviderByName(DEFAULT_PAYMENT_GATEWAY);
     if (existingProvider) {
       console.log(`Payment gateway provider already initialized: ${existingProvider.providerName}`);
       if (!existingProvider.isDefault) {
@@ -23006,7 +23379,7 @@ async function initializeDefaultGateway() {
       }
       return existingProvider;
     }
-    const provider = await billingStorage2.createGatewayProvider({
+    const provider = await billingStorage.createGatewayProvider({
       providerName: DEFAULT_PAYMENT_GATEWAY,
       isActive: true,
       isDefault: true,
@@ -23047,6 +23420,7 @@ import { eq as eq24, desc as desc14, sql as sql13 } from "drizzle-orm";
 
 // server/routes-auth.ts
 init_storage_auth();
+init_storage_billing();
 init_jwt();
 init_email();
 init_schema();
@@ -23102,7 +23476,7 @@ async function logSuperUserAccess(userId, email, action, metadata) {
 // server/middleware/auth.ts
 init_db();
 init_schema();
-import { eq as eq8, and as and6 } from "drizzle-orm";
+import { eq as eq9, and as and7 } from "drizzle-orm";
 function withAuthenticated(handler) {
   return (req, res, next) => {
     return handler(req, res, next);
@@ -23183,9 +23557,9 @@ async function authenticateMarketing(req, res, next) {
           sessionInvalidated: true
         });
       }
-      const [access] = await db.select().from(marketingAccess).where(and6(
-        eq8(marketingAccess.userId, payload.userId),
-        eq8(marketingAccess.status, "active")
+      const [access] = await db.select().from(marketingAccess).where(and7(
+        eq9(marketingAccess.userId, payload.userId),
+        eq9(marketingAccess.status, "active")
       )).limit(1);
       if (!access) {
         return res.status(403).json({ message: "Marketing access revoked or expired" });
@@ -24732,7 +25106,7 @@ function setupAdminRoutes(app2) {
         paymentId: z3.string().min(1, "Payment ID is required"),
         userId: z3.string().min(1, "User ID is required"),
         amount: z3.string().min(1, "Amount is required"),
-        currency: z3.string().default("INR"),
+        currency: z3.string().default("USD"),
         reason: z3.string().min(1, "Reason is required")
       });
       const validationResult = refundSchema.safeParse(req.body);
@@ -25134,7 +25508,7 @@ function setupAdminRoutes(app2) {
     try {
       const createSchema = z3.object({
         code: z3.string().min(3).max(50),
-        category: z3.enum(["platform_subscription", "session_minutes", "train_me", "dai"]),
+        category: z3.enum(["all", "platform_subscription", "session_minutes", "train_me", "service", "dai"]),
         allowedPlanTypes: z3.array(z3.string()).optional(),
         // Add this field
         discountType: z3.enum(["percentage", "fixed"]),
@@ -25455,8 +25829,8 @@ function setupAdminRoutes(app2) {
         originalAmountInPaise = parseFloat(transaction.amountPaid);
         refundAmountInPaise = amount ? parseFloat(amount) : originalAmountInPaise;
       } else if (transactionType === "addon_purchase") {
-        const { billingStorage: billingStorage4 } = await Promise.resolve().then(() => (init_storage_billing(), storage_billing_exports));
-        transaction = await billingStorage4.getAddonPurchase(transactionId);
+        const { billingStorage: billingStorage3 } = await Promise.resolve().then(() => (init_storage_billing(), storage_billing_exports));
+        transaction = await billingStorage3.getAddonPurchase(transactionId);
         if (!transaction) {
           return res.status(404).json({ message: "Addon purchase not found" });
         }
@@ -25465,7 +25839,7 @@ function setupAdminRoutes(app2) {
         }
         const metadata = transaction.metadata;
         if (transaction.gatewayTransactionId) {
-          const gatewayTransaction = await billingStorage4.getGatewayTransaction(transaction.gatewayTransactionId);
+          const gatewayTransaction = await billingStorage3.getGatewayTransaction(transaction.gatewayTransactionId);
           if (gatewayTransaction && gatewayTransaction.providerTransactionId) {
             razorpayPaymentId = gatewayTransaction.providerTransactionId;
           }
@@ -25580,8 +25954,8 @@ function setupAdminRoutes(app2) {
       } else if (transactionType === "minutes_purchase") {
         await authStorage.updateMinutesPurchaseRefund(transactionId, refundData);
       } else if (transactionType === "addon_purchase") {
-        const { billingStorage: billingStorage4 } = await Promise.resolve().then(() => (init_storage_billing(), storage_billing_exports));
-        await billingStorage4.updateAddonPurchaseRefund(transactionId, refundData);
+        const { billingStorage: billingStorage3 } = await Promise.resolve().then(() => (init_storage_billing(), storage_billing_exports));
+        await billingStorage3.updateAddonPurchaseRefund(transactionId, refundData);
       }
       await eventLogger.log({
         actorId: adminId,
@@ -27461,12 +27835,14 @@ function setupEnterpriseRoutes(app2) {
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1e3);
         await authStorage.createPasswordResetToken(userEmail, resetToken, expiresAt);
         const { sendLicenseAssignmentEmail: sendLicenseAssignmentEmail4 } = await Promise.resolve().then(() => (init_email(), email_exports));
-        await sendLicenseAssignmentEmail4(
+        sendLicenseAssignmentEmail4(
           userEmail,
           targetUser.firstName,
           resetToken,
           organization.companyName
-        );
+        ).catch((err) => {
+          console.error("Error sending license assignment email:", err);
+        });
         await eventLogger.log({
           actorId: userId,
           action: "USER_CREATED_VIA_LICENSE",
@@ -27497,20 +27873,26 @@ function setupEnterpriseRoutes(app2) {
         const resetToken = randomBytes(32).toString("hex");
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1e3);
         await authStorage.createPasswordResetToken(userEmail, resetToken, expiresAt);
-        await sendLicenseAssignmentEmail3(
+        sendLicenseAssignmentEmail3(
           userEmail,
           targetUser.firstName,
           resetToken,
           organization.companyName
-        );
-        console.log(`Password setup email sent to new user ${userEmail}`);
+        ).then(() => {
+          console.log(`Password setup email sent to new user ${userEmail}`);
+        }).catch((err) => {
+          console.error(`Error sending password setup email to ${userEmail}:`, err);
+        });
       } else {
-        await sendLicenseAccessNotificationEmail2(
+        sendLicenseAccessNotificationEmail2(
           userEmail,
           targetUser.firstName,
           organization.companyName
-        );
-        console.log(`License access notification sent to existing user ${userEmail}`);
+        ).then(() => {
+          console.log(`License access notification sent to existing user ${userEmail}`);
+        }).catch((err) => {
+          console.error(`Error sending access notification to ${userEmail}:`, err);
+        });
       }
       await eventLogger.log({
         actorId: userId,
@@ -28215,7 +28597,7 @@ function setupEnterpriseRoutes(app2) {
       const orderId = `seats_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const orderResult = await paymentGateway.createOrder({
         amount: additionalCost,
-        currency: "INR",
+        currency: "USD",
         receipt: orderId,
         customerName: `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Customer",
         customerEmail: user.email || "customer@example.com",
@@ -28238,7 +28620,7 @@ function setupEnterpriseRoutes(app2) {
         razorpayKeyId: defaultGatewayProvider === "razorpay" ? getRazorpayKeyId2() : void 0,
         gateway: defaultGatewayProvider,
         amount: additionalCost,
-        currency: "INR",
+        currency: "USD",
         pricePerSeat,
         additionalSeats: seats,
         licensePackageId: activePackage.id
@@ -28507,8 +28889,8 @@ function getPackageBySku(sku) {
 async function getPackageOrAddonBySku(sku) {
   const platformPackage = PLATFORM_ACCESS_PACKAGES[sku];
   if (platformPackage) return platformPackage;
-  const { billingStorage: billingStorage4 } = await Promise.resolve().then(() => (init_storage_billing(), storage_billing_exports));
-  const subscriptionPlans3 = await billingStorage4.getPublishedSubscriptionPlans();
+  const { billingStorage: billingStorage3 } = await Promise.resolve().then(() => (init_storage_billing(), storage_billing_exports));
+  const subscriptionPlans3 = await billingStorage3.getPublishedSubscriptionPlans();
   const subscriptionPlan = subscriptionPlans3.find((plan) => plan.id === sku);
   if (subscriptionPlan) {
     const billingIntervalMap = {
@@ -28535,7 +28917,7 @@ async function getPackageOrAddonBySku(sku) {
       features
     };
   }
-  const addons2 = await billingStorage4.getPublishedAddons();
+  const addons2 = await billingStorage3.getPublishedAddons();
   const addon = addons2.find((a) => a.id === sku);
   if (addon) {
     const metadata = addon.metadata || {};
@@ -28558,11 +28940,11 @@ async function getPackageOrAddonBySku(sku) {
 }
 async function getAddonTypeFromSku(sku) {
   if (sku.startsWith("RW-PA-")) return "platform_access";
-  const { billingStorage: billingStorage4 } = await Promise.resolve().then(() => (init_storage_billing(), storage_billing_exports));
-  const subscriptionPlans3 = await billingStorage4.getPublishedSubscriptionPlans();
+  const { billingStorage: billingStorage3 } = await Promise.resolve().then(() => (init_storage_billing(), storage_billing_exports));
+  const subscriptionPlans3 = await billingStorage3.getPublishedSubscriptionPlans();
   const isPlatformSubscription = subscriptionPlans3.some((plan) => plan.id === sku);
   if (isPlatformSubscription) return "platform_access";
-  const addons2 = await billingStorage4.getPublishedAddons();
+  const addons2 = await billingStorage3.getPublishedAddons();
   const addon = addons2.find((a) => a.id === sku);
   if (addon) {
     return addon.type;
@@ -28643,7 +29025,7 @@ async function activateCartCheckout(pendingOrder, verifiedPaymentId, gatewayTran
       console.log(`[Cart Activation] Item pricing - basePrice: ${itemBasePrice}, discount: ${itemDiscount}, discountedPrice: ${itemDiscountedPrice}, paidAmount: ${itemPaidAmount.toFixed(2)} ${actualCurrency}`);
       console.log(`[Cart Activation] Creating purchase: addonType=${mappedAddonType}, packageSku=${item.packageSku}, totalUnits=${pkg.totalUnits || 0}, paidAmount=${itemPaidAmount.toFixed(2)} ${actualCurrency}`);
       if (mappedAddonType === "session_minutes") {
-        const existingPurchase = await billingStorage2.getActiveAddonPurchase(userId, "session_minutes");
+        const existingPurchase = await billingStorage.getActiveAddonPurchase(userId, "session_minutes");
         const newMinutes = (pkg.totalUnits || 0) * item.quantity;
         const startDate = /* @__PURE__ */ new Date();
         const endDate = pkg.validityDays ? calculateEndDate(startDate, pkg.validityDays) : null;
@@ -28684,7 +29066,7 @@ async function activateCartCheckout(pendingOrder, verifiedPaymentId, gatewayTran
           activatedAddons.push(updatedPurchase);
           console.log(`[Cart Activation] Added ${newMinutes} minutes to existing session_minutes purchase. New total: ${newTotalUnits} minutes`);
         } else {
-          const addon = await billingStorage2.createAddonPurchase({
+          const addon = await billingStorage.createAddonPurchase({
             userId,
             organizationId: null,
             addonType: mappedAddonType,
@@ -28738,42 +29120,50 @@ async function activateCartCheckout(pendingOrder, verifiedPaymentId, gatewayTran
         for (let i = 0; i < item.quantity; i++) {
           const startDate = /* @__PURE__ */ new Date();
           const endDate = pkg.validityDays ? calculateEndDate(startDate, pkg.validityDays) : null;
-          const addon = await billingStorage2.createAddonPurchase({
-            userId,
-            organizationId: null,
-            addonType: mappedAddonType,
-            packageSku: item.packageSku,
-            billingType: "one_time",
-            purchaseAmount: itemPaidAmount.toFixed(2),
-            // Use actual paid amount
-            currency: actualCurrency,
-            // Use actual currency
-            totalUnits: pkg.totalUnits || 0,
-            usedUnits: 0,
-            status: "active",
-            startDate,
-            endDate,
-            gatewayTransactionId: gatewayTransactionId || void 0,
-            metadata: {
-              packageName: pkg.name,
-              basePrice: item.basePrice,
-              // Keep original base price for reference
-              quantity: 1,
-              purchasedViaCart: true,
-              cartOrderId: orderId,
-              paymentId: verifiedPaymentId,
-              gatewayProvider: pendingOrder.gatewayProvider,
-              itemNumber: i + 1,
-              totalItems: item.quantity,
-              originalAddonType: item.addonType,
-              // Store original for reference
-              actualPaidAmount: itemPaidAmount.toFixed(2),
-              // Store actual paid amount
-              actualCurrency
-              // Store actual currency
+          try {
+            const addon = await billingStorage.createAddonPurchase({
+              userId,
+              organizationId: null,
+              addonType: mappedAddonType,
+              packageSku: item.packageSku,
+              billingType: "one_time",
+              purchaseAmount: itemPaidAmount.toFixed(2),
+              // Use actual paid amount
+              currency: actualCurrency,
+              // Use actual currency
+              totalUnits: pkg.totalUnits || 0,
+              usedUnits: 0,
+              status: "active",
+              startDate,
+              endDate,
+              gatewayTransactionId: gatewayTransactionId || void 0,
+              metadata: {
+                packageName: pkg.name,
+                basePrice: item.basePrice,
+                // Keep original base price for reference
+                quantity: 1,
+                purchasedViaCart: true,
+                cartOrderId: orderId,
+                paymentId: verifiedPaymentId,
+                gatewayProvider: pendingOrder.gatewayProvider,
+                itemNumber: i + 1,
+                totalItems: item.quantity,
+                originalAddonType: item.addonType,
+                // Store original for reference
+                actualPaidAmount: itemPaidAmount.toFixed(2),
+                // Store actual paid amount
+                actualCurrency
+                // Store actual currency
+              }
+            });
+            activatedAddons.push(addon);
+          } catch (error) {
+            if (error?.code === "23505" && error?.constraint === "unique_active_addon_per_user") {
+              console.error(`[Cart Activation] User already has active ${mappedAddonType} addon. Skipping item: ${item.packageName}`);
+              throw new Error(`You already have an active ${mappedAddonType === "dai" ? "Domain AI Intelligence" : mappedAddonType === "train_me" ? "Train Me" : mappedAddonType} subscription. Please cancel your existing subscription before purchasing a new one.`);
             }
-          });
-          activatedAddons.push(addon);
+            throw error;
+          }
         }
       }
     }
@@ -28849,9 +29239,9 @@ async function activateCartCheckout(pendingOrder, verifiedPaymentId, gatewayTran
         });
       }
     }
-    await billingStorage2.updatePendingOrderStatus(orderId, userId, "completed", /* @__PURE__ */ new Date());
-    await billingStorage2.clearCart(userId);
-    await billingStorage2.refreshUserEntitlements(userId);
+    await billingStorage.updatePendingOrderStatus(orderId, userId, "completed", /* @__PURE__ */ new Date());
+    await billingStorage.clearCart(userId);
+    await billingStorage.refreshUserEntitlements(userId);
     console.log(`[Cart Activation] Successfully activated ${activatedAddons.length} items for order ${orderId}`);
     return { success: true, activatedAddons };
   } catch (error) {
@@ -28887,7 +29277,7 @@ function setupBillingRoutes(app2) {
       if (!orderId || typeof orderId !== "string") {
         return res.status(400).json({ message: "Order ID is required" });
       }
-      const pendingOrder = await billingStorage2.getPendingOrder(orderId);
+      const pendingOrder = await billingStorage.getPendingOrder(orderId);
       if (!pendingOrder) {
         return res.status(404).json({ message: "Order not found" });
       }
@@ -28919,7 +29309,7 @@ function setupBillingRoutes(app2) {
   });
   app2.get("/api/session-minutes/packages", async (req, res) => {
     try {
-      const publishedAddons = await billingStorage2.getPublishedAddons();
+      const publishedAddons = await billingStorage.getPublishedAddons();
       const sessionMinutesAddons = publishedAddons.filter(
         (addon) => addon.slug === "session-minutes" || addon.metadata?.addonType === "session_minutes" || addon.type === "usage_bundle"
       );
@@ -29075,8 +29465,8 @@ function setupBillingRoutes(app2) {
             });
           }
           if (promo.category !== "all") {
-            const validCategories2 = ["session_minutes", "usage_bundle"];
-            if (!validCategories2.includes(promo.category)) {
+            const validCategories = ["session_minutes", "usage_bundle"];
+            if (!validCategories.includes(promo.category)) {
               return res.status(400).json({
                 message: `This promo code is only valid for ${promo.category} purchases, not session minutes.`
               });
@@ -29093,11 +29483,68 @@ function setupBillingRoutes(app2) {
           return res.status(400).json({ message: "Invalid or expired promo code" });
         }
       }
+      if (finalPrice <= 0) {
+        console.log(`[Session Minutes] \u{1F389} 100% discount applied! Price: ${finalPrice}. Skipping payment gateway.`);
+        const organizationId = await authStorage.getUserOrganizationId(userId);
+        const purchase = await billingStorage.createAddonPurchase({
+          userId,
+          organizationId,
+          addonType: "session_minutes",
+          packageSku: packageId,
+          totalUnits: pkg.totalUnits || 0,
+          usedUnits: 0,
+          purchaseAmount: "0.00",
+          currency: pkg.currency || "USD",
+          billingType: "one-time",
+          autoRenew: false,
+          status: "active",
+          startDate: /* @__PURE__ */ new Date(),
+          endDate: new Date(Date.now() + 31 * 24 * 60 * 60 * 1e3),
+          // 31 days validity
+          metadata: {
+            packageName: pkg.name,
+            freePromo: true,
+            promoCode: promoCode || null,
+            originalPrice: pkg.price.toString(),
+            discountAmount: discountAmount.toString()
+          }
+        });
+        await authStorage.createPayment({
+          userId,
+          razorpayOrderId: `FREE-SM-${Date.now()}`,
+          razorpayPaymentId: `free_${Date.now()}`,
+          amount: "0.00",
+          currency: pkg.currency || "USD",
+          status: "succeeded",
+          paymentMethod: "promo_code_100%",
+          metadata: {
+            type: "session_minutes",
+            packageSku: packageId,
+            purchaseId: purchase.id,
+            freePromo: true
+          }
+        });
+        if (validatedPromo) {
+          await authStorage.incrementPromoCodeUsage(validatedPromo.id);
+        }
+        console.log(`[Session Minutes] \u2705 Free purchase completed: ${pkg.totalUnits} minutes added`);
+        return res.json({
+          success: true,
+          freeOrder: true,
+          message: "Session minutes added successfully with 100% discount!",
+          purchase: {
+            id: purchase.id,
+            packageName: pkg.name,
+            minutes: pkg.totalUnits,
+            expiryDate: purchase.endDate
+          }
+        });
+      }
       const user = await authStorage.getUserById(userId);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      const pendingOrder = await billingStorage2.createPendingOrder({
+      const pendingOrder = await billingStorage.createPendingOrder({
         userId,
         packageSku: packageId,
         addonType: "session_minutes",
@@ -29152,10 +29599,10 @@ function setupBillingRoutes(app2) {
         customerEmail: user.email || "customer@example.com",
         customerPhone: user.mobile || "9999999999"
       });
-      await billingStorage2.updatePendingOrderGatewayId(pendingOrder.id, order.providerOrderId);
-      const gatewayProvider = await billingStorage2.getGatewayProviderByName(gateway.getProviderName());
+      await billingStorage.updatePendingOrderGatewayId(pendingOrder.id, order.providerOrderId);
+      const gatewayProvider = await billingStorage.getGatewayProviderByName(gateway.getProviderName());
       if (gatewayProvider) {
-        await billingStorage2.createGatewayTransaction({
+        await billingStorage.createGatewayTransaction({
           providerId: gatewayProvider.id,
           providerTransactionId: order.providerOrderId,
           transactionType: "order",
@@ -29213,7 +29660,7 @@ function setupBillingRoutes(app2) {
         return res.status(400).json({ message: "Invalid request", errors: validation.error.errors });
       }
       const { orderId, razorpay_payment_id, razorpay_signature, cfPaymentId } = validation.data;
-      const pendingOrder = await billingStorage2.getPendingOrder(orderId);
+      const pendingOrder = await billingStorage.getPendingOrder(orderId);
       if (!pendingOrder) {
         return res.status(404).json({ message: "Order not found" });
       }
@@ -29224,7 +29671,7 @@ function setupBillingRoutes(app2) {
         return res.status(400).json({ message: `Order already ${pendingOrder.status}` });
       }
       if (/* @__PURE__ */ new Date() > new Date(pendingOrder.expiresAt)) {
-        await billingStorage2.updatePendingOrderStatus(orderId, userId, "expired");
+        await billingStorage.updatePendingOrderStatus(orderId, userId, "expired");
         return res.status(400).json({ message: "Order has expired" });
       }
       if (pendingOrder.addonType !== "session_minutes") {
@@ -29279,7 +29726,7 @@ function setupBillingRoutes(app2) {
           status: paymentStatus.status
         });
       }
-      const existingPurchase = await billingStorage2.getActiveAddonPurchase(userId, "session_minutes");
+      const existingPurchase = await billingStorage.getActiveAddonPurchase(userId, "session_minutes");
       let purchase;
       const newMinutes = pkg.totalUnits || 0;
       const startDate = /* @__PURE__ */ new Date();
@@ -29321,7 +29768,7 @@ function setupBillingRoutes(app2) {
         console.log(`[Session Minutes] Added ${newMinutes} minutes to existing purchase. New total: ${newTotalUnits} minutes`);
       } else {
         try {
-          purchase = await billingStorage2.createAddonPurchase({
+          purchase = await billingStorage.createAddonPurchase({
             userId,
             addonType: "session_minutes",
             packageSku: pendingOrder.packageSku,
@@ -29366,7 +29813,7 @@ function setupBillingRoutes(app2) {
         } catch (error) {
           if (error?.code === "23505" && error?.constraint === "unique_active_addon_per_user") {
             console.log(`[Session Minutes] Race condition detected - another purchase was created. Retrying with update...`);
-            const retryExistingPurchase = await billingStorage2.getActiveAddonPurchase(userId, "session_minutes");
+            const retryExistingPurchase = await billingStorage.getActiveAddonPurchase(userId, "session_minutes");
             if (retryExistingPurchase) {
               const currentTotalUnits = retryExistingPurchase.totalUnits || 0;
               const newTotalUnits = currentTotalUnits + newMinutes;
@@ -29441,7 +29888,7 @@ function setupBillingRoutes(app2) {
       } else {
         console.log(`[Session Minutes] Payment record already exists for order ${gatewayOrderId}`);
       }
-      await billingStorage2.updatePendingOrderStatus(orderId, userId, "completed", /* @__PURE__ */ new Date());
+      await billingStorage.updatePendingOrderStatus(orderId, userId, "completed", /* @__PURE__ */ new Date());
       const promoCodeUsed = pendingOrder.metadata?.promoCode;
       if (promoCodeUsed) {
         try {
@@ -29454,7 +29901,7 @@ function setupBillingRoutes(app2) {
           console.error(`[Promo Code] Failed to increment usage for code: ${promoCodeUsed}`, error);
         }
       }
-      await billingStorage2.refreshUserEntitlements(userId);
+      await billingStorage.refreshUserEntitlements(userId);
       res.json({
         success: true,
         purchase,
@@ -29483,7 +29930,7 @@ function setupBillingRoutes(app2) {
           hasPurchasedPackages: true
         });
       }
-      const balance = await billingStorage2.getSessionMinutesBalance(userId);
+      const balance = await billingStorage.getSessionMinutesBalance(userId);
       const purchasedPackages = await db.select().from(addonPurchases).where(
         and11(
           eq13(addonPurchases.userId, userId),
@@ -29555,7 +30002,7 @@ function setupBillingRoutes(app2) {
       }
       const { paymentGateway: requestedGateway } = validation.data;
       const paymentGateway = requestedGateway || DEFAULT_PAYMENT_GATEWAY;
-      const publishedAddons = await billingStorage2.getPublishedAddons();
+      const publishedAddons = await billingStorage.getPublishedAddons();
       const trainMeAddon = publishedAddons.find((a) => a.slug === "train-me" || a.slug === "train_me");
       if (!trainMeAddon) {
         return res.status(404).json({ message: "Train Me addon not found. Please contact support." });
@@ -29568,7 +30015,7 @@ function setupBillingRoutes(app2) {
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      const pendingOrder = await billingStorage2.createPendingOrder({
+      const pendingOrder = await billingStorage.createPendingOrder({
         userId,
         packageSku: trainMeAddon.id,
         addonType: "train_me",
@@ -29620,10 +30067,10 @@ function setupBillingRoutes(app2) {
         customerEmail: user.email || "customer@example.com",
         customerPhone: user.mobile || "9999999999"
       });
-      await billingStorage2.updatePendingOrderGatewayId(pendingOrder.id, order.providerOrderId);
-      const gatewayProvider = await billingStorage2.getGatewayProviderByName(gateway.getProviderName());
+      await billingStorage.updatePendingOrderGatewayId(pendingOrder.id, order.providerOrderId);
+      const gatewayProvider = await billingStorage.getGatewayProviderByName(gateway.getProviderName());
       if (gatewayProvider) {
-        await billingStorage2.createGatewayTransaction({
+        await billingStorage.createGatewayTransaction({
           providerId: gatewayProvider.id,
           providerTransactionId: order.providerOrderId,
           transactionType: "order",
@@ -29680,7 +30127,7 @@ function setupBillingRoutes(app2) {
         return res.status(400).json({ message: "Invalid request", errors: validation.error.errors });
       }
       const { orderId, razorpay_payment_id, razorpay_signature, cfPaymentId, cashfreeOrderId } = validation.data;
-      const pendingOrder = await billingStorage2.getPendingOrder(orderId);
+      const pendingOrder = await billingStorage.getPendingOrder(orderId);
       if (!pendingOrder) {
         return res.status(404).json({ message: "Order not found" });
       }
@@ -29691,7 +30138,7 @@ function setupBillingRoutes(app2) {
         return res.status(400).json({ message: `Order already ${pendingOrder.status}` });
       }
       if (/* @__PURE__ */ new Date() > new Date(pendingOrder.expiresAt)) {
-        await billingStorage2.updatePendingOrderStatus(orderId, userId, "expired");
+        await billingStorage.updatePendingOrderStatus(orderId, userId, "expired");
         return res.status(400).json({ message: "Order has expired" });
       }
       if (pendingOrder.addonType !== "train_me") {
@@ -29746,7 +30193,7 @@ function setupBillingRoutes(app2) {
           status: paymentStatus.status
         });
       }
-      const existingPurchase = await billingStorage2.getActiveAddonPurchase(userId, "train_me");
+      const existingPurchase = await billingStorage.getActiveAddonPurchase(userId, "train_me");
       let purchase;
       const startDate = /* @__PURE__ */ new Date();
       const endDate = pkg.validityDays ? calculateEndDate(startDate, pkg.validityDays) : calculateEndDate(startDate, 30);
@@ -29779,7 +30226,7 @@ function setupBillingRoutes(app2) {
         console.log(`[Train Me] Extended existing purchase. New end date: ${finalEndDate}`);
       } else {
         try {
-          purchase = await billingStorage2.createAddonPurchase({
+          purchase = await billingStorage.createAddonPurchase({
             userId,
             addonType: "train_me",
             packageSku: pendingOrder.packageSku,
@@ -29816,7 +30263,7 @@ function setupBillingRoutes(app2) {
         } catch (error) {
           if (error?.code === "23505" && error?.constraint === "unique_active_addon_per_user") {
             console.log(`[Train Me] Race condition detected - another purchase was created. Retrying with update...`);
-            const retryExistingPurchase = await billingStorage2.getActiveAddonPurchase(userId, "train_me");
+            const retryExistingPurchase = await billingStorage.getActiveAddonPurchase(userId, "train_me");
             if (retryExistingPurchase) {
               const existingEndDate = retryExistingPurchase.endDate;
               const finalEndDate = existingEndDate && endDate ? existingEndDate > endDate ? existingEndDate : endDate : endDate || existingEndDate;
@@ -29852,8 +30299,8 @@ function setupBillingRoutes(app2) {
           }
         }
       }
-      await billingStorage2.updatePendingOrderStatus(orderId, userId, "completed", /* @__PURE__ */ new Date());
-      await billingStorage2.refreshUserEntitlements(userId);
+      await billingStorage.updatePendingOrderStatus(orderId, userId, "completed", /* @__PURE__ */ new Date());
+      await billingStorage.refreshUserEntitlements(userId);
       res.json({
         success: true,
         purchase,
@@ -29866,8 +30313,8 @@ function setupBillingRoutes(app2) {
   });
   app2.get("/api/billing/packages", async (req, res) => {
     try {
-      const publishedPlans = await billingStorage2.getPublishedSubscriptionPlans();
-      const publishedAddons = await billingStorage2.getPublishedAddons();
+      const publishedPlans = await billingStorage.getPublishedSubscriptionPlans();
+      const publishedAddons = await billingStorage.getPublishedAddons();
       const platformAccess = publishedPlans.map((plan) => {
         let billingType = "monthly";
         const interval = plan.billingInterval.toLowerCase();
@@ -29934,11 +30381,11 @@ function setupBillingRoutes(app2) {
       if (!pkg || !packageSku.startsWith("RW-PA-")) {
         return res.status(400).json({ message: "Invalid platform access package" });
       }
-      const existingSubscription = await billingStorage2.getActiveAddonPurchase(userId, "platform_access");
+      const existingSubscription = await billingStorage.getActiveAddonPurchase(userId, "platform_access");
       if (existingSubscription) {
         return res.status(400).json({ message: "You already have an active platform access subscription" });
       }
-      const pendingOrder = await billingStorage2.createPendingOrder({
+      const pendingOrder = await billingStorage.createPendingOrder({
         userId,
         packageSku,
         addonType: "platform_access",
@@ -29970,10 +30417,10 @@ function setupBillingRoutes(app2) {
           notifyUrl: `${baseUrl}/api/billing/webhook`
         }
       });
-      await billingStorage2.updatePendingOrderGatewayId(pendingOrder.id, order.providerOrderId);
-      const gatewayProvider = await billingStorage2.getGatewayProviderByName(gateway.getProviderName());
+      await billingStorage.updatePendingOrderGatewayId(pendingOrder.id, order.providerOrderId);
+      const gatewayProvider = await billingStorage.getGatewayProviderByName(gateway.getProviderName());
       if (gatewayProvider) {
-        await billingStorage2.createGatewayTransaction({
+        await billingStorage.createGatewayTransaction({
           providerId: gatewayProvider.id,
           providerTransactionId: order.providerOrderId,
           transactionType: "order",
@@ -30007,7 +30454,7 @@ function setupBillingRoutes(app2) {
       if (!orderId) {
         return res.status(400).json({ message: "Missing required fields" });
       }
-      const pendingOrder = await billingStorage2.getPendingOrder(orderId);
+      const pendingOrder = await billingStorage.getPendingOrder(orderId);
       if (!pendingOrder) {
         return res.status(404).json({ message: "Order not found" });
       }
@@ -30019,7 +30466,7 @@ function setupBillingRoutes(app2) {
         return res.status(400).json({ message: `Order already ${pendingOrder.status}` });
       }
       if (/* @__PURE__ */ new Date() > new Date(pendingOrder.expiresAt)) {
-        await billingStorage2.updatePendingOrderStatus(orderId, userId, "expired");
+        await billingStorage.updatePendingOrderStatus(orderId, userId, "expired");
         return res.status(400).json({ message: "Order has expired" });
       }
       if (pendingOrder.addonType !== "platform_access") {
@@ -30068,7 +30515,7 @@ function setupBillingRoutes(app2) {
       }
       const startDate = /* @__PURE__ */ new Date();
       const endDate = pkg.validityDays ? calculateEndDate(startDate, pkg.validityDays) : null;
-      const purchase = await billingStorage2.createAddonPurchase({
+      const purchase = await billingStorage.createAddonPurchase({
         userId,
         addonType: "platform_access",
         packageSku: pendingOrder.packageSku,
@@ -30091,7 +30538,7 @@ function setupBillingRoutes(app2) {
           gateway: pendingOrder.gatewayProvider
         }
       });
-      await billingStorage2.updatePendingOrderStatus(orderId, userId, "completed", /* @__PURE__ */ new Date());
+      await billingStorage.updatePendingOrderStatus(orderId, userId, "completed", /* @__PURE__ */ new Date());
       const subscription = await authStorage.getSubscriptionByUserId(userId);
       if (subscription) {
         await authStorage.updateSubscription(subscription.id, {
@@ -30105,7 +30552,7 @@ function setupBillingRoutes(app2) {
         });
         console.log(`\u2705 Subscription updated for user ${userId}: Unlimited access granted`);
       }
-      await billingStorage2.refreshUserEntitlements(userId);
+      await billingStorage.refreshUserEntitlements(userId);
       res.json({
         success: true,
         purchase,
@@ -30119,7 +30566,7 @@ function setupBillingRoutes(app2) {
   app2.get("/api/billing/platform-access/status", authenticateToken, async (req, res) => {
     try {
       const userId = req.jwtUser.userId;
-      const activeSub = await billingStorage2.getActiveAddonPurchase(userId, "platform_access");
+      const activeSub = await billingStorage.getActiveAddonPurchase(userId, "platform_access");
       if (!activeSub) {
         return res.json({
           hasAccess: false,
@@ -30138,9 +30585,9 @@ function setupBillingRoutes(app2) {
   app2.get("/api/billing/entitlements", authenticateToken, async (req, res) => {
     try {
       const userId = req.jwtUser.userId;
-      let entitlements = await billingStorage2.getUserEntitlements(userId);
+      let entitlements = await billingStorage.getUserEntitlements(userId);
       if (!entitlements) {
-        entitlements = await billingStorage2.refreshUserEntitlements(userId);
+        entitlements = await billingStorage.refreshUserEntitlements(userId);
       }
       res.json(entitlements);
     } catch (error) {
@@ -30151,7 +30598,7 @@ function setupBillingRoutes(app2) {
   app2.post("/api/billing/entitlements/refresh", authenticateToken, async (req, res) => {
     try {
       const userId = req.jwtUser.userId;
-      const entitlements = await billingStorage2.refreshUserEntitlements(userId);
+      const entitlements = await billingStorage.refreshUserEntitlements(userId);
       res.json(entitlements);
     } catch (error) {
       console.error("Refresh entitlements error:", error);
@@ -30162,7 +30609,7 @@ function setupBillingRoutes(app2) {
     try {
       const userId = req.jwtUser.userId;
       const { addonType } = req.query;
-      const purchases = await billingStorage2.getUserAddonPurchases(userId, addonType);
+      const purchases = await billingStorage.getUserAddonPurchases(userId, addonType);
       res.json({ purchases });
     } catch (error) {
       console.error("Get purchases error:", error);
@@ -30181,7 +30628,7 @@ function setupBillingRoutes(app2) {
       if (!addonType) {
         return res.status(400).json({ message: "Invalid package SKU" });
       }
-      const availability = await billingStorage2.checkItemAvailability(userId, packageSku, addonType);
+      const availability = await billingStorage.checkItemAvailability(userId, packageSku, addonType);
       res.json({
         packageSku,
         packageName: pkg.name,
@@ -30225,16 +30672,49 @@ function setupBillingRoutes(app2) {
       if (addonType === "platform_access" && quantity > 1 && purchaseMode !== "team") {
         return res.status(400).json({ message: "Cannot add multiple units of subscription plans. Quantity must be 1." });
       }
-      const availability = await billingStorage2.checkItemAvailability(userId, packageSku, addonType);
+      const availability = await billingStorage.checkItemAvailability(userId, packageSku, addonType);
       if (!availability.available) {
         return res.status(400).json({ message: availability.reason || "Item not available" });
       }
-      const existingCartItems = await billingStorage2.getCartItems(userId);
+      const existingCartItems = await billingStorage.getCartItems(userId);
       const existingItem = existingCartItems.find((item) => item.packageSku === packageSku);
       if (existingItem) {
         return res.status(400).json({ message: "Item already in cart" });
       }
-      const cartItem = await billingStorage2.addToCart({
+      if (addonType === "service") {
+        const packageName = pkg.name.toLowerCase();
+        let serviceCategory = "train_me";
+        if (packageName.includes("dai")) {
+          serviceCategory = "dai";
+        } else if (packageName.includes("train me")) {
+          serviceCategory = "train_me";
+        }
+        const conflictingItem = existingCartItems.find((item) => {
+          if (item.addonType !== "service") return false;
+          const itemName = item.packageName.toLowerCase();
+          if (serviceCategory === "dai" && itemName.includes("dai")) return true;
+          if (serviceCategory === "train_me" && itemName.includes("train me")) return true;
+          return false;
+        });
+        if (conflictingItem) {
+          const categoryName = serviceCategory === "dai" ? "Domain AI Intelligence" : "Train Me";
+          return res.status(400).json({
+            message: `You can only have one ${categoryName} item in your cart at a time. Please remove "${conflictingItem.packageName}" first.`,
+            conflictingItem: conflictingItem.packageName
+          });
+        }
+      } else if (addonType === "platform_access") {
+        if (purchaseMode === "user") {
+          const conflictingItem = existingCartItems.find((item) => item.addonType === "platform_access" && item.purchaseMode === "user");
+          if (conflictingItem) {
+            return res.status(400).json({
+              message: `You can only have one Platform Access subscription in your cart at a time. Please remove "${conflictingItem.packageName}" first.`,
+              conflictingItem: conflictingItem.packageName
+            });
+          }
+        }
+      }
+      const cartItem = await billingStorage.addToCart({
         userId,
         packageSku,
         addonType,
@@ -30264,7 +30744,7 @@ function setupBillingRoutes(app2) {
     try {
       const userId = req.jwtUser.userId;
       const { cartItemId } = req.params;
-      await billingStorage2.removeFromCart(userId, cartItemId);
+      await billingStorage.removeFromCart(userId, cartItemId);
       res.json({ message: "Item removed from cart" });
     } catch (error) {
       console.error("Remove from cart error:", error);
@@ -30274,7 +30754,7 @@ function setupBillingRoutes(app2) {
   app2.get("/api/cart", authenticateToken, async (req, res) => {
     try {
       const userId = req.jwtUser.userId;
-      const cartTotal = await billingStorage2.calculateCartTotal(userId);
+      const cartTotal = await billingStorage.calculateCartTotal(userId);
       res.json(cartTotal);
     } catch (error) {
       console.error("Get cart error:", error);
@@ -30284,7 +30764,7 @@ function setupBillingRoutes(app2) {
   app2.delete("/api/cart/clear", authenticateToken, async (req, res) => {
     try {
       const userId = req.jwtUser.userId;
-      await billingStorage2.clearCart(userId);
+      await billingStorage.clearCart(userId);
       res.json({ message: "Cart cleared" });
     } catch (error) {
       console.error("Clear cart error:", error);
@@ -30302,7 +30782,7 @@ function setupBillingRoutes(app2) {
         return res.status(400).json({ message: "Invalid request", errors: validation.error.errors });
       }
       const { promoCode } = validation.data;
-      const result = await billingStorage2.applyPromoCodeToCartItem(userId, cartItemId, promoCode);
+      const result = await billingStorage.applyPromoCodeToCartItem(userId, cartItemId, promoCode);
       if (!result.success) {
         return res.status(400).json({ message: result.message });
       }
@@ -30316,7 +30796,7 @@ function setupBillingRoutes(app2) {
     try {
       const userId = req.jwtUser.userId;
       const { cartItemId } = req.params;
-      const result = await billingStorage2.removePromoCodeFromCartItem(userId, cartItemId);
+      const result = await billingStorage.removePromoCodeFromCartItem(userId, cartItemId);
       if (!result.success) {
         return res.status(400).json({ message: result.message });
       }
@@ -30344,9 +30824,106 @@ function setupBillingRoutes(app2) {
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      const cartTotal = await billingStorage2.calculateCartTotal(userId);
+      const cartTotal = await billingStorage.calculateCartTotal(userId);
       if (cartTotal.items.length === 0) {
         return res.status(400).json({ message: "Cart is empty" });
+      }
+      if (cartTotal.total <= 0.01) {
+        console.log(`[Cart Checkout] \u{1F389} 100% discount applied! Total: ${cartTotal.total}. Skipping payment gateway.`);
+        console.log(`[Cart Checkout] Breakdown - Subtotal: ${cartTotal.subtotal}, Discount: ${cartTotal.discount}, GST: ${cartTotal.gstAmount}`);
+        const pendingOrder2 = await billingStorage.createPendingOrder({
+          userId,
+          packageSku: "CART-MULTI-ITEM",
+          addonType: "cart_checkout",
+          amount: "0.00",
+          currency: cartTotal.currency,
+          gatewayOrderId: `FREE-${Date.now()}`,
+          gatewayProvider: "free_promo",
+          status: "completed",
+          // Mark as completed immediately
+          metadata: {
+            itemCount: cartTotal.items.length,
+            items: cartTotal.items.map((item) => ({
+              packageSku: item.packageSku,
+              packageName: item.packageName,
+              addonType: item.addonType,
+              basePrice: item.basePrice,
+              currency: item.currency,
+              quantity: item.quantity,
+              metadata: item.metadata,
+              purchaseMode: item.purchaseMode,
+              teamManagerName: item.teamManagerName,
+              teamManagerEmail: item.teamManagerEmail,
+              companyName: item.companyName
+            })),
+            subtotal: cartTotal.subtotal,
+            gstAmount: 0,
+            // No GST for free items
+            discount: cartTotal.discount,
+            total: 0,
+            roundoffAmount: 0,
+            finalAmount: 0,
+            originalCurrency: cartTotal.currency,
+            finalCurrency: cartTotal.currency,
+            freePromo: true,
+            // Flag to indicate this was a free promo
+            perItemPromoCodes: cartTotal.items.map((item) => ({
+              cartItemId: item.id,
+              promoCodeId: item.promoCodeId,
+              promoCodeCode: item.promoCodeCode,
+              appliedDiscountAmount: item.appliedDiscountAmount
+            }))
+          },
+          expiresAt: new Date(Date.now() + 30 * 60 * 1e3)
+        });
+        console.log(`[Cart Checkout] Created free order: ${pendingOrder2.id}`);
+        await authStorage.createPayment({
+          userId,
+          razorpayOrderId: pendingOrder2.gatewayOrderId,
+          razorpayPaymentId: `free_${Date.now()}`,
+          amount: "0.00",
+          currency: cartTotal.currency,
+          status: "succeeded",
+          paymentMethod: "promo_code_100%",
+          metadata: {
+            type: "cart_checkout",
+            orderId: pendingOrder2.id,
+            gatewayProvider: "free_promo",
+            freePromo: true,
+            itemCount: cartTotal.items.length
+          }
+        });
+        const result = await activateCartCheckout(pendingOrder2, `free_${Date.now()}`, void 0, req);
+        if (!result.success) {
+          console.error(`[Cart Checkout] Failed to activate free items: ${result.message}`);
+          if (result.message?.includes("duplicate key") || result.message?.includes("unique_active_addon_per_user")) {
+            return res.status(400).json({
+              message: "You already have an active subscription for one of these items. Please check your active subscriptions in your profile.",
+              error: "DUPLICATE_ADDON",
+              details: "Only one active subscription per addon type is allowed."
+            });
+          }
+          return res.status(500).json({
+            message: "Failed to activate items",
+            error: result.message
+          });
+        }
+        await billingStorage.clearCart(userId);
+        console.log(`[Cart Checkout] \u2705 Free order completed: ${result.activatedAddons.length} items activated`);
+        return res.json({
+          success: true,
+          freeOrder: true,
+          orderId: pendingOrder2.id,
+          message: "Order completed successfully with 100% discount!",
+          activatedAddons: result.activatedAddons,
+          itemCount: result.activatedAddons.length,
+          breakdown: {
+            subtotal: cartTotal.subtotal,
+            discount: cartTotal.discount,
+            total: 0,
+            currency: cartTotal.currency
+          }
+        });
       }
       let finalCurrency = cartTotal.currency;
       let conversionRate = 1;
@@ -30379,7 +30956,7 @@ function setupBillingRoutes(app2) {
         finalAmount = MINIMUM_INR_AMOUNT;
       }
       for (const item of cartTotal.items) {
-        const availability = await billingStorage2.checkItemAvailability(userId, item.packageSku, item.addonType);
+        const availability = await billingStorage.checkItemAvailability(userId, item.packageSku, item.addonType);
         if (!availability.available) {
           return res.status(400).json({
             message: `Item "${item.packageName}" is no longer available`,
@@ -30417,7 +30994,7 @@ function setupBillingRoutes(app2) {
           });
         }
       }
-      const pendingOrder = await billingStorage2.createPendingOrder({
+      const pendingOrder = await billingStorage.createPendingOrder({
         userId,
         packageSku: "CART-MULTI-ITEM",
         // Special SKU for multi-item orders
@@ -30521,10 +31098,10 @@ function setupBillingRoutes(app2) {
         customerEmail,
         customerPhone: customerPhone || "9999999999"
       });
-      await billingStorage2.updatePendingOrderGatewayId(pendingOrder.id, order.providerOrderId);
-      const gatewayProvider = await billingStorage2.getGatewayProviderByName(gateway.getProviderName());
+      await billingStorage.updatePendingOrderGatewayId(pendingOrder.id, order.providerOrderId);
+      const gatewayProvider = await billingStorage.getGatewayProviderByName(gateway.getProviderName());
       if (gatewayProvider) {
-        await billingStorage2.createGatewayTransaction({
+        await billingStorage.createGatewayTransaction({
           providerId: gatewayProvider.id,
           providerTransactionId: order.providerOrderId,
           transactionType: "order",
@@ -30619,7 +31196,7 @@ function setupBillingRoutes(app2) {
       }
       const { orderId, cfPaymentId, razorpayPaymentId, razorpaySignature } = validation.data;
       console.log(`[Cart Verify] Processing verification for order: ${orderId}, user: ${userId}`);
-      const pendingOrder = await billingStorage2.getPendingOrder(orderId);
+      const pendingOrder = await billingStorage.getPendingOrder(orderId);
       if (!pendingOrder) {
         console.error(`[Cart Verify] Order not found: ${orderId}`);
         return res.status(404).json({ message: "Order not found" });
@@ -30738,10 +31315,10 @@ function setupBillingRoutes(app2) {
       console.log(`[Cart Verify] Creating gateway transaction for order: ${orderId}`);
       let gatewayTransactionId;
       try {
-        const gatewayProvider = await billingStorage2.getGatewayProviderByName(pendingOrder.gatewayProvider);
+        const gatewayProvider = await billingStorage.getGatewayProviderByName(pendingOrder.gatewayProvider);
         if (gatewayProvider) {
           const orderMetadata = pendingOrder.metadata || {};
-          const gatewayTx = await billingStorage2.createGatewayTransaction({
+          const gatewayTx = await billingStorage.createGatewayTransaction({
             providerId: gatewayProvider.id,
             providerTransactionId: verifiedPaymentId,
             transactionType: "payment",
@@ -30944,7 +31521,7 @@ function setupBillingRoutes(app2) {
       if (!orderId || typeof orderId !== "string") {
         return res.status(400).json({ message: "Order ID is required" });
       }
-      let pendingOrder = await billingStorage2.getPendingOrderById(orderId, userId);
+      let pendingOrder = await billingStorage.getPendingOrderById(orderId, userId);
       if (!pendingOrder && orderId.startsWith("ent_")) {
         console.log(`[Invoice Debug] Enterprise order detected: ${orderId}, looking in payments table`);
         const payment = await authStorage.getPaymentByRazorpayOrderId(orderId);
@@ -30986,7 +31563,7 @@ function setupBillingRoutes(app2) {
       if (pendingOrder.status !== "completed") {
         return res.status(400).json({ message: "Order is not completed yet" });
       }
-      const allPurchases = await billingStorage2.getUserAddonPurchases(userId);
+      const allPurchases = await billingStorage.getUserAddonPurchases(userId);
       console.log(`[Invoice Debug] Found ${allPurchases.length} total purchases for user ${userId}`);
       let orderPurchases = allPurchases.filter(
         (purchase) => purchase.metadata && purchase.metadata.cartOrderId === orderId
@@ -31041,15 +31618,9 @@ function setupBillingRoutes(app2) {
         let gstRate;
         const actualPaidAmount = metadata.actualPaidAmount ? parseFloat(metadata.actualPaidAmount) : totalWithGst;
         const actualCurrency = metadata.actualCurrency || currency2;
-        if (actualCurrency === "INR") {
-          gstRate = 18;
-          baseAmount = actualPaidAmount / 1.18;
-          gstAmount = actualPaidAmount - baseAmount;
-        } else {
-          gstRate = 0;
-          baseAmount = actualPaidAmount;
-          gstAmount = 0;
-        }
+        gstRate = 0;
+        baseAmount = actualPaidAmount;
+        gstAmount = 0;
         const quantity = metadata.quantity || 1;
         const unitPrice = baseAmount / quantity;
         return {
@@ -31078,7 +31649,7 @@ function setupBillingRoutes(app2) {
           if (metadata.subtotal !== void 0 && metadata.gstAmount !== void 0) {
             const subtotal2 = parseFloat(metadata.subtotal?.toString() || "0");
             const gstAmount = parseFloat(metadata.gstAmount?.toString() || "0");
-            const gstRate = currency2 === "INR" ? 18 : 0;
+            const gstRate = 0;
             return {
               packageSku: pendingOrder.packageSku || "CART-MULTI-ITEM",
               packageName: `${metadata.itemCount || 1} Item${(metadata.itemCount || 1) > 1 ? "s" : ""} - Cart Purchase`,
@@ -31100,15 +31671,9 @@ function setupBillingRoutes(app2) {
             let baseAmount;
             let gstAmount;
             let gstRate;
-            if (currency2 === "INR") {
-              gstRate = 18;
-              baseAmount = totalAmount / 1.18;
-              gstAmount = totalAmount - baseAmount;
-            } else {
-              gstRate = 0;
-              baseAmount = totalAmount;
-              gstAmount = 0;
-            }
+            gstRate = 0;
+            baseAmount = totalAmount;
+            gstAmount = 0;
             return {
               packageSku: pendingOrder.packageSku || "PENDING-ORDER",
               packageName: "Order Processing",
@@ -31160,8 +31725,8 @@ function setupBillingRoutes(app2) {
           address: "AI-Powered Sales Intelligence Platform\nHealthcaa Technologies Inc.",
           email: "support@revwinner.com",
           website: "https://revwinner.com",
-          gstNumber: currency === "INR" ? "GST123456789" : null
-          // Add actual GST number if available
+          gstNumber: null
+          // No GST for USD transactions
         },
         // Customer Information
         customer: {
@@ -31188,7 +31753,8 @@ function setupBillingRoutes(app2) {
           subtotalAfterDiscount: parseFloat((subtotal - discount).toFixed(2)),
           // CRITICAL FIX: Show discounted subtotal
           gst: parseFloat(totalGst.toFixed(2)),
-          gstRate: currency === "INR" ? 18 : 0,
+          gstRate: 0,
+          // No GST for USD
           total: parseFloat(grandTotal.toFixed(2)),
           currency,
           amountInWords: convertAmountToWords(grandTotal, currency)
@@ -31203,7 +31769,7 @@ function setupBillingRoutes(app2) {
           "All Rev Winner services are subject to our Terms of Service available at revwinner.com/terms",
           "Refunds are processed as per our refund policy. Contact support for assistance.",
           "For technical support or billing queries, contact support@revwinner.com",
-          currency === "INR" ? "GST is applicable as per Indian tax regulations." : "No GST applicable for international transactions.",
+          "No GST applicable for USD transactions.",
           "This invoice serves as your receipt for tax and accounting purposes."
         ]
       };
@@ -31312,7 +31878,7 @@ function setupBillingRoutes(app2) {
         const amount = parseFloat(order.order_amount);
         const currency = order.order_currency;
         console.log(` Payment success: ${paymentId} for order ${orderId}, amount: ${amount} ${currency}`);
-        const pendingOrder = await billingStorage2.getPendingOrder(orderId);
+        const pendingOrder = await billingStorage.getPendingOrder(orderId);
         if (!pendingOrder) {
           console.error(`\u274C Pending order not found for gateway order: ${orderId}`);
           return res.status(404).json({ message: "Pending order not found" });
@@ -31383,9 +31949,9 @@ function setupBillingRoutes(app2) {
         const orderId = order.order_id;
         const paymentId = payment?.cf_payment_id || "unknown";
         console.log(`\u274C Payment failed: ${paymentId} for order ${orderId}`);
-        const pendingOrder = await billingStorage2.getPendingOrder(orderId);
+        const pendingOrder = await billingStorage.getPendingOrder(orderId);
         if (pendingOrder) {
-          await billingStorage2.updatePendingOrderStatus(orderId, pendingOrder.userId, "failed");
+          await billingStorage.updatePendingOrderStatus(orderId, pendingOrder.userId, "failed");
         }
         return res.json({ status: "acknowledged", message: "Payment failure recorded" });
       }
@@ -37454,17 +38020,28 @@ async function registerRoutes(app2) {
       if (!conversation) {
         return res.status(404).json({ message: "Conversation not found" });
       }
-      const { question, conversationContext, domainExpertiseId } = req.body;
+      const { question, conversationContext, domainExpertiseId, qaHistory } = req.body;
       if (!question || !question.trim()) {
         return res.status(400).json({ message: "Question is required" });
       }
       const allMessages = await storage.getMessages(conversation.id);
-      const recentMessages = allMessages.slice(-15);
+      const recentMessages = allMessages.slice(-20);
       const conversationHistory = recentMessages.map((m) => ({
         sender: m.sender,
         content: m.content
       }));
-      const context = conversationContext || conversationHistory.map((m) => `${m.sender}: ${m.content}`).join("\n");
+      let context = conversationContext || conversationHistory.map((m) => `${m.sender}: ${m.content}`).join("\n");
+      if (qaHistory && Array.isArray(qaHistory) && qaHistory.length > 0) {
+        const qaContext = qaHistory.map(
+          (qa) => `Previous Q: ${qa.question}
+Previous A: ${qa.answer}`
+        ).join("\n\n");
+        context = `${context}
+
+=== Previous Q&A Context ===
+${qaContext}
+=== End Q&A Context ===`;
+      }
       const domain = req.body.domainExpertise || "Generic Product";
       const { answerConversationQuestion: answerConversationQuestion2 } = await Promise.resolve().then(() => (init_openai(), openai_exports));
       const { validateDomainForSession: validateDomainForSession2 } = await Promise.resolve().then(() => (init_ai_context_builder(), ai_context_builder_exports));
@@ -37476,7 +38053,7 @@ async function registerRoutes(app2) {
           console.log(`\u{1F6AB} Ask Question: Invalid domain "${domain}" - proceeding with strict empty context (no fallback)`);
         }
       }
-      console.log(`\u2753 Ask Question: domain="${domain}", strict=${!isUniversalMode}, question="${question.slice(0, 50)}..."`);
+      console.log(`\u2753 Ask Question: domain="${domain}", strict=${!isUniversalMode}, question="${question.slice(0, 50)}...", qaHistory: ${qaHistory?.length || 0} items`);
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
       const answer = await answerConversationQuestion2(
@@ -38764,8 +39341,8 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
   app2.get("/api/profile/invoices", authenticateToken, async (req, res) => {
     try {
       const userId = req.jwtUser.userId;
-      const { billingStorage: billingStorage4 } = await Promise.resolve().then(() => (init_storage_billing(), storage_billing_exports));
-      const allPurchases = await billingStorage4.getUserAddonPurchases(userId);
+      const { billingStorage: billingStorage3 } = await Promise.resolve().then(() => (init_storage_billing(), storage_billing_exports));
+      const allPurchases = await billingStorage3.getUserAddonPurchases(userId);
       const invoices = [];
       allPurchases.forEach((purchase) => {
         const metadata = purchase.metadata || {};
@@ -39190,8 +39767,8 @@ Tell me in 3-4 brief sentences what to do NEXT. Be specific - suggest an exact q
           response: "Our chatbot is currently offline. Please contact support@revwinner.com for help, or check back later."
         });
       }
-      const OpenAI8 = (await import("openai")).default;
-      const deepseekClient = new OpenAI8({
+      const OpenAI9 = (await import("openai")).default;
+      const deepseekClient = new OpenAI9({
         apiKey: deepseekApiKey,
         baseURL: "https://api.deepseek.com/v1",
         timeout: 22e3
@@ -39322,8 +39899,8 @@ Provide a helpful, concise answer (2-4 paragraphs max).` }
           source: "admin"
         });
       }
-      const { billingStorage: billingStorage4 } = await Promise.resolve().then(() => (init_storage_billing(), storage_billing_exports));
-      const trainMePurchase = await billingStorage4.getActiveAddonPurchase(userId, "train_me");
+      const { billingStorage: billingStorage3 } = await Promise.resolve().then(() => (init_storage_billing(), storage_billing_exports));
+      const trainMePurchase = await billingStorage3.getActiveAddonPurchase(userId, "train_me");
       if (trainMePurchase) {
         const now = /* @__PURE__ */ new Date();
         const expiryDate = trainMePurchase.endDate;
@@ -39340,7 +39917,7 @@ Provide a helpful, concise answer (2-4 paragraphs max).` }
           source: "purchase"
         });
       }
-      const enterpriseAssignment = await billingStorage4.getEnterpriseAssignmentByUser(userId);
+      const enterpriseAssignment = await billingStorage3.getEnterpriseAssignmentByUser(userId);
       if (enterpriseAssignment?.trainMeEnabled) {
         return res.json({
           active: true,
@@ -39479,6 +40056,27 @@ Provide a helpful, concise answer (2-4 paragraphs max).` }
     } catch (error) {
       console.error("Get documents error:", error);
       res.status(500).json({ error: "Failed to get documents" });
+    }
+  });
+  app2.get("/api/domain-expertise/:id/extraction-progress", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      const documents = await storage.getTrainingDocumentsByDomain(req.params.id, userId);
+      const documentIds = documents.map((d) => d.id);
+      const progress = {};
+      global.extractionProgress = global.extractionProgress || {};
+      for (const docId of documentIds) {
+        if (global.extractionProgress[docId]) {
+          progress[docId] = global.extractionProgress[docId];
+        }
+      }
+      res.json(progress);
+    } catch (error) {
+      console.error("Get extraction progress error:", error);
+      res.status(500).json({ error: "Failed to get extraction progress" });
     }
   });
   app2.post("/api/domain-expertise/:id/documents", authenticateToken, async (req, res) => {
@@ -39623,27 +40221,51 @@ Provide a helpful, concise answer (2-4 paragraphs max).` }
                 metadata: processedMetadata
               });
               const fileSizeInMB = file.size / (1024 * 1024);
-              if (fileSizeInMB < 5) {
-                console.log(`\u{1F4DA} Processing knowledge synchronously for ${file.originalname} (${fileSizeInMB.toFixed(2)}MB)`);
+              console.log(`\u{1F4DA} Queuing async knowledge extraction for ${file.originalname} (${fileSizeInMB.toFixed(2)}MB)`);
+              const extractionId = doc.id;
+              global.extractionProgress = global.extractionProgress || {};
+              global.extractionProgress[extractionId] = {
+                status: "queued",
+                percentage: 0,
+                message: "Queued for extraction...",
+                phase: "queued"
+              };
+              setImmediate(async () => {
                 try {
+                  global.extractionProgress[extractionId] = {
+                    status: "processing",
+                    percentage: 0,
+                    message: "Starting extraction...",
+                    phase: "starting"
+                  };
                   const { processDocumentForKnowledge: processDocumentForKnowledge2 } = await Promise.resolve().then(() => (init_knowledgeExtraction(), knowledgeExtraction_exports));
-                  await processDocumentForKnowledge2(doc, req.params.id, userId);
-                  console.log(`\u2705 Knowledge extraction completed for ${file.originalname}`);
-                } catch (knowledgeError) {
-                  console.error(`\u26A0\uFE0F Knowledge extraction failed for ${file.originalname}:`, knowledgeError.message);
+                  const progressCallback = (progress) => {
+                    global.extractionProgress[extractionId] = {
+                      status: "processing",
+                      ...progress
+                    };
+                  };
+                  await processDocumentForKnowledge2(doc, req.params.id, userId, progressCallback);
+                  global.extractionProgress[extractionId] = {
+                    status: "completed",
+                    percentage: 100,
+                    message: "Extraction complete!",
+                    phase: "complete"
+                  };
+                  console.log(`\u2705 Async knowledge extraction completed for ${file.originalname}`);
+                  setTimeout(() => {
+                    delete global.extractionProgress[extractionId];
+                  }, 3e4);
+                } catch (error) {
+                  console.error(`\u274C Async knowledge extraction failed for ${file.originalname}:`, error.message);
+                  global.extractionProgress[extractionId] = {
+                    status: "failed",
+                    percentage: 0,
+                    message: error.message,
+                    phase: "error"
+                  };
                 }
-              } else {
-                console.log(`\u{1F4DA} Queuing async knowledge extraction for ${file.originalname} (${fileSizeInMB.toFixed(2)}MB)`);
-                setImmediate(async () => {
-                  try {
-                    const { processDocumentForKnowledge: processDocumentForKnowledge2 } = await Promise.resolve().then(() => (init_knowledgeExtraction(), knowledgeExtraction_exports));
-                    await processDocumentForKnowledge2(doc, req.params.id, userId);
-                    console.log(`\u2705 Async knowledge extraction completed for ${file.originalname}`);
-                  } catch (error) {
-                    console.error(`\u274C Async knowledge extraction failed for ${file.originalname}:`, error.message);
-                  }
-                });
-              }
+              });
               results.push(doc);
             } else {
               const doc = await storage.createTrainingDocument({
@@ -39976,13 +40598,15 @@ Provide a helpful, concise answer (2-4 paragraphs max).` }
       });
       setImmediate(async () => {
         try {
+          console.log(`\u{1F680} Starting knowledge rebuild for domain ${req.params.id}, force=${forceFullRebuild}`);
           const { rebuildKnowledgeBase: rebuildKnowledgeBase2 } = await Promise.resolve().then(() => (init_knowledgeExtraction(), knowledgeExtraction_exports));
           const result = await rebuildKnowledgeBase2(req.params.id, userId, forceFullRebuild);
-          console.log(`\u{1F4DA} Knowledge base updated: ${result.newEntriesAdded} new entries created`);
+          console.log(`\u2705 Knowledge base updated: ${result.newEntriesAdded} new entries created, ${result.duplicatesSkipped} duplicates skipped`);
           const { invalidateTrainingContextCache: invalidateTrainingContextCache2 } = await Promise.resolve().then(() => (init_openai(), openai_exports));
           invalidateTrainingContextCache2(userId);
         } catch (error) {
-          console.error("Knowledge base rebuild error:", error.message);
+          console.error("\u274C Knowledge base rebuild error:", error.message);
+          console.error("Stack trace:", error.stack);
         }
       });
     } catch (error) {
@@ -40063,6 +40687,106 @@ Provide a helpful, concise answer (2-4 paragraphs max).` }
   registerBibleRoutes(app2);
   app2.use("/api/download", routes_api_docs_default);
   app2.use(routes_recordings_default);
+  const feedbackSubmitSchema = z11.object({
+    category: z11.enum(["bug_report", "feature_request", "improvement", "general", "performance", "ui_ux"]),
+    subject: z11.string().min(1).max(255),
+    message: z11.string().min(1),
+    priority: z11.enum(["low", "medium", "high"]).default("medium"),
+    page: z11.string().max(255).optional(),
+    userPhone: z11.string().max(20).optional(),
+    screenshotUrl: z11.string().optional()
+  });
+  app2.post("/api/feedback", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      const validated = feedbackSubmitSchema.parse(req.body);
+      const feedback = await db.insert(userFeedback).values({
+        userId,
+        category: validated.category,
+        subject: validated.subject,
+        message: validated.message,
+        priority: validated.priority,
+        page: validated.page,
+        userPhone: validated.userPhone,
+        screenshotUrl: validated.screenshotUrl,
+        status: "open"
+      }).returning();
+      console.log(`\u{1F4DD} Feedback submitted by user ${userId}: ${validated.subject}`);
+      res.json({ success: true, data: feedback[0] });
+    } catch (error) {
+      console.error("Submit feedback error:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Invalid feedback data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to submit feedback" });
+    }
+  });
+  app2.get("/api/feedback", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      const feedbackList = await db.select().from(userFeedback).where(eq24(userFeedback.userId, userId)).orderBy(desc14(userFeedback.createdAt));
+      res.json({ success: true, data: feedbackList });
+    } catch (error) {
+      console.error("Get feedback error:", error);
+      res.status(500).json({ error: "Failed to retrieve feedback" });
+    }
+  });
+  app2.get("/api/admin/feedback", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      const user = await authStorage.getUserById(userId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const { status, category } = req.query;
+      let query = db.select().from(userFeedback);
+      if (status) {
+        query = query.where(eq24(userFeedback.status, status));
+      }
+      if (category) {
+        query = query.where(eq24(userFeedback.category, category));
+      }
+      const feedbackList = await query.orderBy(desc14(userFeedback.createdAt));
+      res.json({ success: true, data: feedbackList });
+    } catch (error) {
+      console.error("Admin get feedback error:", error);
+      res.status(500).json({ error: "Failed to retrieve feedback" });
+    }
+  });
+  app2.patch("/api/admin/feedback/:id", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      const user = await authStorage.getUserById(userId);
+      if (!user || user.role !== "admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const { status, adminNotes } = req.body;
+      const updates = { updatedAt: /* @__PURE__ */ new Date() };
+      if (status) updates.status = status;
+      if (adminNotes !== void 0) updates.adminNotes = adminNotes;
+      const updated = await db.update(userFeedback).set(updates).where(eq24(userFeedback.id, req.params.id)).returning();
+      if (!updated.length) {
+        return res.status(404).json({ error: "Feedback not found" });
+      }
+      res.json({ success: true, data: updated[0] });
+    } catch (error) {
+      console.error("Admin update feedback error:", error);
+      res.status(500).json({ error: "Failed to update feedback" });
+    }
+  });
+  console.log("\u{1F4AC} Feedback routes registered");
   const httpServer = createServer(app2);
   setupTranscriptionRoutes(httpServer);
   return httpServer;
@@ -40985,8 +41709,8 @@ import "dotenv/config";
 var AUTO_REBUILD_COOLDOWN = 5 * 60 * 1e3;
 var app = express3();
 app.set("trust proxy", true);
-app.use(express3.json());
-app.use(express3.urlencoded({ extended: false }));
+app.use(express3.json({ limit: "50mb" }));
+app.use(express3.urlencoded({ extended: false, limit: "50mb" }));
 app.use((req, res, next) => {
   const host = req.get("host") || "";
   if (host.startsWith("www.")) {

@@ -100,7 +100,7 @@ export class CashfreeAdapter implements IPaymentGateway {
       
       const request: CreateOrderRequest = {
         order_amount: options.amount,
-        order_currency: options.currency || "INR",
+        order_currency: options.currency || "USD",
         order_id: orderId,
         customer_details: {
           customer_id: options.metadata?.userId || `cust_${Date.now()}`,
@@ -144,7 +144,7 @@ export class CashfreeAdapter implements IPaymentGateway {
       return {
         orderId: order.order_id || orderId,
         amount: options.amount,
-        currency: order.order_currency || options.currency || "INR",
+        currency: order.order_currency || options.currency || "USD",
         status: order.order_status || "ACTIVE",
         providerOrderId: order.order_id || orderId,
         paymentSessionId: order.payment_session_id,
@@ -197,7 +197,7 @@ export class CashfreeAdapter implements IPaymentGateway {
         paymentId: payment.cf_payment_id?.toString() || options.paymentId,
         orderId: payment.order_id,
         amount: payment.payment_amount || 0,
-        currency: payment.payment_currency || "INR",
+        currency: payment.payment_currency || "USD",
         status: payment.payment_status || "UNKNOWN",
         providerPaymentId: payment.cf_payment_id?.toString() || options.paymentId,
         method: payment.payment_group || undefined,
@@ -236,7 +236,7 @@ export class CashfreeAdapter implements IPaymentGateway {
         refundId: refund.refund_id || refundId,
         paymentId: options.paymentId,
         amount: refund.refund_amount || options.amount || 0,
-        currency: refund.refund_currency || "INR",
+        currency: refund.refund_currency || "USD",
         status: refund.refund_status || "pending",
         providerRefundId: refund.cf_refund_id?.toString() || refundId,
         reason: options.reason,
@@ -287,7 +287,7 @@ export class CashfreeAdapter implements IPaymentGateway {
         paymentId: order.order_id || paymentId,
         status: order.order_status || "UNKNOWN",
         amount: order.order_amount || 0,
-        currency: order.order_currency || "INR",
+        currency: order.order_currency || "USD",
         method: undefined,
         errorCode: undefined,
         errorDescription: undefined,

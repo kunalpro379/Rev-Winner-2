@@ -411,7 +411,7 @@ export const addons = pgTable("addons", {
   billingInterval: varchar("billing_interval", { length: 20 }), // 'one-time', 'monthly', etc. (null for usage_bundle)
   pricingTiers: jsonb("pricing_tiers"), // For usage_bundle: [{ minutes: 500, price: '6', currency: 'USD' }]
   flatPrice: varchar("flat_price", { length: 20 }), // For service type
-  currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+  currency: varchar("currency", { length: 10 }).notNull().default("USD"),
   features: jsonb("features").default([]),
   metadata: jsonb("metadata").default({}), // Additional data, Razorpay IDs, etc.
   isActive: boolean("is_active").default(true),
@@ -426,7 +426,7 @@ export const subscriptionPlans = pgTable("subscription_plans", {
   name: varchar("name", { length: 100 }).notNull(),
   price: varchar("price", { length: 20 }).notNull(), // Store as string to avoid precision issues
   listedPrice: varchar("listed_price", { length: 20 }), // Original/regular price (for showing strikethrough)
-  currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+  currency: varchar("currency", { length: 10 }).notNull().default("USD"),
   billingInterval: varchar("billing_interval", { length: 20 }).notNull(), // '3-years'
   features: jsonb("features").default([]),
   isActive: boolean("is_active").default(true),
@@ -515,7 +515,7 @@ export const payments = pgTable("payments", {
   razorpayPaymentId: varchar("razorpay_payment_id", { length: 255 }),
   razorpaySignature: varchar("razorpay_signature", { length: 500 }),
   amount: varchar("amount", { length: 20 }).notNull(),
-  currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+  currency: varchar("currency", { length: 10 }).notNull().default("USD"),
   status: varchar("status", { length: 20 }).notNull(), // 'pending', 'succeeded', 'failed', 'refunded', 'partially_refunded'
   paymentMethod: varchar("payment_method", { length: 50 }),
   receiptUrl: varchar("receipt_url", { length: 500 }),
@@ -584,7 +584,7 @@ export const sessionMinutesPurchases = pgTable("session_minutes_purchases", {
   razorpayOrderId: varchar("razorpay_order_id", { length: 255 }),
   razorpayPaymentId: varchar("razorpay_payment_id", { length: 255 }),
   amountPaid: varchar("amount_paid", { length: 20 }).notNull(), // In dollars ($6, $12, etc.)
-  currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+  currency: varchar("currency", { length: 10 }).notNull().default("USD"),
   // Refund tracking fields
   refundedAt: timestamp("refunded_at"),
   refundAmount: varchar("refund_amount", { length: 20 }),
@@ -666,7 +666,7 @@ export const licensePackages = pgTable("license_packages", {
   totalSeats: integer("total_seats").notNull(), // Total licenses purchased
   pricePerSeat: varchar("price_per_seat", { length: 20 }).notNull(), // Price per seat (stored as string like other amounts)
   totalAmount: varchar("total_amount", { length: 20 }).notNull(), // Total package cost
-  currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+  currency: varchar("currency", { length: 10 }).notNull().default("USD"),
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(), // Package expiration
   previousPackageId: varchar("previous_package_id", { length: 255 }), // Self-reference FK (will be constrained in DB)
@@ -708,7 +708,7 @@ export const billingAdjustments = pgTable("billing_adjustments", {
   razorpayOrderId: varchar("razorpay_order_id", { length: 255 }),
   razorpayPaymentId: varchar("razorpay_payment_id", { length: 255 }),
   amount: varchar("amount", { length: 20 }).notNull(), // Total charge for this adjustment
-  currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+  currency: varchar("currency", { length: 10 }).notNull().default("USD"),
   status: varchar("status", { length: 20 }).notNull().default("pending"), // 'pending', 'succeeded', 'failed'
   processedAt: timestamp("processed_at"),
   addedBy: varchar("added_by").references(() => authUsers.id), // License manager who initiated
@@ -1205,7 +1205,7 @@ export const refunds = pgTable("refunds", {
   paymentId: varchar("payment_id").references(() => payments.id).notNull(),
   userId: varchar("user_id").references(() => authUsers.id).notNull(),
   amount: varchar("amount", { length: 20 }).notNull(),
-  currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+  currency: varchar("currency", { length: 10 }).notNull().default("USD"),
   reason: text("reason"),
   status: varchar("status", { length: 20 }).notNull().default("pending"), // 'pending', 'processed', 'failed'
   razorpayRefundId: varchar("razorpay_refund_id", { length: 255 }),
@@ -1450,7 +1450,7 @@ export const gatewayTransactions = pgTable("gateway_transactions", {
   transactionType: varchar("transaction_type", { length: 50 }).notNull(), // 'order', 'subscription', 'payment', 'refund'
   status: varchar("status", { length: 50 }).notNull(), // 'pending', 'success', 'failed', 'refunded'
   amount: varchar("amount", { length: 20 }).notNull(),
-  currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+  currency: varchar("currency", { length: 10 }).notNull().default("USD"),
   userId: varchar("user_id").references(() => authUsers.id),
   organizationId: varchar("organization_id").references(() => organizations.id),
   relatedEntity: varchar("related_entity", { length: 50 }), // 'subscription', 'addon_purchase', etc.
@@ -1495,7 +1495,7 @@ export const addonPurchases = pgTable("addon_purchases", {
   
   // Financial
   purchaseAmount: varchar("purchase_amount", { length: 20 }).notNull(),
-  currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+  currency: varchar("currency", { length: 10 }).notNull().default("USD"),
   gatewayTransactionId: varchar("gateway_transaction_id").references(() => gatewayTransactions.id, { onDelete: "set null" }),
   
   // Validity period

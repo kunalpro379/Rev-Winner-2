@@ -3386,60 +3386,82 @@ export class AuthStorage implements IAuthStorage {
   
   // Enterprise dashboard operations
   async getOrganizationOverview(organizationId: string): Promise<OrganizationOverviewDTO> {
-    // Get organization
-    const organization = await this.getOrganizationById(organizationId);
+    // Parallel fetch all data at once to reduce latency
+    const [
+      organization,
+      activePackage,
+      membershipsData,
+      assignmentsData,
+      ownerSubscriptionData
+    ] = await Promise.all([
+      // Get organization
+      this.getOrganizationById(organizationId),
+      
+      // Get active license package
+      this.getActiveLicensePackage(organizationId),
+      
+      // Get members with user details
+      db.select({
+        membership: organizationMemberships,
+        user: authUsers
+      })
+        .from(organizationMemberships)
+        .innerJoin(authUsers, eq(organizationMemberships.userId, authUsers.id))
+        .where(eq(organizationMemberships.organizationId, organizationId)),
+      
+      // Get assignments with user details (we'll filter by package later)
+      db.select({
+        assignment: licenseAssignments,
+        user: authUsers,
+        package: licensePackages
+      })
+        .from(licenseAssignments)
+        .innerJoin(authUsers, eq(licenseAssignments.userId, authUsers.id))
+        .innerJoin(licensePackages, eq(licenseAssignments.licensePackageId, licensePackages.id))
+        .where(eq(licensePackages.organizationId, organizationId)),
+      
+      // Get owner's subscription in parallel
+      (async () => {
+        const org = await this.getOrganizationById(organizationId);
+        if (!org?.primaryManagerId) return null;
+        
+        const [ownerSubscription] = await db.select({
+          subscription: subscriptions,
+          plan: subscriptionPlans
+        })
+          .from(subscriptions)
+          .leftJoin(subscriptionPlans, eq(subscriptions.planId, subscriptionPlans.id))
+          .where(eq(subscriptions.userId, org.primaryManagerId))
+          .limit(1);
+        
+        return ownerSubscription;
+      })()
+    ]);
+    
     if (!organization) {
       throw new Error('Organization not found');
     }
     
-    // Get active license package
-    const activePackage = await this.getActiveLicensePackage(organizationId);
-    
-    // Get organization owner's subscription details with proper DTO
+    // Process subscription DTO
     let subscriptionDTO: OrganizationSubscriptionDTO | null = null;
-    const addonsDTO: OrganizationAddonDTO[] = [];
-    
-    if (organization.primaryManagerId) {
-      // Get owner's subscription (platform access)
-      const [ownerSubscription] = await db.select()
-        .from(subscriptions)
-        .where(eq(subscriptions.userId, organization.primaryManagerId))
-        .limit(1);
-      
-      if (ownerSubscription && ownerSubscription.planId) {
-        // Get subscription plan details
-        const [plan] = await db.select()
-          .from(subscriptionPlans)
-          .where(eq(subscriptionPlans.id, ownerSubscription.planId))
-          .limit(1);
-        
-        // Create properly typed DTO with ISO string dates (return null for missing createdAt)
-        subscriptionDTO = {
-          id: ownerSubscription.id,
-          planId: ownerSubscription.planId,
-          plan: plan ? {
-            id: plan.id,
-            name: plan.name,
-            billingInterval: plan.billingInterval,
-            price: plan.price
-          } : null,
-          status: ownerSubscription.status,
-          createdAt: ownerSubscription.createdAt ? new Date(ownerSubscription.createdAt).toISOString() : null,
-          currentPeriodStart: ownerSubscription.currentPeriodStart ? new Date(ownerSubscription.currentPeriodStart).toISOString() : null,
-          currentPeriodEnd: ownerSubscription.currentPeriodEnd ? new Date(ownerSubscription.currentPeriodEnd).toISOString() : null,
-        };
-      }
+    if (ownerSubscriptionData?.subscription && ownerSubscriptionData.subscription.planId) {
+      subscriptionDTO = {
+        id: ownerSubscriptionData.subscription.id,
+        planId: ownerSubscriptionData.subscription.planId,
+        plan: ownerSubscriptionData.plan ? {
+          id: ownerSubscriptionData.plan.id,
+          name: ownerSubscriptionData.plan.name,
+          billingInterval: ownerSubscriptionData.plan.billingInterval,
+          price: ownerSubscriptionData.plan.price
+        } : null,
+        status: ownerSubscriptionData.subscription.status,
+        createdAt: ownerSubscriptionData.subscription.createdAt ? new Date(ownerSubscriptionData.subscription.createdAt).toISOString() : null,
+        currentPeriodStart: ownerSubscriptionData.subscription.currentPeriodStart ? new Date(ownerSubscriptionData.subscription.currentPeriodStart).toISOString() : null,
+        currentPeriodEnd: ownerSubscriptionData.subscription.currentPeriodEnd ? new Date(ownerSubscriptionData.subscription.currentPeriodEnd).toISOString() : null,
+      };
     }
     
-    // Get members with user details
-    const membershipsData = await db.select({
-      membership: organizationMemberships,
-      user: authUsers
-    })
-      .from(organizationMemberships)
-      .innerJoin(authUsers, eq(organizationMemberships.userId, authUsers.id))
-      .where(eq(organizationMemberships.organizationId, organizationId));
-    
+    // Process members DTO
     const membersDTO: OrganizationMembershipDTO[] = membershipsData.map(row => ({
       id: row.membership.id,
       organizationId: row.membership.organizationId,
@@ -3456,22 +3478,19 @@ export class AuthStorage implements IAuthStorage {
       }
     }));
     
-    // Get assignments with user details if there's an active package
+    // Process assignments DTO - filter by active package
     let assignmentsDTO: LicenseAssignmentDTO[] = [];
     let totalSeats = 0;
     let assignedSeats = 0;
     let availableSeats = 0;
     
     if (activePackage) {
-      const assignmentsData = await db.select({
-        assignment: licenseAssignments,
-        user: authUsers
-      })
-        .from(licenseAssignments)
-        .innerJoin(authUsers, eq(licenseAssignments.userId, authUsers.id))
-        .where(eq(licenseAssignments.licensePackageId, activePackage.id));
+      // Filter assignments for the active package
+      const activePackageAssignments = assignmentsData.filter(
+        row => row.assignment.licensePackageId === activePackage.id
+      );
       
-      assignmentsDTO = assignmentsData.map(row => ({
+      assignmentsDTO = activePackageAssignments.map(row => ({
         id: row.assignment.id,
         licensePackageId: row.assignment.licensePackageId,
         userId: row.assignment.userId,
@@ -3503,6 +3522,8 @@ export class AuthStorage implements IAuthStorage {
       createdAt: organization.createdAt ? new Date(organization.createdAt).toISOString() : new Date().toISOString(),
       updatedAt: organization.updatedAt ? new Date(organization.updatedAt).toISOString() : new Date().toISOString(),
     };
+    
+    const addonsDTO: OrganizationAddonDTO[] = [];
     
     return {
       organization: organizationDTO,

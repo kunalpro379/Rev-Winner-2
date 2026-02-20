@@ -101,6 +101,11 @@ export default function Checkout() {
   const gatewayLoaded = locationDetected && (isDomestic ? razorpayLoaded : cashfreeLoaded);
   const gatewayName = isDomestic ? "Razorpay" : "Cashfree";
 
+  // Cart pricing helpers
+  const cartTotal = cart?.total || 0;
+  const isFreeOrder = cartTotal <= 0.01; // Match server-side free threshold
+  const displayTotal = isFreeOrder ? 0 : Math.max(cartTotal, 1);
+
   // Check if user is authenticated
   const { data: authData, isLoading: authLoading } = useQuery({
     queryKey: ['/api/auth/me'],
@@ -120,7 +125,9 @@ export default function Checkout() {
   }
 
   const handlePayment = async () => {
-    if (!gatewayLoaded) {
+    // For regular payments, ensure gateway is ready before proceeding.
+    // For 100% discount / free orders, skip gateway checks entirely.
+    if (!isFreeOrder && !gatewayLoaded) {
       toast({
         title: "Payment Gateway Loading",
         description: `Please wait while we load ${gatewayName}...`,
@@ -160,6 +167,26 @@ export default function Checkout() {
       }
 
       const checkoutData = await response.json();
+
+      // Handle 100% discount / free orders (no payment gateway)
+      if (checkoutData.freeOrder) {
+        const { orderId } = checkoutData;
+
+        // Invalidate subscription and cart queries to reflect updated state
+        await queryClient.invalidateQueries({ queryKey: ["/api/profile/subscription"] });
+        await queryClient.invalidateQueries({ queryKey: ["/api/subscriptions/current"] });
+        await queryClient.invalidateQueries({ queryKey: ["/api/subscriptions/check-limits"] });
+        await queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
+
+        toast({
+          title: "Order Completed",
+          description: "Your 100% discount order has been activated. No payment was required.",
+        });
+        setIsProcessing(false);
+        setLocation(`/invoice?orderId=${orderId}`);
+        return;
+      }
+
       const { orderId, amount, currency, gateway } = checkoutData;
 
       if (gateway === 'razorpay') {
@@ -479,32 +506,34 @@ export default function Checkout() {
                 <Separator className="bg-white/20" />
                 <div className="flex justify-between text-lg sm:text-xl font-bold text-white">
                   <span>Total</span>
-                  <span>${Math.max(cart?.total || 0, 1).toFixed(2)} USD</span>
+                  <span>${displayTotal.toFixed(2)} USD</span>
                 </div>
-                {(cart?.total || 0) > 0 && (cart?.total || 0) < 1 && (
+                {!isFreeOrder && cartTotal > 0 && cartTotal < 1 && (
                   <div className="text-xs text-amber-300 mt-1">
                     * Minimum transaction amount is $1.00 USD
                   </div>
                 )}
               </div>
 
-              <div className="pt-3 sm:pt-4 space-y-2 sm:space-y-3">
-                <div className="flex items-center gap-2 text-xs sm:text-sm text-purple-100">
-                  <Lock className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span>Secured by {gatewayName}</span>
+              {!isFreeOrder && (
+                <div className="pt-3 sm:pt-4 space-y-2 sm:space-y-3">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm text-purple-100">
+                    <Lock className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>Secured by {gatewayName}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs sm:text-sm text-purple-100">
+                    <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span>SSL encrypted payment</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-xs sm:text-sm text-purple-100">
-                  <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-                  <span>SSL encrypted payment</span>
-                </div>
-              </div>
+              )}
             </CardContent>
             <CardFooter className="flex flex-col gap-3 sm:gap-4 p-4 sm:p-6">
               <Button 
                 className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-sm sm:text-base"
                 size="lg"
                 onClick={handlePayment}
-                disabled={isProcessing || !locationDetected || !gatewayLoaded}
+                disabled={isProcessing || (!isFreeOrder && (!locationDetected || !gatewayLoaded))}
                 data-testid="button-pay-now"
               >
                 {isProcessing ? (
@@ -512,6 +541,11 @@ export default function Checkout() {
                     <Loader2 className="mr-2 h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
                     <span className="hidden sm:inline">Processing...</span>
                     <span className="sm:hidden">Processing</span>
+                  </>
+                ) : isFreeOrder ? (
+                  <>
+                    <CheckCircle className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                    Complete Order (100% Off)
                   </>
                 ) : !locationDetected ? (
                   <>
@@ -528,7 +562,7 @@ export default function Checkout() {
                 ) : (
                   <>
                     <CreditCard className="mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                    Pay ${Math.max(cart?.total || 0, 1).toFixed(2)} USD
+                    Pay ${displayTotal.toFixed(2)} USD
                   </>
                 )}
               </Button>

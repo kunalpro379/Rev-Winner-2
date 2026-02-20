@@ -72,9 +72,10 @@ export function FeedbackDialog() {
   const [location] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: authData } = useQuery<any>({
+  const { data: authData, isLoading: isAuthLoading } = useQuery<any>({
     queryKey: ['/api/auth/me'],
     retry: false,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   const userName = authData?.user
@@ -86,6 +87,7 @@ export function FeedbackDialog() {
   const { data: feedbackHistory, isLoading: isLoadingHistory } = useQuery<{ success: boolean; data: FeedbackItem[] }>({
     queryKey: ['/api/feedback'],
     enabled: open && activeTab === "history" && !!authData,
+    staleTime: 30 * 1000, // Cache for 30 seconds
   });
 
   const handleScreenshotCapture = useCallback(() => {
@@ -127,7 +129,7 @@ export function FeedbackDialog() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest('POST', '/api/feedback', {
+      const response = await apiRequest('POST', '/api/feedback', {
         category,
         subject,
         message,
@@ -136,6 +138,7 @@ export function FeedbackDialog() {
         userPhone: userPhone || undefined,
         screenshotUrl: screenshotData || undefined,
       });
+      return await response.json();
     },
     onSuccess: (data) => {
       if (data.success) {
@@ -152,13 +155,21 @@ export function FeedbackDialog() {
           setPriority("medium");
           setScreenshotData(null);
           setSubmitted(false);
+          setActiveTab("history"); // Switch to history tab to show the submitted feedback
         }, 2000);
+      } else {
+        toast({
+          title: "Submission Failed",
+          description: data.error || "Could not submit your feedback. Please try again.",
+          variant: "destructive",
+        });
       }
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Feedback submission error:", error);
       toast({
         title: "Submission Failed",
-        description: "Could not submit your feedback. Please try again.",
+        description: error.message || "Could not submit your feedback. Please try again.",
         variant: "destructive",
       });
     },
@@ -179,6 +190,7 @@ export function FeedbackDialog() {
   const isSubmitting = submitMutation.isPending;
   const canSubmit = category && subject.trim() && message.trim() && !isSubmitting;
 
+  if (isAuthLoading) return null; // Don't show button while checking auth
   if (!authData) return null;
 
   return (
@@ -444,12 +456,13 @@ export function FeedbackDialog() {
 }
 
 export function FloatingFeedbackButton() {
-  const { data: authData } = useQuery<any>({
+  const { data: authData, isLoading: isAuthLoading } = useQuery<any>({
     queryKey: ['/api/auth/me'],
     retry: false,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
-  if (!authData) return null;
+  if (!authData || isAuthLoading) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-40">

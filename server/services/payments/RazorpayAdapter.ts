@@ -64,7 +64,7 @@ export class RazorpayAdapter implements IPaymentGateway {
     try {
       // Razorpay expects amount in smallest currency unit (paise for INR, cents for USD)
       const amountInSmallestUnit = Math.round(options.amount * 100);
-      const currency = options.currency || "INR";
+      const currency = options.currency || "USD";
       
       console.log(`[Razorpay] Creating order: amount=${amountInSmallestUnit}, currency=${currency}, receipt=${options.receipt}`);
 
@@ -103,7 +103,7 @@ export class RazorpayAdapter implements IPaymentGateway {
       }
       
       if (error.error?.description?.includes('currency') || error.error?.code === 'BAD_REQUEST_CURRENCY') {
-        throw new Error(`Currency ${options.currency || "INR"} is not supported by your Razorpay account. Please use INR or enable USD in your Razorpay dashboard.`);
+        throw new Error(`Currency ${options.currency || "USD"} is not supported by your Razorpay account. Please enable USD in your Razorpay dashboard.`);
       }
       
       throw new Error(`Failed to create Razorpay order: ${error.error?.description || error.message || 'Unknown error'}`);
@@ -218,7 +218,7 @@ export class RazorpayAdapter implements IPaymentGateway {
         refundId: refund.id,
         paymentId: options.paymentId,
         amount: (refund.amount || 0) / 100,
-        currency: refund.currency || "INR",
+        currency: refund.currency || "USD",
         status: refund.status || "pending",
         providerRefundId: refund.id,
         reason: options.reason,

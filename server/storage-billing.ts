@@ -1027,6 +1027,7 @@ export class BillingStorage implements IBillingStorage {
       // Allow this promo on any item
     } else {
       // Map addon types to promo categories
+      // For 'service' type, we need to check the actual addon to determine if it's DAI or Train Me
       const categoryMap: Record<string, string> = {
         'platform_access': 'platform_subscription',
         'platform_subscription': 'platform_subscription',
@@ -1034,14 +1035,27 @@ export class BillingStorage implements IBillingStorage {
         'usage_bundle': 'session_minutes',
         'train_me': 'train_me',
         'dai': 'dai',
-        'service': 'train_me', // Map service to train_me (Train Me purchases are categorized as service)
       };
 
-      const itemCategory = categoryMap[item.addonType] || item.addonType;
+      let itemCategory = categoryMap[item.addonType] || item.addonType;
+      
+      // Special handling for 'service' type - check package name to determine if it's DAI or Train Me
+      if (item.addonType === 'service') {
+        const packageName = (item.packageName || '').toLowerCase();
+        if (packageName.includes('dai')) {
+          itemCategory = 'dai';
+        } else if (packageName.includes('train me')) {
+          itemCategory = 'train_me';
+        } else {
+          // Default to train_me for other service items
+          itemCategory = 'train_me';
+        }
+      }
+      
       const promoCategory = categoryMap[promo.category] || promo.category;
       
       if (promoCategory !== itemCategory) {
-        console.log(`⚠️ Promo category mismatch: promo.category="${promo.category}" (mapped: "${promoCategory}"), itemCategory="${itemCategory}", addonType="${item.addonType}"`);
+        console.log(`⚠️ Promo category mismatch: promo.category="${promo.category}" (mapped: "${promoCategory}"), itemCategory="${itemCategory}", addonType="${item.addonType}", packageName="${item.packageName}"`);
         
         // Provide user-friendly category names in error message
         const categoryNames: Record<string, string> = {
@@ -1184,8 +1198,9 @@ export class BillingStorage implements IBillingStorage {
       return sum;
     }, 0);
 
-    // Calculate GST (18%) on discounted amount
-    const GST_RATE = 0.18;
+    // Calculate GST - Only for INR, not for USD
+    const currency = items[0]?.currency || 'USD';
+    const GST_RATE = currency === 'INR' ? 0.18 : 0; // 18% GST for INR, 0% for USD
     const gstAmount = (subtotal - discount) * GST_RATE;
 
     // Calculate total
@@ -1197,7 +1212,7 @@ export class BillingStorage implements IBillingStorage {
       gstAmount,
       discount,
       total,
-      currency: items[0].currency, // Assuming all items have the same currency
+      currency: currency,
       itemCount: items.length,
     };
   }

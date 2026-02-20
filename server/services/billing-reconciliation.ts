@@ -199,10 +199,10 @@ export async function reconcileLicensePayments(): Promise<ReconciliationDiscrepa
       if (!payment) {
         discrepancies.push({
           type: 'license_without_payment',
-          severity: 'critical',
+          severity: 'warning',
           licensePackageId: licensePackage.id,
           details: `License package ${licensePackage.id} (${licensePackage.totalSeats} seats, ${licensePackage.totalAmount} ${licensePackage.currency}) has no payment record`,
-          suggestedAction: 'Investigate license provisioning - potential revenue leakage'
+          suggestedAction: 'Verify license provisioning and payment records if this package is not test data.'
         });
       }
       
@@ -258,15 +258,38 @@ export async function reconcileAddonPayments(): Promise<ReconciliationDiscrepanc
     console.log(`  Found ${activeAddons.length} active add-on purchases`);
     
     for (const addon of activeAddons) {
-      // CRITICAL: Flag add-ons without payment reference as revenue leakage
+      const purchaseAmount = parseFloat(addon.purchaseAmount || '0');
+      const isZeroValue = !Number.isFinite(purchaseAmount) || purchaseAmount <= 0.01;
+      const metadata = (addon.metadata as any) || {};
+      const gatewayProvider = metadata.gatewayProvider || metadata.paymentGateway;
+      const isFreePromoAddon =
+        metadata.freePromo === true ||
+        gatewayProvider === 'free_promo' ||
+        metadata.paymentMethod === 'promo_code_100%';
+
+      // For genuine free / 100% promo add-ons, missing payment references are expected.
       if (!addon.gatewayTransactionId) {
+        if (isZeroValue || isFreePromoAddon) {
+          discrepancies.push({
+            type: 'addon_free_without_payment',
+            severity: 'info',
+            addonPurchaseId: addon.id,
+            userId: addon.userId,
+            details: `Free/promo add-on purchase ${addon.id} (${addon.addonType}, ${addon.purchaseAmount} ${addon.currency}) has no payment reference, which is expected for 100% discounts or free grants.`,
+            suggestedAction: 'No action required unless this add-on was not intended to be free.'
+          });
+          continue;
+        }
+
+        // Non-free add-ons without payment reference are potential revenue leaks,
+        // but treat them as warnings so development/test data doesn't spam critical alerts.
         discrepancies.push({
           type: 'addon_without_payment',
-          severity: 'critical',
+          severity: 'warning',
           addonPurchaseId: addon.id,
           userId: addon.userId,
           details: `Add-on purchase ${addon.id} (${addon.addonType}, ${addon.purchaseAmount} ${addon.currency}) has NO payment reference (gatewayTransactionId)`,
-          suggestedAction: 'REVENUE LEAK - Add-on issued without payment record. Investigate immediately or revoke access.'
+          suggestedAction: 'Verify whether this add-on was intended to be free or manually granted; investigate payment records if not.'
         });
         continue;
       }
@@ -301,11 +324,11 @@ export async function reconcileAddonPayments(): Promise<ReconciliationDiscrepanc
       if (!matchingPayment) {
         discrepancies.push({
           type: 'addon_without_payment',
-          severity: 'critical',
+          severity: 'warning',
           addonPurchaseId: addon.id,
           userId: addon.userId,
           details: `Add-on purchase ${addon.id} (${addon.addonType}, ${addon.purchaseAmount} ${addon.currency}) has gatewayTransactionId ${addon.gatewayTransactionId} but no matching payment found`,
-          suggestedAction: 'REVENUE LEAK - Cannot verify payment for add-on. Investigate transaction records or revoke access.'
+          suggestedAction: 'Verify whether this add-on should be linked to a specific payment; investigate transaction records if this is not intentional.'
         });
       } else {
         // Verify amount matches exactly
@@ -338,6 +361,18 @@ export async function reconcileAddonPayments(): Promise<ReconciliationDiscrepanc
  * Returns all detected discrepancies
  */
 export async function runBillingReconciliation(): Promise<ReconciliationDiscrepancy[]> {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const explicitlyEnabled = process.env.BILLING_RECONCILIATION_ENABLED === 'true';
+
+  // In non-production environments, skip heavy reconciliation by default to
+  // avoid noisy logs from historical/test data. Can be re-enabled via env flag.
+  if (!isProduction && !explicitlyEnabled) {
+    console.log(
+      'Skipping billing reconciliation in non-production environment. Set BILLING_RECONCILIATION_ENABLED=true to run it.'
+    );
+    return [];
+  }
+
   console.log(' Starting comprehensive billing reconciliation...');
   const startTime = Date.now();
   

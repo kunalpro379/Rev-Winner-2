@@ -49,6 +49,7 @@ export default function LicenseManager() {
   const [reassignNotes, setReassignNotes] = useState("");
   const [additionalSeats, setAdditionalSeats] = useState("");
   const [activeTab, setActiveTab] = useState("assignments");
+  const [resendTargetId, setResendTargetId] = useState<string | null>(null);
 
   // Check authentication first - API returns { user, subscription }
   const { data: authResponse, isLoading: userLoading, error: userError } = useQuery<AuthResponse>({
@@ -61,8 +62,10 @@ export default function LicenseManager() {
   // Fetch organization overview only if authenticated
   const { data: overview, isLoading, error, refetch } = useQuery<OrganizationOverviewDTO>({
     queryKey: ["/api/enterprise/overview"],
-    retry: false,
-    enabled: !!user
+    retry: 1, // Retry once in case data is still being created
+    retryDelay: 1000, // Wait 1 second before retry
+    enabled: !!user,
+    refetchOnMount: 'always', // Always refetch when component mounts to get fresh data
   });
 
   // ALL MUTATIONS MUST BE DECLARED BEFORE ANY CONDITIONAL RETURNS (React Rules of Hooks)
@@ -144,18 +147,21 @@ export default function LicenseManager() {
     mutationFn: async (assignmentId: string) => {
       return await apiRequest("POST", "/api/enterprise/resend-email", { assignmentId });
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: any, variables: string) => {
       toast({
         title: "Email Sent",
         description: data.message || "Access email has been resent. Please check spam folder."
       });
     },
-    onError: (error: any) => {
+    onError: (error: any, variables: string) => {
       toast({
         title: "Email Failed",
         description: error.message || "Failed to send email. Please try again.",
         variant: "destructive"
       });
+    },
+    onSettled: () => {
+      setResendTargetId(null);
     }
   });
 
@@ -300,6 +306,23 @@ export default function LicenseManager() {
       setLocation("/login");
     }
   }, [user, userLoading, userError, setLocation, toast]);
+
+  // Refetch data when coming from payment success
+  useEffect(() => {
+    if (user && !isLoading) {
+      // Check if we're coming from a payment redirect
+      const urlParams = new URLSearchParams(window.location.search);
+      const fromPayment = urlParams.get('fromPayment');
+      
+      if (fromPayment === 'true') {
+        // Clear the URL parameter
+        window.history.replaceState({}, '', '/license-manager');
+        
+        // Force refetch to get the latest data
+        refetch();
+      }
+    }
+  }, [user, isLoading, refetch]);
 
   // Show error if user doesn't have license_manager role AND is not a super user
   if (user && user.role !== 'license_manager' && !user.superUser && !isLoading) {
@@ -966,12 +989,17 @@ export default function LicenseManager() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => resendEmailMutation.mutate(assignment.id)}
-                                  disabled={resendEmailMutation.isPending}
+                                  onClick={() => {
+                                    setResendTargetId(assignment.id);
+                                    resendEmailMutation.mutate(assignment.id);
+                                  }}
+                                  disabled={resendEmailMutation.isPending && resendTargetId === assignment.id}
                                   data-testid={`button-resend-email-${assignment.id}`}
                                 >
                                   <Mail className="h-4 w-4 mr-1" />
-                                  {resendEmailMutation.isPending ? "Sending..." : "Resend Email"}
+                                  {resendEmailMutation.isPending && resendTargetId === assignment.id
+                                    ? "Sending..."
+                                    : "Resend Email"}
                                 </Button>
                                 {assignment.userId !== user?.id && (
                                   <Button
