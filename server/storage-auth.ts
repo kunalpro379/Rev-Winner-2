@@ -759,8 +759,11 @@ export class AuthStorage implements IAuthStorage {
     currentPeriodStart?: Date;
     currentPeriodEnd?: Date;
   }): Promise<Subscription> {
+    // Free trial has no row in subscription_plans; keep planId null to satisfy FK
+    const planId = (data.planType === 'free_trial' || data.planId === 'free_trial') ? null : data.planId;
     const [subscription] = await db.insert(subscriptions).values({
       ...data,
+      planId,
       planType: data.planType || 'free_trial',
       sessionsUsed: data.sessionsUsed || '0',
       // For paid subscriptions, DO NOT set default limits (leave them null for unlimited)
@@ -3523,7 +3526,25 @@ export class AuthStorage implements IAuthStorage {
       updatedAt: organization.updatedAt ? new Date(organization.updatedAt).toISOString() : new Date().toISOString(),
     };
     
-    const addonsDTO: OrganizationAddonDTO[] = [];
+    // Fetch organization add-ons (session minutes, train_me, dai) for license manager view
+    const orgAddons = await this.getOrganizationAddons(organizationId);
+    const addonDisplayName = (type: string, slug: string) =>
+      type === 'session_minutes' ? 'Session Minutes' : type === 'train_me' ? 'Train Me' : type === 'dai' ? 'DAI' : type === 'platform_access' ? 'Platform Access' : slug;
+    const addonsDTO: OrganizationAddonDTO[] = orgAddons.map(a => ({
+      id: a.id,
+      displayName: a.displayName && a.displayName !== a.slug ? a.displayName : addonDisplayName(a.type, a.slug),
+      status: a.status,
+      startDate: a.startDate,
+      endDate: a.endDate ?? a.renewalDate ?? null,
+      details: {
+        type: a.type,
+        totalUnits: a.totalUnits,
+        usedUnits: a.usedUnits,
+        totalPrice: a.totalPrice,
+        currency: a.currency,
+        description: a.type === 'session_minutes' ? `${a.totalUnits} minutes (${a.usedUnits} used)` : a.type === 'train_me' ? 'Train Me add-on' : a.type === 'dai' ? 'DAI tokens' : a.slug,
+      },
+    }));
     
     return {
       organization: organizationDTO,

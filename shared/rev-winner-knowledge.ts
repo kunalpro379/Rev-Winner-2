@@ -17,7 +17,7 @@ Rev Winner is an enterprise-grade, AI-powered sales assistant platform designed 
 ### 1. REAL-TIME LIVE TRANSCRIPTION
 - **Accuracy:** 48kHz high-quality audio capture with Deepgram's nova-2-general model
 - **Multi-Speaker Detection:** Automatic speaker diarization identifies and labels multiple speakers
-- **Dual Audio Sources:** Captures both microphone and meeting audio (Google Meet, Zoom, Webex)
+- **Dual Audiao Sources:** Captures both microphone and meeting audio (Google Meet, Zoom, Webex)
 - **Smart Formatting:** Automatic punctuation, number conversion, and sentence structure
 - **Voice Activity Detection:** Intelligent speech detection prevents premature cutoffs
 - **Filler Word Capture:** Natural transcription including "um," "uh" for authentic conversation flow

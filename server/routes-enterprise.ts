@@ -24,9 +24,18 @@ function getCashfreeMode(): 'sandbox' | 'production' {
 }
 
 // Helper function to get Razorpay key ID based on environment
+// RAZORPAY_MODE takes absolute precedence - if set to LIVE, use LIVE regardless of NODE_ENV
 function getRazorpayKeyId(): string | undefined {
+  // Check RAZORPAY_MODE first - if explicitly set, use it regardless of NODE_ENV
+  if (process.env.RAZORPAY_MODE === 'LIVE' || process.env.RAZORPAY_MODE === 'PRODUCTION') {
+    return process.env.RAZORPAY_LIVE_KEY_ID || process.env.RAZORPAY_KEY_ID;
+  } else if (process.env.RAZORPAY_MODE === 'TEST') {
+    return process.env.RAZORPAY_TEST_KEY_ID || process.env.RAZORPAY_KEY_ID;
+  }
+  
+  // Fallback: auto-detect based on NODE_ENV only if RAZORPAY_MODE is not set
   const isDevelopment = process.env.NODE_ENV === 'development';
-  const razorpayMode = process.env.RAZORPAY_MODE || (isDevelopment ? 'TEST' : 'LIVE');
+  const razorpayMode = isDevelopment ? 'TEST' : 'LIVE';
   
   if (razorpayMode === 'TEST') {
     return process.env.RAZORPAY_TEST_KEY_ID || process.env.RAZORPAY_KEY_ID;
@@ -57,6 +66,19 @@ export function setupEnterpriseRoutes(app: Express) {
     }
   };
   
+  // Lightweight check: does the current user already have an organization (as primary manager)?
+  // Used by enterprise-purchase page to show "Add seats" CTA instead of first-time purchase form.
+  app.get("/api/enterprise/has-organization", authenticateToken, requireAuthenticated, withAuthenticated(async (req, res) => {
+    try {
+      const userId = (req as AuthenticatedRequest).jwtUser.userId;
+      const organization = await authStorage.getOrganizationByManagerId(userId);
+      res.json({ hasOrganization: !!organization });
+    } catch (error: any) {
+      console.error("Error checking has-organization:", error);
+      res.status(500).json({ hasOrganization: false, error: error.message });
+    }
+  }));
+
   // Get organization overview (license manager only)
   app.get("/api/enterprise/overview", authenticateToken, requireAuthenticated, requireLicenseManager, withAuthenticated(async (req, res) => {
     try {
@@ -1224,16 +1246,18 @@ export function setupEnterpriseRoutes(app: Express) {
       const { 
         orderId,
         additionalSeats,
-        licensePackageId
+        licensePackageId,
+        razorpayPaymentId
       } = req.body;
       
       if (!orderId || !additionalSeats || !licensePackageId) {
         return res.status(400).json({ message: "Payment verification details are required" });
       }
       
-      // Verify payment status with payment gateway
+      // Verify payment status with payment gateway (Razorpay expects payment ID pay_xxx, not order ID)
       const paymentGateway = PaymentGatewayFactory.getGateway();
-      const verifyResult = await paymentGateway.getPaymentStatus(orderId);
+      const paymentIdToVerify = razorpayPaymentId || orderId;
+      const verifyResult = await paymentGateway.getPaymentStatus(paymentIdToVerify);
       
       // Check if payment is successful (handle Razorpay status codes)
       const isPaid = verifyResult.status === 'PAID' || 

@@ -25,7 +25,8 @@ const isProductionEnv =
   process.env.NODE_ENV === 'production' ||
   process.env.ENVIRONMENT === 'PROD';
 
-if (isProductionEnv && GMAIL_APP_PASSWORD) {
+// Create transporter whenever Gmail credentials are set (so dev can send real emails too)
+if (GMAIL_APP_PASSWORD) {
   transporter = nodemailer.createTransport({
     service: 'gmail',
     host: 'smtp.gmail.com',
@@ -36,10 +37,17 @@ if (isProductionEnv && GMAIL_APP_PASSWORD) {
       pass: GMAIL_APP_PASSWORD,
     },
   });
+  if (!isProductionEnv) {
+    console.log(
+      'Email SMTP enabled in development (GMAIL_APP_PASSWORD set). Emails will be sent to recipients.'
+    );
+  }
 } else {
-  console.log(
-    'Email SMTP transporter disabled (non-production environment). Emails will be logged to console instead of being sent.'
-  );
+  if (!isProductionEnv) {
+    console.log(
+      'Email SMTP transporter disabled (no GMAIL_APP_PASSWORD). Emails will be logged to console instead of being sent.'
+    );
+  }
 }
 
 export async function sendOTPEmail(email: string, code: string, firstName: string): Promise<void> {

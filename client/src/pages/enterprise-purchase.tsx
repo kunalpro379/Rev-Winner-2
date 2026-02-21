@@ -1,23 +1,34 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { Building2, CreditCard, Users } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Building2, CreditCard, Users, ArrowRight } from "lucide-react";
 
 export default function EnterprisePurchase() {
   const [_, setLocation] = useLocation();
   const { toast } = useToast();
-  
+  const [showAddSeatsBanner, setShowAddSeatsBanner] = useState(false);
+
   const [companyName, setCompanyName] = useState("");
   const [billingEmail, setBillingEmail] = useState("");
   const [packageType, setPackageType] = useState<"monthly" | "annual">("annual");
   const [totalSeats, setTotalSeats] = useState("5");
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const { data: hasOrgData } = useQuery<{ hasOrganization?: boolean }>({
+    queryKey: ["/api/enterprise/has-organization"],
+    retry: false,
+    staleTime: 60_000,
+  });
+  const hasOrganization = hasOrgData?.hasOrganization === true;
+  const showAddSeatsCta = hasOrganization || showAddSeatsBanner;
 
   const pricePerSeat = packageType === "annual" ? 60 : 6;
   const seats = parseInt(totalSeats, 10) || 0;
@@ -163,11 +174,23 @@ export default function EnterprisePurchase() {
         };
       }
     } catch (error: any) {
-      toast({
-        title: "Purchase Failed",
-        description: error.message || "Failed to initiate purchase",
-        variant: "destructive"
-      });
+      const msg = error?.message ?? "";
+      const alreadyHasOrg = msg.includes("You already have an organization");
+      if (alreadyHasOrg) {
+        setShowAddSeatsBanner(true);
+        queryClient.invalidateQueries({ queryKey: ["/api/enterprise/has-organization"] });
+        toast({
+          title: "You already have an organization",
+          description: "Use License Manager → Add Seats to buy more licenses.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Purchase Failed",
+          description: msg || "Failed to initiate purchase",
+          variant: "destructive"
+        });
+      }
       setIsProcessing(false);
     }
   };
@@ -185,6 +208,24 @@ export default function EnterprisePurchase() {
               Get bulk licenses for your organization with centralized management
             </p>
           </div>
+
+          {/* Already have organization: show Add Seats CTA instead of first-time purchase */}
+          {showAddSeatsCta && (
+            <Alert className="mb-6 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/50" data-testid="alert-add-seats">
+              <AlertTitle className="text-amber-800 dark:text-amber-200">You already have an organization</AlertTitle>
+              <AlertDescription>
+                This page is for creating a new organization. To add more licenses to your existing organization, go to the License Manager and click <strong>Add Seats</strong>.
+              </AlertDescription>
+              <Button
+                className="mt-3"
+                onClick={() => setLocation("/license-manager")}
+                data-testid="button-go-license-manager"
+              >
+                Go to License Manager
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Alert>
+          )}
 
           {/* Pricing Info Cards */}
           <div className="grid md:grid-cols-2 gap-6 mb-8">

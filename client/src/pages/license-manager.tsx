@@ -189,7 +189,9 @@ export default function LicenseManager() {
   // Add seats mutation (creates Razorpay order)
   const addSeatsMutation = useMutation({
     mutationFn: async (seats: number) => {
-      return await apiRequest("POST", "/api/enterprise/add-seats", { additionalSeats: seats });
+      const res = await apiRequest("POST", "/api/enterprise/add-seats", { additionalSeats: seats });
+      const json = await res.json();
+      return json as { success: boolean; orderId: string; razorpayOrderId?: string; razorpayKeyId?: string; gateway?: string; amount: number; currency: string; additionalSeats: number; licensePackageId: string };
     },
     onSuccess: async (data: any) => {
       // Check if Razorpay SDK is available
@@ -197,6 +199,16 @@ export default function LicenseManager() {
         toast({
           title: "Payment Gateway Loading",
           description: "Please wait while we load the payment gateway...",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Razorpay requires key to open checkout; backend must send it when gateway is razorpay
+      if ((data.gateway === "razorpay" || data.razorpayOrderId) && !data.razorpayKeyId) {
+        toast({
+          title: "Order Creation Failed",
+          description: "No key passed. Payment gateway key was not returned. Please contact support.",
           variant: "destructive",
         });
         return;
@@ -1046,62 +1058,84 @@ export default function LicenseManager() {
                     <Package className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
                     <p className="text-muted-foreground">No add-ons purchased yet</p>
                     <p className="text-sm text-muted-foreground mt-2">
-                      Add-ons can be purchased from the Packages page to extend your subscription features.
+                      Purchase Session Minutes, Train Me, or DAI for your organization. Team packages will be linked to this org and all assigned users can use them.
                     </p>
+                    <Button
+                      className="mt-4"
+                      onClick={() => setLocation("/packages?mode=team")}
+                      data-testid="button-browse-packages-addons"
+                    >
+                      <Package className="h-4 w-4 mr-2" />
+                      Browse team packages
+                    </Button>
                   </div>
                 ) : (
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {overview.addons.map((addon) => (
-                      <Card key={addon.id} className="border-2" data-testid={`card-addon-${addon.id}`}>
-                        <CardHeader className="pb-2">
-                          <div className="flex items-center justify-between">
-                            <CardTitle className="text-base font-semibold">
-                              {addon.displayName}
-                            </CardTitle>
-                            <Badge 
-                              variant={addon.status === "active" ? "default" : "secondary"}
-                              data-testid={`badge-addon-status-${addon.id}`}
-                            >
-                              {addon.status}
-                            </Badge>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Calendar className="h-4 w-4" />
-                              <span>Start Date</span>
+                  <>
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {overview.addons.map((addon) => (
+                        <Card key={addon.id} className="border-2" data-testid={`card-addon-${addon.id}`}>
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-base font-semibold">
+                                {addon.displayName}
+                              </CardTitle>
+                              <Badge 
+                                variant={addon.status === "active" ? "default" : "secondary"}
+                                data-testid={`badge-addon-status-${addon.id}`}
+                              >
+                                {addon.status}
+                              </Badge>
                             </div>
-                            <div className="font-medium text-right" data-testid={`text-addon-start-${addon.id}`}>
-                              {addon.startDate 
-                                ? new Date(addon.startDate).toLocaleDateString() 
-                                : "N/A"}
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <Calendar className="h-4 w-4" />
+                                <span>Start</span>
+                              </div>
+                              <div className="font-medium text-right" data-testid={`text-addon-start-${addon.id}`}>
+                                {addon.startDate 
+                                  ? new Date(addon.startDate).toLocaleDateString() 
+                                  : "N/A"}
+                              </div>
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <RefreshCw className="h-4 w-4" />
+                                <span>End / Renewal</span>
+                              </div>
+                              <div className="font-medium text-right" data-testid={`text-addon-renewal-${addon.id}`}>
+                                {addon.endDate 
+                                  ? new Date(addon.endDate).toLocaleDateString() 
+                                  : "N/A"}
+                              </div>
                             </div>
-                            
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <RefreshCw className="h-4 w-4" />
-                              <span>Renewal Date</span>
-                            </div>
-                            <div className="font-medium text-right" data-testid={`text-addon-renewal-${addon.id}`}>
-                              {addon.endDate 
-                                ? new Date(addon.endDate).toLocaleDateString() 
-                                : "N/A"}
-                            </div>
-                          </div>
-                          
-                          {addon.details && (
-                            <div className="pt-2 border-t">
-                              <p className="text-xs text-muted-foreground">
-                                {typeof addon.details === 'object' && addon.details.description 
-                                  ? addon.details.description 
-                                  : JSON.stringify(addon.details)}
-                              </p>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
+                            {addon.details && typeof addon.details === 'object' && (addon.details.totalUnits != null || addon.details.description) && (
+                              <div className="pt-2 border-t">
+                                <p className="text-xs text-muted-foreground">
+                                  {addon.details.description ?? (addon.details.totalUnits != null
+                                    ? `Total: ${addon.details.totalUnits}${addon.details.usedUnits != null ? `, Used: ${addon.details.usedUnits}` : ''}`
+                                    : null)}
+                                </p>
+                                {addon.details.totalPrice != null && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {addon.details.currency || 'USD'} {addon.details.totalPrice}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="mt-4"
+                      onClick={() => setLocation("/packages?mode=team")}
+                      data-testid="button-browse-more-addons"
+                    >
+                      <Package className="h-4 w-4 mr-2" />
+                      Purchase more add-ons (team)
+                    </Button>
+                  </>
                 )}
               </CardContent>
             </Card>

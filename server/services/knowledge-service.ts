@@ -234,7 +234,7 @@ export class KnowledgeService {
     
     const industries = industryIndicators.filter(word => text.includes(word));
     
-    console.log(` Extracted keywords from transcript:`, {
+    console.log(`🔍 Extracted keywords from transcript:`, {
       problemKeywords: problemKeywords.slice(0, 10),
       productKeywords: productKeywords.slice(0, 15),
       industries

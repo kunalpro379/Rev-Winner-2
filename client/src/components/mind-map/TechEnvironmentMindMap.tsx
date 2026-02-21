@@ -878,6 +878,8 @@ export function TechEnvironmentMindMap({
   const [selectedNode, setSelectedNode] = useState<TechNode | null>(null);
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [streamingMessage, setStreamingMessage] = useState<string>('');
+  const [partialSections, setPartialSections] = useState<MultiSectionMap | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -890,15 +892,101 @@ export function TechEnvironmentMindMap({
     refetchOnReconnect: false,
   });
 
+  const sectionKeyFromStream = (s: string): keyof MultiSectionMap => {
+    const map: Record<string, keyof MultiSectionMap> = {
+      techEnvironment: 'techEnvironment',
+      decisionMakers: 'decisionMakers',
+      businessProcesses: 'businessProcesses',
+      callTimeline: 'callTimeline',
+      compliance: 'compliance'
+    };
+    return map[s] ?? 'techEnvironment';
+  };
+
   const generateMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', `/api/conversations/${sessionId}/mind-map`, {
-        sessionId, transcript, domainExpertise
+      setStreamingMessage('Starting…');
+      setPartialSections(null);
+      const token = localStorage.getItem('accessToken');
+      const res = await fetch(`/api/conversations/${sessionId}/mind-map/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        credentials: 'include',
+        body: JSON.stringify({ sessionId, transcript, domainExpertise })
       });
-      return response.json();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `Request failed: ${res.status}`);
+      }
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) throw new Error('No response body');
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        let event = '';
+        for (const line of lines) {
+          if (line.startsWith('event: ')) event = line.slice(7).trim();
+          else if (line.startsWith('data: ') && event) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (event === 'progress') {
+                setStreamingMessage(data.message || 'Processing…');
+              } else if (event === 'section' && data.section && data.data) {
+                const key = sectionKeyFromStream(data.section);
+                setPartialSections(prev => {
+                  const next = { ...(prev || {
+                    techEnvironment: { nodes: [], edges: [], sectionEmpty: true },
+                    decisionMakers: { nodes: [], edges: [], sectionEmpty: true },
+                    businessProcesses: { nodes: [], edges: [], sectionEmpty: true },
+                    callTimeline: { nodes: [], edges: [], sectionEmpty: true },
+                    compliance: { nodes: [], edges: [], sectionEmpty: true }
+                  }) };
+                  next[key] = data.data;
+                  return next;
+                });
+                const n = data.data?.nodes?.length ?? 0;
+                const labels: Record<string, string> = {
+                  techEnvironment: 'Tech environment',
+                  decisionMakers: 'Decision makers',
+                  businessProcesses: 'Business processes',
+                  callTimeline: 'Call timeline',
+                  compliance: 'Compliance'
+                };
+                setStreamingMessage(`${labels[data.section] || data.section}: ${n} node${n !== 1 ? 's' : ''} ready`);
+              } else if (event === 'done' && data.success && data.data) {
+                return data;
+              } else if (event === 'error') {
+                throw new Error(data.message || 'Stream error');
+              }
+            } catch (e) {
+              if (event === 'done' || event === 'error') throw e;
+            }
+          }
+        }
+      }
+      if (buffer.trim()) {
+        const line = buffer.trim();
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.success && data.data) return data;
+          } catch {}
+        }
+      }
+      throw new Error('No data received');
     },
     onSuccess: (data) => {
-      if (data.success && data.data) {
+      setStreamingMessage('');
+      setPartialSections(null);
+      if (data?.success && data?.data) {
         const wasRegenerate = !!queryClient.getQueryData(['/api/conversations', sessionId, 'mind-map']);
         queryClient.setQueryData(['/api/conversations', sessionId, 'mind-map'], data.data);
         const totalNodes = data.data.nodes?.length || 0;
@@ -920,6 +1008,8 @@ export function TechEnvironmentMindMap({
       }
     },
     onError: (error: any) => {
+      setStreamingMessage('');
+      setPartialSections(null);
       toast({
         title: "Generation Failed",
         description: error.message || "Could not generate maps",
@@ -941,24 +1031,20 @@ export function TechEnvironmentMindMap({
   const isGenerating = generateMutation.isPending;
 
   const sections = useMemo(() => {
-    if (!mindMapData) return null;
-    
-    if (mindMapData.sections) {
-      return mindMapData.sections;
+    if (partialSections && generateMutation.isPending) {
+      return partialSections;
     }
-    
+    if (!mindMapData) return null;
+    if (mindMapData.sections) return mindMapData.sections;
     const allNodes = (mindMapData.nodes || []) as TechNode[];
     const allEdges = mindMapData.edges || [];
-    
     const techCategories = ['users_access', 'endpoints', 'network', 'infrastructure', 'applications', 'data_flow', 'security', 'operations', 'cloud', 'database', 'integration', 'vendor', 'projects', 'people', 'pain_point'];
-    
     const filterSection = (cats: string[]): MapSection => {
       const sNodes = allNodes.filter(n => cats.includes(n.category));
       const sNodeIds = new Set(sNodes.map(n => n.id));
       const sEdges = allEdges.filter(e => sNodeIds.has(e.source) && sNodeIds.has(e.target));
       return { nodes: sNodes, edges: sEdges, sectionEmpty: sNodes.length === 0 };
     };
-    
     return {
       techEnvironment: filterSection(techCategories),
       decisionMakers: filterSection(['decision_maker']),
@@ -966,9 +1052,14 @@ export function TechEnvironmentMindMap({
       callTimeline: filterSection(['timeline']),
       compliance: filterSection(['compliance'])
     } as MultiSectionMap;
-  }, [mindMapData]);
+  }, [mindMapData, partialSections, generateMutation.isPending]);
 
-  const totalNodes = mindMapData?.nodes?.length || 0;
+  const totalNodes = useMemo(() => {
+    if (sections) {
+      return sections.techEnvironment.nodes.length + sections.decisionMakers.nodes.length + sections.businessProcesses.nodes.length + sections.callTimeline.nodes.length + sections.compliance.nodes.length;
+    }
+    return mindMapData?.nodes?.length || 0;
+  }, [sections, mindMapData?.nodes?.length]);
   const hasData = totalNodes > 0;
 
   const sectionEntries: [SectionKey, MapSection][] = sections ? [
@@ -1067,13 +1158,18 @@ export function TechEnvironmentMindMap({
 
         {isExpanded && (
           <CardContent className="pt-0">
-            {(isFetching || isGenerating) && !hasData ? (
+            {(isFetching || (isGenerating && !hasData)) ? (
               <div className="h-[200px] flex items-center justify-center">
                 <div className="text-center">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-blue-500" />
                   <p className="text-sm text-muted-foreground">
-                    {isGenerating ? 'Analyzing conversation & building intelligence maps...' : 'Loading maps...'}
+                    {isGenerating ? (streamingMessage || 'Analyzing conversation & building maps…') : 'Loading maps…'}
                   </p>
+                  {isGenerating && partialSections && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {[partialSections.techEnvironment, partialSections.decisionMakers, partialSections.businessProcesses, partialSections.callTimeline, partialSections.compliance].filter(s => s.nodes.length > 0).length} section(s) ready
+                    </p>
+                  )}
                 </div>
               </div>
             ) : hasData && sections && activeMeta && ActiveIcon ? (
@@ -1082,8 +1178,8 @@ export function TechEnvironmentMindMap({
                   <div className="absolute inset-0 z-10 bg-white/60 dark:bg-black/40 rounded-lg flex items-center justify-center backdrop-blur-[1px]">
                     <div className="text-center p-4 bg-white dark:bg-slate-900 rounded-lg shadow-lg border">
                       <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-blue-500" />
-                      <p className="text-sm font-medium">Updating maps with latest context...</p>
-                      <p className="text-xs text-muted-foreground mt-1">Re-analyzing conversation</p>
+                      <p className="text-sm font-medium">{streamingMessage || 'Updating maps…'}</p>
+                      <p className="text-xs text-muted-foreground mt-1">New sections appear as they’re ready</p>
                     </div>
                   </div>
                 )}

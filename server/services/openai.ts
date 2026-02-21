@@ -138,7 +138,7 @@ function cleanJSONResponse(content: string): string {
 
 // Cache for training document context to avoid repeated DB queries
 const trainingContextCache = new Map<string, { context: string, timestamp: number }>();
-const CACHE_TTL = 30 * 1000; // 30 seconds cache (reduced from 5 minutes for faster knowledge updates)
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
 
 // Export function to invalidate training context cache when documents are updated/deleted
 // DOMAIN ISOLATION: Now clears all domain-specific cache entries for the user
@@ -3293,8 +3293,7 @@ STRICT RULES:
         }
       ],
       temperature: 0.5,
-      max_tokens: 400,
-      timeout: 30000 // 30 second timeout instead of 10
+      max_tokens: 300
     });
 
     const answer = response.choices[0]?.message?.content?.trim() || "I couldn't generate an answer. Please try rephrasing your question.";
@@ -3991,14 +3990,13 @@ JSON format:
     } else if (type === 'battle-card') {
       console.log(`🎯 Generating battle card for domain: ${domainExpertise}`);
       
-      // OPTIMIZED: Reduced training context for faster generation (1000 chars instead of 2000)
+      // PRIORITY 1: Fetch Train Me documents (reduced for speed)
       // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
-      const trainingContext = await getTrainingDocumentContext(userId, 1000, true, undefined, 2, domainExpertise);
+      const trainingContext = await getTrainingDocumentContext(userId, 2000, true, undefined, 3, domainExpertise);
       console.log(`📚 Battle Card - Training: ${trainingContext ? trainingContext.length : 0} chars`);
       
-      // OPTIMIZED: Use last 800 chars instead of 1000 for faster processing
-      const fullContext = conversationContext.length > 800
-        ? conversationContext.slice(-800)
+      const fullContext = conversationContext.length > 1000
+        ? conversationContext.slice(-1000)
         : conversationContext;
       
       const supplement = buildPromptSupplement(conversationContext, domainExpertise, 'battle_card');

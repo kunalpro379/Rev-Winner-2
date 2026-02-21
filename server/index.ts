@@ -6,6 +6,26 @@ import { storage } from "./storage";
 import { performanceMonitor } from "./middleware/performance-logger";
 import 'dotenv/config';
 
+// Global error handlers to prevent crashes from unhandled errors
+process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+  console.error('❌ Unhandled Promise Rejection:', reason);
+  if (reason?.error) {
+    console.error('Error details:', JSON.stringify(reason.error, null, 2));
+  }
+  // Don't exit - log and continue
+});
+
+process.on('uncaughtException', (error: Error) => {
+  console.error('❌ Uncaught Exception:', error);
+  console.error('Stack:', error.stack);
+  // For uncaught exceptions, we might want to exit in production
+  // but in development, let's log and continue
+  if (process.env.NODE_ENV === 'production') {
+    console.error('Exiting due to uncaught exception in production');
+    process.exit(1);
+  }
+});
+
 // Track last auto-rebuild time to prevent excessive rebuilds
 let lastAutoRebuildTime = 0;
 const AUTO_REBUILD_COOLDOWN = 5 * 60 * 1000; // 5 minutes cooldown

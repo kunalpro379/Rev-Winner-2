@@ -13,9 +13,18 @@ import { jobQueue } from './services/job-queue';
 import { generateAccessToken, generateRefreshToken } from "./utils/jwt";
 
 // Helper function to get Razorpay credentials based on environment
+// RAZORPAY_MODE takes absolute precedence - if set to LIVE, use LIVE regardless of NODE_ENV
 function getRazorpayKeyId(): string | undefined {
+  // Check RAZORPAY_MODE first - if explicitly set, use it regardless of NODE_ENV
+  if (process.env.RAZORPAY_MODE === 'LIVE' || process.env.RAZORPAY_MODE === 'PRODUCTION') {
+    return process.env.RAZORPAY_LIVE_KEY_ID || process.env.RAZORPAY_KEY_ID;
+  } else if (process.env.RAZORPAY_MODE === 'TEST') {
+    return process.env.RAZORPAY_TEST_KEY_ID || process.env.RAZORPAY_KEY_ID;
+  }
+  
+  // Fallback: auto-detect based on NODE_ENV only if RAZORPAY_MODE is not set
   const isDevelopment = process.env.NODE_ENV === 'development';
-  const razorpayMode = process.env.RAZORPAY_MODE || (isDevelopment ? 'TEST' : 'LIVE');
+  const razorpayMode = isDevelopment ? 'TEST' : 'LIVE';
   
   if (razorpayMode === 'TEST') {
     return process.env.RAZORPAY_TEST_KEY_ID || process.env.RAZORPAY_KEY_ID;
@@ -25,8 +34,16 @@ function getRazorpayKeyId(): string | undefined {
 }
 
 function getRazorpayKeySecret(): string | undefined {
+  // Check RAZORPAY_MODE first - if explicitly set, use it regardless of NODE_ENV
+  if (process.env.RAZORPAY_MODE === 'LIVE' || process.env.RAZORPAY_MODE === 'PRODUCTION') {
+    return process.env.RAZORPAY_LIVE_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET;
+  } else if (process.env.RAZORPAY_MODE === 'TEST') {
+    return process.env.RAZORPAY_TEST_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET;
+  }
+  
+  // Fallback: auto-detect based on NODE_ENV only if RAZORPAY_MODE is not set
   const isDevelopment = process.env.NODE_ENV === 'development';
-  const razorpayMode = process.env.RAZORPAY_MODE || (isDevelopment ? 'TEST' : 'LIVE');
+  const razorpayMode = isDevelopment ? 'TEST' : 'LIVE';
   
   if (razorpayMode === 'TEST') {
     return process.env.RAZORPAY_TEST_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET;
@@ -1930,9 +1947,18 @@ const refreshToken = generateRefreshToken({
   // Get payment gateway configuration
   app.get("/api/admin/payment-config", authenticateToken, requireAdmin, async (req: Request, res: Response) => {
     try {
-      const isDevelopment = process.env.NODE_ENV === 'development';
-      const razorpayMode = process.env.RAZORPAY_MODE || (isDevelopment ? 'TEST' : 'LIVE');
-      const cashfreeMode = process.env.CASHFREE_ENVIRONMENT || (isDevelopment ? 'SANDBOX' : 'PRODUCTION');
+      // RAZORPAY_MODE takes absolute precedence - if set to LIVE, use LIVE regardless of NODE_ENV
+      let razorpayMode: string;
+      if (process.env.RAZORPAY_MODE === 'LIVE' || process.env.RAZORPAY_MODE === 'PRODUCTION') {
+        razorpayMode = 'LIVE';
+      } else if (process.env.RAZORPAY_MODE === 'TEST') {
+        razorpayMode = 'TEST';
+      } else {
+        // Fallback: auto-detect based on NODE_ENV only if RAZORPAY_MODE is not set
+        const isDevelopment = process.env.NODE_ENV === 'development';
+        razorpayMode = isDevelopment ? 'TEST' : 'LIVE';
+      }
+      const cashfreeMode = process.env.CASHFREE_ENVIRONMENT || (process.env.NODE_ENV === 'development' ? 'SANDBOX' : 'PRODUCTION');
       
       const razorpayKeyId = getRazorpayKeyId();
       const cashfreeAppId = process.env.CASHFREE_APP_ID || process.env.CASHFREE_SANDBOX_APP_ID;
@@ -1981,8 +2007,17 @@ const refreshToken = generateRefreshToken({
         key_secret: razorpayKeySecret,
       });
       
-      const isDevelopment = process.env.NODE_ENV === 'development';
-      const razorpayMode = process.env.RAZORPAY_MODE || (isDevelopment ? 'TEST' : 'LIVE');
+      // RAZORPAY_MODE takes absolute precedence - if set to LIVE, use LIVE regardless of NODE_ENV
+      let razorpayMode: string;
+      if (process.env.RAZORPAY_MODE === 'LIVE' || process.env.RAZORPAY_MODE === 'PRODUCTION') {
+        razorpayMode = 'LIVE';
+      } else if (process.env.RAZORPAY_MODE === 'TEST') {
+        razorpayMode = 'TEST';
+      } else {
+        // Fallback: auto-detect based on NODE_ENV only if RAZORPAY_MODE is not set
+        const isDevelopment = process.env.NODE_ENV === 'development';
+        razorpayMode = isDevelopment ? 'TEST' : 'LIVE';
+      }
       
       // Test by fetching payments (will fail gracefully if credentials are invalid)
       try {

@@ -58,6 +58,39 @@ export function setupTranscriptionRoutes(server: Server): Router {
       
       console.log('🎙️ Deepgram configured with nova-2-meeting model for multi-speaker diarization');
 
+      // CRITICAL: Attach error handler IMMEDIATELY, before Open event
+      // This prevents unhandled errors during connection attempts
+      dgConnection.on(LiveTranscriptionEvents.Error, (error: any) => {
+        console.error('❌ Deepgram connection error:', error);
+        console.error('❌ Deepgram error details:', JSON.stringify(error, null, 2));
+        
+        // Clean up the connection
+        try {
+          if (dgConnection.getReadyState() !== 3) { // Not already closed
+            dgConnection.finish();
+          }
+        } catch (cleanupError) {
+          console.error('Error cleaning up Deepgram connection:', cleanupError);
+        }
+        
+        // Notify client if still connected
+        if (clientWs.readyState === WebSocket.OPEN) {
+          try {
+            clientWs.send(JSON.stringify({ 
+              type: 'error', 
+              error: 'Transcription service error. Please try again.' 
+            }));
+            clientWs.close();
+          } catch (wsError) {
+            console.error('Error sending error message to client:', wsError);
+          }
+        }
+      });
+
+      dgConnection.on(LiveTranscriptionEvents.Close, () => {
+        console.log('🔌 Deepgram connection closed');
+      });
+
       dgConnection.on(LiveTranscriptionEvents.Open, () => {
         console.log('✅ Deepgram connection opened with nova-2-meeting model');
         console.log('🎙️ Configuration: 48kHz sample rate, diarization enabled');
@@ -139,61 +172,71 @@ export function setupTranscriptionRoutes(server: Server): Router {
           console.log('🎤 Utterance ended - speaker turn complete');
         });
 
-        dgConnection.on(LiveTranscriptionEvents.Error, (error) => {
-          console.error('❌ Deepgram error:', error);
-          console.error('❌ Deepgram error details:', JSON.stringify(error, null, 2));
-          if (clientWs.readyState === WebSocket.OPEN) {
-            clientWs.send(JSON.stringify({ 
-              type: 'error', 
-              error: 'Transcription service error. Please try again.' 
-            }));
-          }
-        });
-
-        dgConnection.on(LiveTranscriptionEvents.Close, () => {
-          console.log('🔌 Deepgram connection closed');
-        });
-
         clientWs.on('message', (data: Buffer | ArrayBuffer | Buffer[]) => {
-          if (dgConnection.getReadyState() === 1) {
-            // Handle keepalive (empty buffer)
-            if (Buffer.isBuffer(data) && data.length === 0) {
-              console.log('💓 Keepalive ping received');
-              return;
+          try {
+            if (dgConnection.getReadyState() === 1) {
+              // Handle keepalive (empty buffer)
+              if (Buffer.isBuffer(data) && data.length === 0) {
+                console.log('💓 Keepalive ping received');
+                return;
+              }
+              
+              // Convert Buffer to ArrayBuffer for Deepgram
+              if (Buffer.isBuffer(data)) {
+                dgConnection.send(new Uint8Array(data).buffer);
+              } else if (data instanceof ArrayBuffer) {
+                dgConnection.send(data);
+              } else if (Array.isArray(data)) {
+                const combined = Buffer.concat(data);
+                dgConnection.send(new Uint8Array(combined).buffer);
+              }
             }
-            
-            // Convert Buffer to ArrayBuffer for Deepgram
-            if (Buffer.isBuffer(data)) {
-              dgConnection.send(new Uint8Array(data).buffer);
-            } else if (data instanceof ArrayBuffer) {
-              dgConnection.send(data);
-            } else if (Array.isArray(data)) {
-              const combined = Buffer.concat(data);
-              dgConnection.send(new Uint8Array(combined).buffer);
-            }
+          } catch (error) {
+            console.error('Error processing client message:', error);
           }
         });
 
         clientWs.on('close', () => {
           console.log('👋 Client disconnected from transcription stream');
-          dgConnection.finish();
+          try {
+            if (dgConnection.getReadyState() !== 3) { // Not already closed
+              dgConnection.finish();
+            }
+          } catch (error) {
+            console.error('Error closing Deepgram connection:', error);
+          }
         });
 
         clientWs.on('error', (error) => {
           console.error('Client WebSocket error:', error);
-          dgConnection.finish();
+          try {
+            if (dgConnection.getReadyState() !== 3) { // Not already closed
+              dgConnection.finish();
+            }
+          } catch (cleanupError) {
+            console.error('Error cleaning up Deepgram connection on client error:', cleanupError);
+          }
         });
       });
 
     } catch (error: any) {
       console.error('Failed to setup Deepgram connection:', error);
-      if (clientWs.readyState === WebSocket.OPEN) {
-        clientWs.send(JSON.stringify({ 
-          type: 'error', 
-          error: 'Failed to initialize transcription service' 
-        }));
+      console.error('Error stack:', error?.stack);
+      try {
+        if (clientWs.readyState === WebSocket.OPEN) {
+          clientWs.send(JSON.stringify({ 
+            type: 'error', 
+            error: 'Failed to initialize transcription service' 
+          }));
+        }
+      } catch (sendError) {
+        console.error('Error sending error message to client:', sendError);
       }
-      clientWs.close();
+      try {
+        clientWs.close();
+      } catch (closeError) {
+        console.error('Error closing client WebSocket:', closeError);
+      }
     }
   });
 

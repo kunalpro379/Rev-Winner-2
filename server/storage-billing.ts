@@ -90,6 +90,7 @@ export interface IBillingStorage {
   trackSessionMinutesUsage(data: InsertSessionMinutesUsage): Promise<SessionMinutesUsage>;
   trackSessionMinutesUsageTransactional(userId: string, sessionId: string, minutesUsed: number): Promise<SessionMinutesUsage>;
   getSessionMinutesBalance(userId: string): Promise<{ totalMinutes: number; usedMinutes: number; remainingMinutes: number; expiresAt: Date | null }>;
+  getSessionMinutesBalanceByOrganization(organizationId: string): Promise<{ totalMinutes: number; usedMinutes: number; remainingMinutes: number; expiresAt: Date | null }>;
   getUserSessionMinutesUsage(userId: string, limit?: number): Promise<SessionMinutesUsage[]>;
   
   // DAI (Rev Winner AI) Management (with transactional safety)
@@ -148,7 +149,7 @@ export interface IBillingStorage {
     currency: string;
     itemCount: number; // Total number of items in cart
   }>;
-  checkItemAvailability(userId: string, packageSku: string, addonType: string): Promise<{
+  checkItemAvailability(userId: string, packageSku: string, addonType: string, options?: { purchaseMode?: 'user' | 'team' }): Promise<{
     available: boolean;
     reason?: string; // Why item is not available (e.g., "Already have active subscription")
   }>;
@@ -525,6 +526,52 @@ export class BillingStorage implements IBillingStorage {
         const latestStartDate = startDates[0];
         expiresAt = new Date(latestStartDate);
         expiresAt.setDate(expiresAt.getDate() + 30); // Add 30 days default validity
+      }
+    }
+
+    return {
+      totalMinutes,
+      usedMinutes,
+      remainingMinutes: Math.max(0, remainingMinutes),
+      expiresAt,
+    };
+  }
+
+  async getSessionMinutesBalanceByOrganization(organizationId: string): Promise<{ totalMinutes: number; usedMinutes: number; remainingMinutes: number; expiresAt: Date | null }> {
+    const activePurchases = await db
+      .select()
+      .from(addonPurchases)
+      .where(
+        and(
+          eq(addonPurchases.organizationId, organizationId),
+          eq(addonPurchases.addonType, 'session_minutes'),
+          eq(addonPurchases.status, 'active'),
+          or(
+            isNull(addonPurchases.endDate),
+            gte(addonPurchases.endDate, new Date())
+          )
+        )
+      );
+
+    const totalMinutes = activePurchases.reduce((sum, p) => sum + (p.totalUnits || 0), 0);
+    const usedMinutes = activePurchases.reduce((sum, p) => sum + (p.usedUnits || 0), 0);
+    const remainingMinutes = totalMinutes - usedMinutes;
+
+    const expiryDates = activePurchases
+      .map(p => p.endDate)
+      .filter((d): d is Date => d !== null)
+      .sort((a, b) => (a < b ? -1 : 1));
+
+    let expiresAt: Date | null = expiryDates[0] || null;
+
+    if (!expiresAt && remainingMinutes > 0 && activePurchases.length > 0) {
+      const startDates = activePurchases
+        .map(p => p.startDate)
+        .filter((d): d is Date => d !== null)
+        .sort((a, b) => (a > b ? -1 : 1));
+      if (startDates.length > 0 && startDates[0]) {
+        expiresAt = new Date(startDates[0]);
+        expiresAt.setDate(expiresAt.getDate() + 30);
       }
     }
 
@@ -1217,10 +1264,18 @@ export class BillingStorage implements IBillingStorage {
     };
   }
 
-  async checkItemAvailability(userId: string, packageSku: string, addonType: string): Promise<{
+  async checkItemAvailability(userId: string, packageSku: string, addonType: string, options?: { purchaseMode?: 'user' | 'team' }): Promise<{
     available: boolean;
     reason?: string;
   }> {
+    const purchaseMode = options?.purchaseMode ?? 'user';
+
+    // Team platform_access: user can buy team licenses even if they have a personal subscription.
+    // Personal subscription is for the buyer; team packages are for their team members.
+    if (addonType === 'platform_access' && purchaseMode === 'team') {
+      return { available: true };
+    }
+
     // Check if user already has an active addon of this type
     const activeAddon = await this.getActiveAddonPurchase(userId, addonType);
 

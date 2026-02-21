@@ -26,26 +26,41 @@ import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
 
 // Helper function to get Razorpay credentials based on environment
+// RAZORPAY_MODE takes absolute precedence - if set to LIVE, use LIVE regardless of NODE_ENV
 function getRazorpayKeyId(): string | undefined {
+  // Check RAZORPAY_MODE first - if explicitly set, use it regardless of NODE_ENV
+  if (process.env.RAZORPAY_MODE === 'LIVE' || process.env.RAZORPAY_MODE === 'PRODUCTION') {
+    return process.env.RAZORPAY_LIVE_KEY_ID || process.env.RAZORPAY_KEY_ID;
+  } else if (process.env.RAZORPAY_MODE === 'TEST') {
+    return process.env.RAZORPAY_TEST_KEY_ID || process.env.RAZORPAY_KEY_ID;
+  }
+  
+  // Fallback: auto-detect based on NODE_ENV only if RAZORPAY_MODE is not set
   const isDevelopment = process.env.NODE_ENV === 'development';
-  const razorpayMode = process.env.RAZORPAY_MODE || (isDevelopment ? 'TEST' : 'LIVE');
+  const razorpayMode = isDevelopment ? 'TEST' : 'LIVE';
   
   if (razorpayMode === 'TEST') {
     return process.env.RAZORPAY_TEST_KEY_ID || process.env.RAZORPAY_KEY_ID;
   } else {
-    // LIVE or PRODUCTION mode
     return process.env.RAZORPAY_LIVE_KEY_ID || process.env.RAZORPAY_KEY_ID;
   }
 }
 
 function getRazorpayKeySecret(): string | undefined {
+  // Check RAZORPAY_MODE first - if explicitly set, use it regardless of NODE_ENV
+  if (process.env.RAZORPAY_MODE === 'LIVE' || process.env.RAZORPAY_MODE === 'PRODUCTION') {
+    return process.env.RAZORPAY_LIVE_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET;
+  } else if (process.env.RAZORPAY_MODE === 'TEST') {
+    return process.env.RAZORPAY_TEST_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET;
+  }
+  
+  // Fallback: auto-detect based on NODE_ENV only if RAZORPAY_MODE is not set
   const isDevelopment = process.env.NODE_ENV === 'development';
-  const razorpayMode = process.env.RAZORPAY_MODE || (isDevelopment ? 'TEST' : 'LIVE');
+  const razorpayMode = isDevelopment ? 'TEST' : 'LIVE';
   
   if (razorpayMode === 'TEST') {
     return process.env.RAZORPAY_TEST_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET;
   } else {
-    // LIVE or PRODUCTION mode
     return process.env.RAZORPAY_LIVE_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET;
   }
 }
@@ -84,6 +99,12 @@ async function activateCartCheckout(
       return { success: false, activatedAddons: [], message: "No items found in order" };
     }
 
+    // Only activate personal (non-team) items here; team items are handled by team flow in verify/free-order
+    const personalItems = cartItems.filter((i: any) => i.purchaseMode !== 'team');
+    if (personalItems.length < cartItems.length) {
+      console.log(`[Cart Activation] Skipping ${cartItems.length - personalItems.length} team items; processing ${personalItems.length} personal items`);
+    }
+
     // Extract per-item promo codes and increment usage counts
     const perItemPromoCodes = metadata?.perItemPromoCodes as Array<{
       cartItemId: string;
@@ -105,8 +126,8 @@ async function activateCartCheckout(
 
     const activatedAddons: AddonPurchase[] = [];
 
-    // Activate each item in the cart
-    for (const item of cartItems) {
+    // Activate each personal (non-team) item
+    for (const item of personalItems) {
       const pkg = await getPackageOrAddonBySku(item.packageSku);
       if (!pkg) continue;
 
@@ -319,10 +340,10 @@ async function activateCartCheckout(
       }
     }
 
-    // Check if any purchased item is a platform_access subscription
-    const platformAccessItems = cartItems.filter(item => item.addonType === 'platform_access');
+    // Check if any purchased personal item is a platform_access subscription
+    const platformAccessItems = personalItems.filter(item => item.addonType === 'platform_access');
     
-    console.log(`[Cart Activation] Found ${platformAccessItems.length} platform_access items out of ${cartItems.length} total items`);
+    console.log(`[Cart Activation] Found ${platformAccessItems.length} platform_access items out of ${personalItems.length} personal items`);
     
     if (platformAccessItems.length > 0) {
       const subscriptionItem = platformAccessItems[0];
@@ -429,6 +450,198 @@ async function activateCartCheckout(
     console.error("[Cart Activation] Error activating cart checkout:", error);
     return { success: false, activatedAddons: [], message: error.message };
   }
+}
+
+/** Run team cart activation: create/find org, license package, org add-ons, send invitation. Used by verify and free-order. */
+async function runTeamCartActivation(
+  pendingOrder: any,
+  userId: string,
+  req: Request
+): Promise<{ licenseManagerInvitationSent: boolean }> {
+  const metadata = pendingOrder.metadata as any;
+  const cartItems = (metadata?.items || []) as Array<{
+    packageSku: string;
+    packageName: string;
+    addonType: string;
+    basePrice: string;
+    currency: string;
+    quantity: number;
+    metadata: any;
+    purchaseMode?: string;
+    teamManagerName?: string;
+    teamManagerEmail?: string;
+    companyName?: string;
+  }>;
+  const teamItems = cartItems.filter(item => item.purchaseMode === 'team');
+  if (teamItems.length === 0) return { licenseManagerInvitationSent: false };
+
+  let licenseManagerInvitationSent = false;
+  try {
+    const { sendLicenseManagerInvitationEmail } = await import('./services/email');
+    const crypto = await import('crypto');
+    const teamItem = teamItems[0];
+    const teamManagerName = teamItem.teamManagerName as string;
+    const teamManagerEmail = teamItem.teamManagerEmail as string;
+
+    if (!teamManagerName || !teamManagerEmail) return { licenseManagerInvitationSent: false };
+
+    const buyer = await authStorage.getUserById(userId);
+    const buyerName = buyer ? `${buyer.firstName || ''} ${buyer.lastName || ''}`.trim() || buyer.email : 'A Rev Winner customer';
+    const purchaseDetails = {
+      platformAccessCount: cartItems.filter(item => item.addonType === 'platform_access').reduce((sum, item) => sum + (item.quantity || 1), 0),
+      sessionMinutesCount: cartItems.filter(item => (item.addonType === 'session_minutes' || item.addonType === 'usage_bundle')).reduce((sum, item) => sum + (item.quantity || 1), 0),
+      daiCount: cartItems.filter(item => item.addonType === 'dai' || (item.addonType === 'service' && (item.packageSku || '').toLowerCase().includes('dai'))).reduce((sum, item) => sum + (item.quantity || 1), 0),
+      trainMeCount: cartItems.filter(item => item.addonType === 'train_me' || (item.addonType === 'service' && (item.packageSku || '').toLowerCase().includes('train'))).reduce((sum, item) => sum + (item.quantity || 1), 0),
+      totalAmount: pendingOrder.amount || '0',
+      buyerName,
+    };
+
+    let licenseManager = await authStorage.getUserByEmail(teamManagerEmail);
+    if (!licenseManager) {
+      const tempPassword = crypto.randomBytes(32).toString('hex');
+      const nameParts = teamManagerName.trim().split(' ');
+      const firstName = nameParts[0] || teamManagerName;
+      const lastName = nameParts.slice(1).join(' ') || '';
+      const username = teamManagerEmail.split('@')[0] + '_' + crypto.randomBytes(4).toString('hex');
+      licenseManager = await authStorage.createUser({
+        email: teamManagerEmail,
+        username,
+        password: tempPassword,
+        firstName,
+        lastName,
+        role: 'license_manager',
+      });
+      console.log(`Created License Manager user: ${licenseManager.id} (${teamManagerEmail})`);
+    } else if (licenseManager.role !== 'license_manager') {
+      await authStorage.updateUser(licenseManager.id, { role: 'license_manager' });
+      console.log(`Updated user ${licenseManager.id} role to license_manager`);
+    }
+
+    const companyName = teamItem.companyName as string || `${teamManagerName}'s Organization`;
+    let organization = await authStorage.getOrganizationByManagerId(licenseManager.id);
+    if (!organization) {
+      organization = await authStorage.createOrganization({
+        companyName,
+        billingEmail: teamManagerEmail,
+        primaryManagerId: licenseManager.id,
+        status: 'active',
+      });
+      console.log(`Created organization: ${organization.id} (${companyName})`);
+      await authStorage.createOrganizationMembership({
+        organizationId: organization.id,
+        userId: licenseManager.id,
+        role: 'admin',
+        status: 'active',
+      });
+      console.log(`Added license manager to organization membership`);
+    } else {
+      if (organization.companyName !== companyName || organization.primaryManagerId !== licenseManager.id) {
+        await authStorage.updateOrganization(organization.id, {
+          companyName,
+          primaryManagerId: licenseManager.id,
+          billingEmail: teamManagerEmail,
+        });
+        console.log(`Updated organization: ${organization.id} (${companyName})`);
+      }
+      const existingMembership = await authStorage.getUserMembership(licenseManager.id);
+      if (!existingMembership || existingMembership.organizationId !== organization.id) {
+        try {
+          await authStorage.createOrganizationMembership({
+            organizationId: organization.id,
+            userId: licenseManager.id,
+            role: 'admin',
+            status: 'active',
+          });
+          console.log(`Added license manager to existing organization membership`);
+        } catch (membershipError: any) {
+          if (membershipError.code !== '23505') throw membershipError;
+          console.log(`License manager already has membership for organization`);
+        }
+      }
+    }
+
+    const teamPlatformAccessItems = teamItems.filter(item => item.addonType === 'platform_access');
+    const totalSeats = teamPlatformAccessItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+    if (totalSeats > 0) {
+      const platformAccessItem = teamPlatformAccessItems[0];
+      const pricePerSeat = platformAccessItem?.basePrice || '0';
+      const currency = platformAccessItem?.currency || 'USD';
+      const pkg = platformAccessItem ? await getPackageOrAddonBySku(platformAccessItem.packageSku) : null;
+      const validityDays = pkg?.validityDays || 365;
+      const startDate = new Date();
+      const endDate = new Date(startDate.getTime() + validityDays * 24 * 60 * 60 * 1000);
+      const licensePackage = await authStorage.createLicensePackage({
+        organizationId: organization.id,
+        packageType: platformAccessItem?.packageSku || 'team-platform-access',
+        totalSeats,
+        pricePerSeat,
+        totalAmount: (parseFloat(pricePerSeat) * totalSeats).toString(),
+        currency,
+        startDate,
+        endDate,
+        status: 'active',
+      });
+      console.log(`Created license package: ${licensePackage.id} with ${totalSeats} seats for organization ${organization.id}`);
+      (purchaseDetails as any).licensePackageId = licensePackage.id;
+      (purchaseDetails as any).organizationId = organization.id;
+    }
+
+    const teamAddonTypes = ['session_minutes', 'train_me', 'dai'];
+    for (const item of cartItems.filter((i: any) => i.purchaseMode === 'team')) {
+      let mappedType = item.addonType;
+      if (item.addonType === 'usage_bundle') mappedType = 'session_minutes';
+      if (item.addonType === 'service') {
+        const sku = (item.packageSku || '').toLowerCase();
+        mappedType = sku.includes('train') ? 'train_me' : sku.includes('dai') ? 'dai' : 'train_me';
+      }
+      if (!teamAddonTypes.includes(mappedType)) continue;
+      const pkg = await getPackageOrAddonBySku(item.packageSku);
+      if (!pkg) continue;
+      const startDate = new Date();
+      const endDate = pkg.validityDays ? calculateEndDate(startDate, pkg.validityDays) : null;
+      const totalUnits = (pkg.totalUnits || 0) * (item.quantity || 1);
+      const itemPaidAmount = parseFloat(pendingOrder.amount || '0') / Math.max(1, cartItems.length);
+      try {
+        await billingStorage.createAddonPurchase({
+          userId: licenseManager.id,
+          organizationId: organization.id,
+          addonType: mappedType,
+          packageSku: item.packageSku,
+          billingType: 'one_time',
+          purchaseAmount: itemPaidAmount.toFixed(2),
+          currency: pendingOrder.currency || 'USD',
+          totalUnits,
+          usedUnits: 0,
+          status: 'active',
+          startDate,
+          endDate,
+          metadata: { teamPurchase: true, cartOrderId: pendingOrder.id, packageName: pkg.name },
+        });
+        console.log(`[Team Cart] Created org addon: ${mappedType} for org ${organization.id}, ${totalUnits} units`);
+      } catch (addonErr: any) {
+        console.error('[Team Cart] Failed to create org addon:', addonErr);
+      }
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await authStorage.createPasswordResetToken(teamManagerEmail, resetToken, resetTokenExpiry);
+    await sendLicenseManagerInvitationEmail(teamManagerEmail, teamManagerName, resetToken, purchaseDetails);
+    licenseManagerInvitationSent = true;
+    console.log(`License Manager invitation sent to ${teamManagerEmail}`);
+    await eventLogger.log({
+      actorId: userId,
+      action: 'team_purchase.completed',
+      targetType: 'license_manager',
+      targetId: licenseManager.id,
+      metadata: { licenseManagerEmail: teamManagerEmail, licenseManagerName: teamManagerName, purchaseDetails, orderId: pendingOrder.id },
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+    });
+  } catch (err) {
+    console.error('runTeamCartActivation error:', err);
+  }
+  return { licenseManagerInvitationSent };
 }
 
 // Get the base URL for payment callbacks - uses APP_URL in production, falls back to request host
@@ -1295,7 +1508,7 @@ export function setupBillingRoutes(app: Router) {
     }
   });
 
-  // Get session minutes status for current user
+  // Get session minutes status for current user (individual or org seat: org members see organization's pool)
   app.get("/api/session-minutes/status", authenticateToken, async (req: Request, res: Response) => {
     try {
       const userId = req.jwtUser!.userId;
@@ -1316,31 +1529,41 @@ export function setupBillingRoutes(app: Router) {
         });
       }
       
-      // Get session minutes balance from addon purchases (purchased packages)
-      const balance = await billingStorage.getSessionMinutesBalance(userId);
+      // Check if user is an org member with active enterprise seat → use organization's session minutes
+      const membership = await authStorage.getUserMembership(userId);
+      const licensePackage = membership && membership.status === 'active'
+        ? await authStorage.getActiveLicensePackage(membership.organizationId)
+        : null;
+      const isOrgSeatUser = !!(membership && membership.status === 'active' && licensePackage);
+
+      let balance: { totalMinutes: number; usedMinutes: number; remainingMinutes: number; expiresAt: Date | null };
+      let hasPurchasedPackages: boolean;
+
+      if (isOrgSeatUser && membership) {
+        balance = await billingStorage.getSessionMinutesBalanceByOrganization(membership.organizationId);
+        hasPurchasedPackages = true; // Org seat users use team subscription; show same UI as individual with plan
+        console.log(`[Session Minutes] Org seat user ${userId} - Org ${membership.organizationId} balance: ${balance.totalMinutes} total, ${balance.remainingMinutes} remaining`);
+      } else {
+        balance = await billingStorage.getSessionMinutesBalance(userId);
+        const purchasedPackages = await db
+          .select()
+          .from(addonPurchases)
+          .where(
+            and(
+              eq(addonPurchases.userId, userId),
+              eq(addonPurchases.addonType, 'session_minutes')
+            )
+          );
+        hasPurchasedPackages = purchasedPackages.length > 0;
+      }
       
-      // Check if user has ever purchased any session minutes packages
-      const purchasedPackages = await db
-        .select()
-        .from(addonPurchases)
-        .where(
-          and(
-            eq(addonPurchases.userId, userId),
-            eq(addonPurchases.addonType, 'session_minutes')
-          )
-        );
-      
-      const hasPurchasedPackages = purchasedPackages.length > 0;
-      
-      // Get subscription data for trial minutes
+      // Get subscription data for trial minutes (only for non-org users)
       let subscription = await authStorage.getSubscriptionByUserId(userId);
       
-      // If no subscription exists, create a default free trial subscription
-      if (!subscription) {
+      if (!subscription && !isOrgSeatUser) {
         console.log(`[Session Minutes] No subscription found for user ${userId}, creating free trial`);
         subscription = await authStorage.createSubscription({
           userId,
-          planId: 'free_trial',
           planType: 'free_trial',
           status: 'trial',
           sessionsUsed: '0',
@@ -1351,20 +1574,19 @@ export function setupBillingRoutes(app: Router) {
         });
       }
       
-      // Calculate total minutes: purchased + trial
-      let totalMinutes = balance.totalMinutes; // From purchased packages
+      // Calculate total minutes: purchased + trial (for individual); for org seat use org balance only
+      let totalMinutes = balance.totalMinutes;
       
-      console.log(`[Session Minutes] User ${userId} - Purchased: ${balance.totalMinutes}, Subscription: ${subscription?.minutesLimit}, Has Packages: ${hasPurchasedPackages}`);
-      
-      // Add trial minutes if user is on free trial
-      if (subscription?.planType === 'free_trial' && subscription.minutesLimit) {
-        const trialMinutes = subscription.minutesLimit === 'unlimited' ? 0 : parseInt(subscription.minutesLimit || '0');
-        totalMinutes += trialMinutes;
-        console.log(`[Session Minutes] Added ${trialMinutes} trial minutes, total now: ${totalMinutes}`);
+      if (!isOrgSeatUser) {
+        console.log(`[Session Minutes] User ${userId} - Purchased: ${balance.totalMinutes}, Subscription: ${subscription?.minutesLimit}, Has Packages: ${hasPurchasedPackages}`);
+        if (subscription?.planType === 'free_trial' && subscription.minutesLimit) {
+          const trialMinutes = subscription.minutesLimit === 'unlimited' ? 0 : parseInt(subscription.minutesLimit || '0');
+          totalMinutes += trialMinutes;
+          console.log(`[Session Minutes] Added ${trialMinutes} trial minutes, total now: ${totalMinutes}`);
+        }
       }
       
-      // CRITICAL FIX: Calculate actual used minutes from filtered conversations
-      // Only count sessions where transcriptionStartedAt is set (user clicked Start button)
+      // Calculate actual used minutes from filtered conversations (this user's usage)
       let actualUsedMinutes = 0;
       try {
         const userConversations = await db
@@ -1373,9 +1595,8 @@ export function setupBillingRoutes(app: Router) {
           .where(eq(conversations.userId, userId))
           .orderBy(desc(conversations.createdAt));
         
-        // Calculate minutes from sessions that actually had transcription
         actualUsedMinutes = userConversations
-          .filter(conv => !!conv.transcriptionStartedAt) // Only sessions where user clicked Start
+          .filter(conv => !!conv.transcriptionStartedAt)
           .reduce((total, conv) => {
             const startTime = conv.transcriptionStartedAt || conv.createdAt || new Date();
             const endTime = conv.endedAt || conv.createdAt || new Date();
@@ -1384,23 +1605,24 @@ export function setupBillingRoutes(app: Router) {
             return total + durationMinutes;
           }, 0);
         
-        console.log(`[Session Minutes Status] User ${userId}: ${actualUsedMinutes} minutes used from ${userConversations.filter(c => !!c.transcriptionStartedAt).length} sessions (Total: ${totalMinutes} minutes available, Purchased packages: ${hasPurchasedPackages})`);
+        console.log(`[Session Minutes Status] User ${userId}: ${actualUsedMinutes} minutes used (Total: ${totalMinutes}, Remaining: ${isOrgSeatUser ? balance.remainingMinutes : Math.max(0, totalMinutes - actualUsedMinutes)}, Has packages: ${hasPurchasedPackages})`);
       } catch (error) {
         console.error('[Session Minutes Status] Error calculating used minutes:', error);
-        // Fallback to subscription data if conversation query fails
         actualUsedMinutes = subscription?.minutesUsed ? parseInt(subscription.minutesUsed) : 0;
       }
       
-      const remainingMinutes = Math.max(0, totalMinutes - actualUsedMinutes);
+      const remainingMinutes = isOrgSeatUser
+        ? balance.remainingMinutes
+        : Math.max(0, totalMinutes - actualUsedMinutes);
       
       res.json({
         hasActiveMinutes: remainingMinutes > 0,
         totalMinutesRemaining: remainingMinutes,
         totalMinutes: totalMinutes,
-        usedMinutes: actualUsedMinutes,
+        usedMinutes: isOrgSeatUser ? balance.usedMinutes : actualUsedMinutes,
         nextExpiryDate: balance.expiresAt ? balance.expiresAt.toISOString() : null,
         superUserAccess: false,
-        hasPurchasedPackages: hasPurchasedPackages, // NEW: Flag to indicate if user has ever purchased packages
+        hasPurchasedPackages: hasPurchasedPackages,
       });
     } catch (error: any) {
       console.error("Get session minutes status error:", error);
@@ -2258,7 +2480,8 @@ export function setupBillingRoutes(app: Router) {
         return res.status(400).json({ message: "Invalid package SKU" });
       }
 
-      const availability = await billingStorage.checkItemAvailability(userId, packageSku, addonType);
+      const purchaseMode = (req.query.purchaseMode as 'user' | 'team') === 'team' ? 'team' : 'user';
+      const availability = await billingStorage.checkItemAvailability(userId, packageSku, addonType, { purchaseMode });
 
       res.json({
         packageSku,
@@ -2317,8 +2540,8 @@ export function setupBillingRoutes(app: Router) {
         return res.status(400).json({ message: "Cannot add multiple units of subscription plans. Quantity must be 1." });
       }
 
-      // Check availability
-      const availability = await billingStorage.checkItemAvailability(userId, packageSku, addonType);
+      // Check availability (team platform_access is allowed even if user has personal subscription)
+      const availability = await billingStorage.checkItemAvailability(userId, packageSku, addonType, { purchaseMode });
       if (!availability.available) {
         return res.status(400).json({ message: availability.reason || "Item not available" });
       }
@@ -2597,7 +2820,7 @@ export function setupBillingRoutes(app: Router) {
           },
         });
 
-        // Activate all cart items immediately
+        // Activate personal cart items only (team items are handled below)
         const result = await activateCartCheckout(pendingOrder, `free_${Date.now()}`, undefined, req);
 
         if (!result.success) {
@@ -2625,10 +2848,13 @@ export function setupBillingRoutes(app: Router) {
           });
         }
 
-        // Clear the cart
+        // Run team activation when cart has team items (org, license package, org add-ons, invitation)
+        const teamResult = await runTeamCartActivation(pendingOrder, userId, req);
+
+        // Clear the cart (activateCartCheckout already cleared it; ensure no-op if called twice)
         await billingStorage.clearCart(userId);
 
-        console.log(`[Cart Checkout] ✅ Free order completed: ${result.activatedAddons.length} items activated`);
+        console.log(`[Cart Checkout] ✅ Free order completed: ${result.activatedAddons.length} personal items activated, team invitation: ${teamResult.licenseManagerInvitationSent}`);
 
         // Return success response (no payment gateway needed)
         return res.json({
@@ -2638,6 +2864,7 @@ export function setupBillingRoutes(app: Router) {
           message: "Order completed successfully with 100% discount!",
           activatedAddons: result.activatedAddons,
           itemCount: result.activatedAddons.length,
+          licenseManagerInvitationSent: teamResult.licenseManagerInvitationSent,
           breakdown: {
             subtotal: cartTotal.subtotal,
             discount: cartTotal.discount,
@@ -2687,7 +2914,8 @@ export function setupBillingRoutes(app: Router) {
 
       // Verify all items are still available
       for (const item of cartTotal.items) {
-        const availability = await billingStorage.checkItemAvailability(userId, item.packageSku, item.addonType);
+        const purchaseMode = (item.purchaseMode === 'team' ? 'team' : 'user') as 'user' | 'team';
+        const availability = await billingStorage.checkItemAvailability(userId, item.packageSku, item.addonType, { purchaseMode });
         if (!availability.available) {
           return res.status(400).json({ 
             message: `Item "${item.packageName}" is no longer available`, 
@@ -3170,7 +3398,7 @@ export function setupBillingRoutes(app: Router) {
             metadata: { 
               orderId,
               cartCheckout: true,
-              itemCount: cartItems.length,
+              itemCount: (orderMetadata.items || []).length,
             },
           });
           gatewayTransactionId = gatewayTx.id;
@@ -3190,227 +3418,9 @@ export function setupBillingRoutes(app: Router) {
 
       const activatedAddons = result.activatedAddons;
 
-      // Extract cart items for team purchase handling
-      const metadata = pendingOrder.metadata as any;
-      const cartItems = metadata?.items as Array<{
-        packageSku: string;
-        packageName: string;
-        addonType: string;
-        basePrice: string;
-        currency: string;
-        quantity: number;
-        metadata: any;
-        purchaseMode?: string;
-        teamManagerName?: string;
-        teamManagerEmail?: string;
-        companyName?: string;
-      }>;
-
-      // Handle team purchases - send License Manager invitation
-      // Note: purchaseMode, teamManagerName, teamManagerEmail are top-level cart item fields
-      let licenseManagerInvitationSent = false;
-      const teamItems = cartItems.filter(item => item.purchaseMode === 'team');
-      
-      if (teamItems.length > 0) {
-        try {
-          const { sendLicenseManagerInvitationEmail } = await import('./services/email');
-          const crypto = await import('crypto');
-          
-          // Get team manager info from the first team item (stored as top-level fields)
-          const teamItem = teamItems[0];
-          const teamManagerName = teamItem.teamManagerName as string;
-          const teamManagerEmail = teamItem.teamManagerEmail as string;
-          
-          if (teamManagerName && teamManagerEmail) {
-            // Get buyer info
-            const buyer = await authStorage.getUserById(userId);
-            const buyerName = buyer ? `${buyer.firstName || ''} ${buyer.lastName || ''}`.trim() || buyer.email : 'A Rev Winner customer';
-            
-            // Calculate purchase quantities
-            const purchaseDetails = {
-              platformAccessCount: cartItems
-                .filter(item => item.addonType === 'platform_access')
-                .reduce((sum, item) => sum + (item.quantity || 1), 0),
-              sessionMinutesCount: cartItems
-                .filter(item => item.addonType === 'session_minutes')
-                .reduce((sum, item) => sum + (item.quantity || 1), 0),
-              daiCount: cartItems
-                .filter(item => item.addonType === 'dai')
-                .reduce((sum, item) => sum + (item.quantity || 1), 0),
-              trainMeCount: cartItems
-                .filter(item => item.addonType === 'train_me')
-                .reduce((sum, item) => sum + (item.quantity || 1), 0),
-              totalAmount: pendingOrder.amount || '0',
-              buyerName,
-            };
-            
-            // Check if license manager user already exists
-            let licenseManager = await authStorage.getUserByEmail(teamManagerEmail);
-            
-            if (!licenseManager) {
-              // Create new license manager user with temporary random password
-              // The user will set their real password via the invitation email link
-              const tempPassword = crypto.randomBytes(32).toString('hex');
-              
-              // Parse name into first/last
-              const nameParts = teamManagerName.trim().split(' ');
-              const firstName = nameParts[0] || teamManagerName;
-              const lastName = nameParts.slice(1).join(' ') || '';
-              
-              // Generate a username from email
-              const username = teamManagerEmail.split('@')[0] + '_' + crypto.randomBytes(4).toString('hex');
-              
-              // createUser expects plaintext password and hashes internally
-              licenseManager = await authStorage.createUser({
-                email: teamManagerEmail,
-                username,
-                password: tempPassword,
-                firstName,
-                lastName,
-                role: 'license_manager',
-              });
-              
-              console.log(`Created License Manager user: ${licenseManager.id} (${teamManagerEmail})`);
-            } else if (licenseManager.role !== 'license_manager') {
-              // Update existing user to be a license manager
-              await authStorage.updateUser(licenseManager.id, { role: 'license_manager' });
-              console.log(`Updated user ${licenseManager.id} role to license_manager`);
-            }
-            
-            // Get company name from cart item
-            const companyName = teamItem.companyName as string || `${teamManagerName}'s Organization`;
-            
-            // Check if license manager already has an organization
-            let organization = await authStorage.getOrganizationByManagerId(licenseManager.id);
-            let isNewOrganization = false;
-            
-            if (!organization) {
-              // Create organization for the license manager
-              organization = await authStorage.createOrganization({
-                companyName,
-                billingEmail: teamManagerEmail,
-                primaryManagerId: licenseManager.id,
-                status: 'active',
-              });
-              isNewOrganization = true;
-              console.log(`Created organization: ${organization.id} (${companyName})`);
-              
-              // Create organization membership for the license manager
-              await authStorage.createOrganizationMembership({
-                organizationId: organization.id,
-                userId: licenseManager.id,
-                role: 'admin',
-                status: 'active',
-              });
-              console.log(`Added license manager to organization membership`);
-            } else {
-              // Organization exists - update company name and manager if needed
-              if (organization.companyName !== companyName || organization.primaryManagerId !== licenseManager.id) {
-                await authStorage.updateOrganization(organization.id, {
-                  companyName,
-                  primaryManagerId: licenseManager.id,
-                  billingEmail: teamManagerEmail,
-                });
-                console.log(`Updated organization: ${organization.id} (${companyName})`);
-              }
-              
-              // Check if license manager has membership for THIS organization, create if not
-              const existingMembership = await authStorage.getUserMembership(licenseManager.id);
-              if (!existingMembership || existingMembership.organizationId !== organization.id) {
-                try {
-                  await authStorage.createOrganizationMembership({
-                    organizationId: organization.id,
-                    userId: licenseManager.id,
-                    role: 'admin',
-                    status: 'active',
-                  });
-                  console.log(`Added license manager to existing organization membership`);
-                } catch (membershipError: any) {
-                  // Handle duplicate membership gracefully
-                  if (membershipError.code !== '23505') {
-                    throw membershipError;
-                  }
-                  console.log(`License manager already has membership for organization`);
-                }
-              }
-            }
-            
-            // Calculate seats from team platform_access items
-            // Note: Current UI design allows only ONE team purchase per cart (one org, one manager)
-            // All team platform_access items in this cart belong to this organization
-            const teamPlatformAccessItems = teamItems.filter(item => item.addonType === 'platform_access');
-            const totalSeats = teamPlatformAccessItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
-            
-            if (totalSeats > 0) {
-              // Get the Platform Access package info for pricing from the first team platform access item
-              const platformAccessItem = teamPlatformAccessItems[0];
-              const pricePerSeat = platformAccessItem?.basePrice || '0';
-              const currency = platformAccessItem?.currency || 'USD';
-              
-              // Calculate validity period from the package
-              const pkg = platformAccessItem ? await getPackageOrAddonBySku(platformAccessItem.packageSku) : null;
-              const validityDays = pkg?.validityDays || 365;
-              
-              const startDate = new Date();
-              const endDate = new Date(startDate.getTime() + validityDays * 24 * 60 * 60 * 1000);
-              
-              // Create license package with seats = team Platform Access quantity
-              const licensePackage = await authStorage.createLicensePackage({
-                organizationId: organization.id,
-                packageType: platformAccessItem?.packageSku || 'team-platform-access',
-                totalSeats,
-                pricePerSeat,
-                totalAmount: (parseFloat(pricePerSeat) * totalSeats).toString(),
-                currency,
-                startDate,
-                endDate,
-                status: 'active',
-              });
-              console.log(`Created license package: ${licensePackage.id} with ${totalSeats} seats for organization ${organization.id}`);
-              
-              // Add license package info to purchase details for email
-              (purchaseDetails as any).licensePackageId = licensePackage.id;
-              (purchaseDetails as any).organizationId = organization.id;
-            }
-            
-            // Generate password reset token (24 hour expiry)
-            const resetToken = crypto.randomBytes(32).toString('hex');
-            const resetTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
-            
-            await authStorage.createPasswordResetToken(teamManagerEmail, resetToken, resetTokenExpiry);
-            
-            // Send invitation email
-            await sendLicenseManagerInvitationEmail(
-              teamManagerEmail,
-              teamManagerName,
-              resetToken,
-              purchaseDetails
-            );
-            
-            licenseManagerInvitationSent = true;
-            console.log(`License Manager invitation sent to ${teamManagerEmail}`);
-            
-            // Log the team purchase event
-            await eventLogger.log({
-              actorId: userId,
-              action: 'team_purchase.completed',
-              targetType: 'license_manager',
-              targetId: licenseManager.id,
-              metadata: {
-                licenseManagerEmail: teamManagerEmail,
-                licenseManagerName: teamManagerName,
-                purchaseDetails,
-                orderId,
-              },
-              ipAddress: req.ip,
-              userAgent: req.get('user-agent'),
-            });
-          }
-        } catch (emailError) {
-          console.error('Failed to send License Manager invitation:', emailError);
-          // Don't fail the payment verification - log and continue
-        }
-      }
+      // Handle team purchases (org, license package, org add-ons, invitation)
+      const teamResult = await runTeamCartActivation(pendingOrder, userId, req);
+      const licenseManagerInvitationSent = teamResult.licenseManagerInvitationSent;
 
       res.json({
         success: true,

@@ -118,8 +118,14 @@ export default function Packages() {
     ogUrl: "https://revwinner.com/packages"
   });
   
-  // Purchase mode state
-  const [purchaseMode, setPurchaseMode] = useState<'user' | 'team'>('user');
+  // Purchase mode state (support ?mode=team in URL for License Manager deep link)
+  const [purchaseMode, setPurchaseMode] = useState<'user' | 'team'>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('mode') === 'team' ? 'team' : 'user';
+    }
+    return 'user';
+  });
   
   // Team manager info
   const [teamManager, setTeamManager] = useState<TeamManagerInfo>({ name: '', email: '', companyName: '' });
@@ -154,17 +160,20 @@ export default function Packages() {
     ...(packagesData.addons || []).map(a => a.id),
   ] : [];
 
-  // Batch fetch all availability data using useQueries (called outside render loops)
+  // Batch fetch all availability data using useQueries (team mode uses different availability)
   const availabilityQueries = useQueries({
     queries: allSkus.map(sku => ({
-      queryKey: [`/api/cart/check-availability/${sku}`],
+      queryKey: [`/api/cart/check-availability/${sku}`, purchaseMode],
       queryFn: async () => {
         const token = localStorage.getItem('accessToken');
         const headers: HeadersInit = {};
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
         }
-        const response = await fetch(`/api/cart/check-availability/${sku}`, { 
+        const url = purchaseMode === 'team'
+          ? `/api/cart/check-availability/${sku}?purchaseMode=team`
+          : `/api/cart/check-availability/${sku}`;
+        const response = await fetch(url, {
           credentials: 'include',
           headers
         });

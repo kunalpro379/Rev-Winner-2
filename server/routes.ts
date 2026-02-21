@@ -1140,131 +1140,163 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to save meeting minutes", error: error.message });
     }
   });
+ // Generate Tech Environment Mind Map from transcript
+ app.post("/api/conversations/:sessionId/mind-map", authenticateToken, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { transcript, domainExpertise } = req.body;
+    const userId = req.jwtUser?.userId;
 
-  // Generate Tech Environment Mind Map from transcript
-  app.post("/api/conversations/:sessionId/mind-map", authenticateToken, async (req, res) => {
-    try {
-      const { sessionId } = req.params;
-      const { transcript, domainExpertise } = req.body;
-      const userId = req.jwtUser?.userId;
+    console.log(`🗺️ Map/Flow: Request for session ${sessionId}, userId: ${userId}, transcript length: ${transcript?.length || 0}`);
 
-      console.log(`🗺️ Map/Flow: Request for session ${sessionId}, userId: ${userId}, transcript length: ${transcript?.length || 0}`);
-
-      if (!transcript || transcript.trim().length < 50) {
-        console.log('🗺️ Map/Flow: Insufficient transcript content');
-        return res.status(400).json({
-          success: false,
-          message: "Insufficient transcript content",
-          details: "Need more conversation content to generate a mind map"
-        });
-      }
-
-      if (!userId) {
-        console.log('🗺️ Map/Flow: No userId available');
-        return res.status(400).json({
-          success: false,
-          message: "User authentication required",
-          details: "Please log in to generate the Map/Flow visualization"
-        });
-      }
-
-      const { extractTechEnvironment } = await import("./services/mind-map-extraction");
-      console.log('🗺️ Map/Flow: Calling AI extraction...');
-      
-      // CRITICAL: 60-second timeout for Map/Flow (background feature, can take longer due to complex analysis with knowledge base)
-      const extractionPromise = extractTechEnvironment(sessionId, transcript, domainExpertise, userId);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Map/Flow generation timeout after 60 seconds')), 60000)
-      );
-      
-      const mindMapData = await Promise.race([extractionPromise, timeoutPromise]) as any;
-      console.log(`🗺️ Map/Flow: Generated ${mindMapData.nodes?.length || 0} nodes, ${mindMapData.edges?.length || 0} edges`);
-
-      if (mindMapData.nodes?.length === 0 && transcript.trim().length >= 200) {
-        console.warn('⚠️ Map/Flow: 0 nodes extracted from substantial transcript. Consider investigating AI response.');
-      }
-
-      res.json({
-        success: true,
-        data: mindMapData
-      });
-    } catch (error: any) {
-      console.error("🗺️ Map/Flow generation error:", error);
-      res.status(500).json({
+    if (!transcript || transcript.trim().length < 50) {
+      console.log('🗺️ Map/Flow: Insufficient transcript content');
+      return res.status(400).json({
         success: false,
-        message: "Failed to generate mind map",
-        error: error.message
+        message: "Insufficient transcript content",
+        details: "Need more conversation content to generate a mind map"
       });
     }
-  });
 
-  // Get existing Mind Map for session
-  app.get("/api/conversations/:sessionId/mind-map", authenticateToken, async (_req, res) => {
-    try {
-      // For now, return null as we don't persist mind maps
-      res.json(null);
-    } catch (error: any) {
-      console.error("Mind map fetch error:", error);
-      res.status(500).json({ message: "Failed to fetch mind map", error: error.message });
+    if (!userId) {
+      console.log('🗺️ Map/Flow: No userId available');
+      return res.status(400).json({
+        success: false,
+        message: "User authentication required",
+        details: "Please log in to generate the Map/Flow visualization"
+      });
     }
-  });
 
-  // Helper function: Detect conversation phase based on content and signals
-  const detectConversationPhase = (text: string, messageCount: number, insights: any): { phase: string; readinessScore: number; signals: string[] } => {
-    const lowerText = text.toLowerCase();
-    const signals: string[] = [];
-    
-    // Closing phase indicators (highest priority)
-    const closingIndicators = [
-      'contract', 'agreement', 'sign', 'when can we start', 'next steps',
-      'implementation date', 'go live', 'procurement', 'purchase order',
-      'finalize', 'move forward', 'ready to proceed', 'let\'s do it'
-    ];
-    const closingMatches = closingIndicators.filter(i => lowerText.includes(i));
-    if (closingMatches.length >= 2 || (closingMatches.length >= 1 && messageCount > 15)) {
-      signals.push(...closingMatches.map(m => `Closing signal: "${m}"`));
-      return { phase: 'closing', readinessScore: 90, signals };
+    const { extractTechEnvironment } = await import("./services/mind-map-extraction");
+    console.log('🗺️ Map/Flow: Calling AI extraction...');
+    const mindMapData = await extractTechEnvironment(sessionId, transcript, domainExpertise, userId);
+    console.log(`🗺️ Map/Flow: Generated ${mindMapData.nodes?.length || 0} nodes, ${mindMapData.edges?.length || 0} edges`);
+
+    if (mindMapData.nodes?.length === 0 && transcript.trim().length >= 200) {
+      console.warn('⚠️ Map/Flow: 0 nodes extracted from substantial transcript. Consider investigating AI response.');
     }
-    
-    // Objection handling phase
-    const objectionIndicators = [
-      'concern', 'worried', 'hesitant', 'not sure', 'budget issue',
-      'competitor', 'alternative', 'why should', 'convince', 'prove',
-      'risk', 'guarantee', 'what if', 'too expensive', 'need approval'
-    ];
-    const objectionMatches = objectionIndicators.filter(i => lowerText.includes(i));
-    if (objectionMatches.length >= 2) {
-      signals.push(...objectionMatches.map(m => `Objection: "${m}"`));
-      return { phase: 'objection_handling', readinessScore: 65, signals };
+
+    res.json({
+      success: true,
+      data: mindMapData
+    });
+  } catch (error: any) {
+    console.error("🗺️ Map/Flow generation error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate mind map",
+      error: error.message
+    });
+  }
+});
+
+// Stream mind-map generation: same quality as POST /mind-map (non-streaming AI), progress via SSE
+app.post("/api/conversations/:sessionId/mind-map/stream", authenticateToken, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { transcript, domainExpertise } = req.body;
+    const userId = req.jwtUser?.userId;
+
+    if (!transcript || transcript.trim().length < 50) {
+      return res.status(400).json({ success: false, message: "Insufficient transcript content" });
     }
-    
-    // Presentation/Demo phase indicators
-    const presentationIndicators = [
-      'demo', 'show me', 'walkthrough', 'how does', 'features',
-      'capabilities', 'pricing', 'options', 'packages', 'comparison',
-      'integration', 'implementation', 'training', 'support'
-    ];
-    const presentationMatches = presentationIndicators.filter(i => lowerText.includes(i));
-    if (presentationMatches.length >= 2 || messageCount > 10) {
-      signals.push(...presentationMatches.map(m => `Interest signal: "${m}"`));
-      return { phase: 'presentation', readinessScore: 50, signals };
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User authentication required" });
     }
-    
-    // Qualification phase (BANT signals)
-    const qualificationIndicators = [
-      'budget', 'timeline', 'decision', 'stakeholder', 'approval',
-      'authority', 'team size', 'users', 'departments', 'priority'
-    ];
-    const qualificationMatches = qualificationIndicators.filter(i => lowerText.includes(i));
-    if (qualificationMatches.length >= 1 || messageCount > 5) {
-      signals.push(...qualificationMatches.map(m => `Qualification: "${m}"`));
-      return { phase: 'qualification', readinessScore: 35, signals };
-    }
-    
-    // Discovery phase (default for early conversations)
-    signals.push('Early conversation - building rapport and understanding needs');
-    return { phase: 'discovery', readinessScore: 15, signals };
-  };
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders?.();
+
+    const send = (event: string, data: object) => {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      res.flushHeaders?.();
+    };
+
+    send("progress", { status: "start", message: "Analyzing conversation & building maps…" });
+    const { extractTechEnvironment } = await import("./services/mind-map-extraction");
+    const mindMapData = await extractTechEnvironment(sessionId, transcript, domainExpertise, userId);
+    console.log(`🗺️ Map/Flow: Generated ${mindMapData.nodes?.length || 0} nodes, ${mindMapData.edges?.length || 0} edges`);
+    send("done", { success: true, data: mindMapData });
+    res.end();
+  } catch (error: any) {
+    console.error("🗺️ Map/Flow stream error:", error);
+    if (!res.headersSent) res.status(500).json({ success: false, message: error.message });
+    else res.write(`event: error\ndata: ${JSON.stringify({ message: error.message })}\n\n`);
+    res.end();
+  }
+});
+
+// Get existing Mind Map for session
+app.get("/api/conversations/:sessionId/mind-map", authenticateToken, async (_req, res) => {
+  try {
+    // For now, return null as we don't persist mind maps
+    res.json(null);
+  } catch (error: any) {
+    console.error("Mind map fetch error:", error);
+    res.status(500).json({ message: "Failed to fetch mind map", error: error.message });
+  }
+});
+
+// Helper function: Detect conversation phase based on content and signals
+const detectConversationPhase = (text: string, messageCount: number, insights: any): { phase: string; readinessScore: number; signals: string[] } => {
+  const lowerText = text.toLowerCase();
+  const signals: string[] = [];
+  
+  // Closing phase indicators (highest priority)
+  const closingIndicators = [
+    'contract', 'agreement', 'sign', 'when can we start', 'next steps',
+    'implementation date', 'go live', 'procurement', 'purchase order',
+    'finalize', 'move forward', 'ready to proceed', 'let\'s do it'
+  ];
+  const closingMatches = closingIndicators.filter(i => lowerText.includes(i));
+  if (closingMatches.length >= 2 || (closingMatches.length >= 1 && messageCount > 15)) {
+    signals.push(...closingMatches.map(m => `Closing signal: "${m}"`));
+    return { phase: 'closing', readinessScore: 90, signals };
+  }
+  
+  // Objection handling phase
+  const objectionIndicators = [
+    'concern', 'worried', 'hesitant', 'not sure', 'budget issue',
+    'competitor', 'alternative', 'why should', 'convince', 'prove',
+    'risk', 'guarantee', 'what if', 'too expensive', 'need approval'
+  ];
+  const objectionMatches = objectionIndicators.filter(i => lowerText.includes(i));
+  if (objectionMatches.length >= 2) {
+    signals.push(...objectionMatches.map(m => `Objection: "${m}"`));
+    return { phase: 'objection_handling', readinessScore: 65, signals };
+  }
+  
+  // Presentation/Demo phase indicators
+  const presentationIndicators = [
+    'demo', 'show me', 'walkthrough', 'how does', 'features',
+    'capabilities', 'pricing', 'options', 'packages', 'comparison',
+    'integration', 'implementation', 'training', 'support'
+  ];
+  const presentationMatches = presentationIndicators.filter(i => lowerText.includes(i));
+  if (presentationMatches.length >= 2 || messageCount > 10) {
+    signals.push(...presentationMatches.map(m => `Interest signal: "${m}"`));
+    return { phase: 'presentation', readinessScore: 50, signals };
+  }
+  
+  // Qualification phase (BANT signals)
+  const qualificationIndicators = [
+    'budget', 'timeline', 'decision', 'stakeholder', 'approval',
+    'authority', 'team size', 'users', 'departments', 'priority'
+  ];
+  const qualificationMatches = qualificationIndicators.filter(i => lowerText.includes(i));
+  if (qualificationMatches.length >= 1 || messageCount > 5) {
+    signals.push(...qualificationMatches.map(m => `Qualification: "${m}"`));
+    return { phase: 'qualification', readinessScore: 35, signals };
+  }
+  
+  // Discovery phase (default for early conversations)
+  signals.push('Early conversation - building rapport and understanding needs');
+  return { phase: 'discovery', readinessScore: 15, signals };
+};
+
 
   // Relationship Building One-liners endpoint with conversation phase awareness (ULTRA-OPTIMIZED)
   app.get("/api/conversations/:sessionId/one-liners", authenticateToken, checkEntitlement, async (req, res) => {
@@ -1595,9 +1627,26 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
       
       let recommendations;
       try {
-        // Response is already cleaned by generateResponse
+        // Robust extract: strip code fences (with or without closing ```), then try first { to last } if needed
+        let jsonStr = response.trim();
+        if (jsonStr.startsWith("```")) {
+          const firstNewline = jsonStr.indexOf("\n");
+          const lastBackticks = jsonStr.lastIndexOf("```");
+          if (firstNewline !== -1 && lastBackticks > firstNewline) {
+            jsonStr = jsonStr.slice(firstNewline + 1, lastBackticks).trim();
+          } else if (firstNewline !== -1) {
+            jsonStr = jsonStr.slice(firstNewline + 1).trim();
+          } else {
+            jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+          }
+        }
+        const openBrace = jsonStr.indexOf("{");
+        if (openBrace >= 0 && (openBrace > 0 || !jsonStr.startsWith("{"))) {
+          const lastBrace = jsonStr.lastIndexOf("}");
+          if (lastBrace > openBrace) jsonStr = jsonStr.slice(openBrace, lastBrace + 1);
+        }
         console.log(`AI response length: ${response.length}`);
-        recommendations = JSON.parse(response);
+        recommendations = JSON.parse(jsonStr);
         console.log(`Partner services recommendations generated: ${recommendations.recommendations?.length || 0} services`);
         
         // Cache successful response
@@ -1631,6 +1680,233 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
     } catch (error) {
       console.error('Error generating partner services recommendations:', error);
       res.status(500).json({ error: "Failed to generate recommendations" });
+    }
+  });
+
+  // Run multiple Call Session AI features in parallel (async batch)
+  app.post("/api/conversations/:sessionId/ai-batch", authenticateToken, checkEntitlement, async (req, res) => {
+    const startBatch = Date.now();
+    try {
+      const { sessionId } = req.params;
+      const userId = req.jwtUser?.userId;
+      const {
+        domainExpertise,
+        transcriptText: bodyTranscript,
+        multiProductEliteAI: rawMultiProductFlag = false,
+        features: requestedFeatures,
+      } = req.body || {};
+
+      const domain = domainExpertise || "Generic Product";
+      const multiProductEliteAI = typeof rawMultiProductFlag === "boolean"
+        ? rawMultiProductFlag
+        : rawMultiProductFlag === "true" || rawMultiProductFlag === true;
+
+      const defaultFeatures = [
+        "one-liners",
+        "partner-services",
+        "meeting-minutes",
+        "conversation-analysis",
+        "mind-map",
+        "present-to-win",
+      ];
+      const features = Array.isArray(requestedFeatures) && requestedFeatures.length > 0
+        ? requestedFeatures
+        : defaultFeatures;
+
+      const conversation = await storage.getConversation(sessionId);
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      const messages = await storage.getMessages(conversation.id);
+      const conversationHistory = messages.map((m: any) => ({
+        sender: m.sender,
+        content: m.content,
+        speakerLabel: m.speakerLabel,
+      }));
+      const conversationText = messages.length > 0
+        ? messages.map((m: any) => `${m.sender}: ${m.content}`).join("\n")
+        : "";
+      const transcriptForAnalysis = (bodyTranscript && String(bodyTranscript).trim()) || conversationText;
+
+      const sessionStart = conversation.transcriptionStartedAt
+        ? new Date(conversation.transcriptionStartedAt)
+        : conversation.createdAt
+          ? new Date(conversation.createdAt)
+          : new Date();
+      const durationMs = Date.now() - sessionStart.getTime();
+      const durationMinutes = Math.round(durationMs / 60000);
+      const formattedDuration = durationMinutes >= 60
+        ? `${Math.floor(durationMinutes / 60)} hour${Math.floor(durationMinutes / 60) > 1 ? "s" : ""} ${durationMinutes % 60} minutes`
+        : `${durationMinutes} minutes`;
+
+      const openaiService = await import("./services/openai");
+      const { generateMeetingMinutes, generateCombinedAnalysis, generatePresentToWin } = openaiService;
+      const { extractTechEnvironment } = await import("./services/mind-map-extraction");
+      const { aiCache } = await import("./services/ai-cache");
+
+      const runOneLiners = async () => {
+        if (messages.length < 5) {
+          const phaseAnalysis = { phase: "discovery" as const, readinessScore: 15 };
+          const defaultOneliners = [
+            { id: "opener-1", category: "empathy", text: "I really appreciate you sharing that context.", situation: "Opening the conversation", tone: "supportive", phase: "discovery", strategicIntent: "Build trust" },
+            { id: "rapport-1", category: "insight", text: "Based on what I'm hearing, you're dealing with challenges that many successful organizations have overcome.", situation: "Connecting to success stories", tone: "consultative", phase: "discovery", strategicIntent: "Position as trusted advisor" },
+            { id: "discovery-1", category: "curiosity", text: "What would it mean for your team if we could solve this challenge in the next quarter?", situation: "Understanding vision", tone: "curious", phase: "discovery", strategicIntent: "Create vision and timeline" },
+            { id: "reassurance-1", category: "reassurance", text: "You've clearly put a lot of thought into this.", situation: "Acknowledging preparation", tone: "reassuring", phase: "discovery", strategicIntent: "Validate approach" },
+          ];
+          return { oneliners: defaultOneliners, phase: phaseAnalysis.phase, readinessScore: phaseAnalysis.readinessScore };
+        }
+        const cacheKey = `oneliners:${sessionId}:${messages.length}`;
+        const cached = aiCache.get(cacheKey);
+        if (cached) return cached;
+        const phaseAnalysis = detectConversationPhase(conversationText, messages.length, conversation.discoveryInsights);
+        const onelinerPrompt = `Sales coach. 4 rapport statements for ${phaseAnalysis.phase} phase.\n\nCONVERSATION:\n${conversationText.slice(-800)}\n\nJSON only:\n{"phase":"${phaseAnalysis.phase}","readinessScore":${phaseAnalysis.readinessScore},"oneliners":[{"id":"1","category":"empathy","text":"Statement","situation":"When","tone":"tone","strategicIntent":"Goal"},{"id":"2","category":"insight","text":"Statement","situation":"When","tone":"tone","strategicIntent":"Goal"},{"id":"3","category":"curiosity","text":"Statement","situation":"When","tone":"tone","strategicIntent":"Goal"},{"id":"4","category":"reassurance","text":"Statement","situation":"When","tone":"tone","strategicIntent":"Goal"}]}`;
+        const response = await Promise.race([
+          openaiService.generateResponse(onelinerPrompt, []),
+          new Promise<string>((_, rej) => setTimeout(() => rej(new Error("Timeout")), 15000)),
+        ]);
+        let oneliners: any;
+        try {
+          const cleaned = response.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+          oneliners = JSON.parse(cleaned);
+          oneliners.phase = oneliners.phase || phaseAnalysis.phase;
+          oneliners.readinessScore = oneliners.readinessScore ?? phaseAnalysis.readinessScore;
+        } catch {
+          oneliners = { phase: phaseAnalysis.phase, readinessScore: phaseAnalysis.readinessScore, oneliners: [] };
+        }
+        aiCache.set(cacheKey, oneliners, 120000);
+        return oneliners;
+      };
+
+      const runPartnerServices = async () => {
+        const cacheKey = `partner-services:${sessionId}:${domain}`;
+        const CACHE_TTL = 60000;
+        const cached = partnerServicesCache.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < CACHE_TTL) return cached.data;
+        const painPoints = (conversation.discoveryInsights as any)?.painPoints || [];
+        const requirements = (conversation.discoveryInsights as any)?.requirements || [];
+        if (messages.length < 2) {
+          const defaultRec = {
+            recommendations: [
+              { service: { id: "discovery-1", name: `${domain} Discovery Workshop`, type: "consulting", description: `Workshop to map workflows and align ${domain} solutions.`, provider: "Strategic Advisory", estimatedDuration: "1-2 weeks", complexity: "low", tags: ["discovery", domain.toLowerCase()] }, relevanceScore: 95, reasoning: "Understanding your processes ensures the right-fit products.", priority: "high" },
+              { service: { id: "platform-1", name: `${domain} Platform`, type: "product", description: `Unified ${domain} platform.`, provider: domain, estimatedDuration: "2-4 months", complexity: "medium", tags: ["automation", domain.toLowerCase()] }, relevanceScore: 88, reasoning: "Unified approach to consolidating tools.", priority: "high" },
+              { service: { id: "success-1", name: `${domain} Success Partnership`, type: "service", description: `Ongoing partnership.`, provider: "Customer Success", estimatedDuration: "Ongoing", complexity: "low", tags: ["success", domain.toLowerCase()] }, relevanceScore: 82, reasoning: "Maximize investment with ongoing optimization.", priority: "medium" },
+            ],
+          };
+          partnerServicesCache.set(cacheKey, { data: defaultRec, timestamp: Date.now() });
+          return defaultRec;
+        }
+        const analysisPrompt = `Act as expert ${domain} consultant. Conversation:\n${conversationText}\nPain: ${painPoints.join(", ") || "Discovery"}. Requirements: ${requirements.join(", ") || "Gathering"}.\nRecommend 3 products/services. JSON only: {"recommendations":[{"service":{"id","name","type","description","provider","estimatedDuration","complexity","tags"},"relevanceScore":0-100,"reasoning":"","priority":"high|medium|low"}]}`;
+        const response = await openaiService.generateResponse(analysisPrompt, []);
+        let jsonStr = response.trim().replace(/```(?:json)?\s*/gi, "").replace(/```\s*$/g, "").trim();
+        const openBrace = jsonStr.indexOf("{");
+        if (openBrace >= 0) {
+          const lastBrace = jsonStr.lastIndexOf("}");
+          if (lastBrace > openBrace) jsonStr = jsonStr.slice(openBrace, lastBrace + 1);
+        }
+        let recommendations: any;
+        try {
+          recommendations = JSON.parse(jsonStr);
+          partnerServicesCache.set(cacheKey, { data: recommendations, timestamp: Date.now() });
+        } catch {
+          recommendations = { recommendations: [{ service: { id: "consultation-fallback", name: "Strategic Solution Consultation", type: "consulting", description: "Personalized consultation.", provider: "Strategic Advisory", estimatedDuration: "1-2 weeks", complexity: "low", tags: ["consultation"] }, relevanceScore: 85, reasoning: "Deeper consultation to tailor solution.", priority: "high" }] };
+        }
+        return recommendations;
+      };
+
+      const runMeetingMinutes = async () => {
+        const minutes = await generateMeetingMinutes(
+          conversationHistory,
+          conversation.clientName || "Client",
+          domain,
+          userId,
+          sessionStart
+        );
+        (minutes as any).duration = formattedDuration;
+        const { db } = await import("./db");
+        const { authUsers } = await import("@shared/schema");
+        const { eq } = await import("drizzle-orm");
+        let repName = "Sales Representative";
+        if (userId) {
+          const [user] = await db.select().from(authUsers).where(eq(authUsers.id, userId)).limit(1);
+          if (user && (user.firstName || user.lastName)) repName = [user.firstName, user.lastName].filter(Boolean).join(" ") || repName;
+        }
+        (minutes as any).repName = repName;
+        return minutes;
+      };
+
+      const runAnalysis = async () => {
+        if (!transcriptForAnalysis.trim()) return null;
+        const result = await generateCombinedAnalysis(transcriptForAnalysis, conversationHistory.slice(-5), domain, userId, multiProductEliteAI);
+        const { analysis, salesScript, multiProductIntelligence, products, _multiProduct } = result;
+        return {
+          discoveryQuestions: analysis?.discoveryQuestions || [],
+          recommendedSolutions: analysis?.recommendedModules || [],
+          caseStudies: analysis?.caseStudies || [],
+          discoveryInsights: analysis?.discoveryInsights || {},
+          nextQuestions: analysis?.nextQuestions || [],
+          salesScript: salesScript ?? null,
+          closingPitch: analysis?.closingPitch ?? null,
+          nextSteps: analysis?.nextSteps || [],
+          multiProductIntelligence: multiProductIntelligence ?? null,
+          products: products ?? null,
+          _multiProduct: _multiProduct ?? false,
+        };
+      };
+
+      const runMindMap = async () => {
+        if (!transcriptForAnalysis.trim() || transcriptForAnalysis.length < 50) return null;
+        const mindMapData = await extractTechEnvironment(sessionId, transcriptForAnalysis, domain, userId);
+        return { success: true, data: mindMapData };
+      };
+
+      const runPresentToWin = async () => {
+        if (!transcriptForAnalysis.trim() || !userId) return null;
+        const uid: string = userId;
+        const types = ["pitch-deck", "case-study", "battle-card"] as const;
+        const results = await Promise.all(
+          types.map((type) => generatePresentToWin(type, transcriptForAnalysis, domain, uid))
+        );
+        return {
+          "pitch-deck": results[0],
+          "case-study": results[1],
+          "battle-card": results[2],
+        };
+      };
+
+      const taskMap: Record<string, () => Promise<any>> = {
+        "one-liners": runOneLiners,
+        "partner-services": runPartnerServices,
+        "meeting-minutes": runMeetingMinutes,
+        "conversation-analysis": runAnalysis,
+        "mind-map": runMindMap,
+        "present-to-win": runPresentToWin,
+      };
+
+      const keys = features.filter((f) => taskMap[f]);
+      const settled = await Promise.allSettled(keys.map((k) => taskMap[k]()));
+
+      const out: Record<string, any> = {};
+      keys.forEach((k, i) => {
+        const s = settled[i];
+        if (s.status === "fulfilled" && s.value != null) {
+          if (k === "one-liners") out.oneLiners = s.value;
+          else if (k === "partner-services") out.partnerServices = s.value;
+          else if (k === "meeting-minutes") out.meetingMinutes = s.value;
+          else if (k === "conversation-analysis") out.analysis = s.value;
+          else if (k === "mind-map") out.mindMap = s.value;
+          else if (k === "present-to-win") out.presentToWin = s.value;
+        }
+      });
+
+      const totalDuration = Date.now() - startBatch;
+      console.log(`✅ AI batch completed in ${totalDuration}ms for session ${sessionId} (${keys.length} features)`);
+      (out as any)._batchDuration = totalDuration;
+      (out as any)._features = keys;
+
+      res.json(out);
+    } catch (error: any) {
+      console.error("AI batch error:", error);
+      res.status(500).json({ error: "AI batch failed", message: error?.message || "Unknown error" });
     }
   });
 
@@ -2172,20 +2448,44 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
     }
   });
   
-  // Get subscription details
+  // Get subscription details (for individual users or org seat users: show org subscription when on enterprise seat)
   app.get("/api/profile/subscription", authenticateToken, async (req, res) => {
     try {
       const userId = req.jwtUser!.userId;
       console.log(`[DEBUG] Fetching subscription for userId: ${userId}`);
       
-      const subscription = await authStorage.getSubscriptionByUserId(userId);
-      console.log(`[DEBUG] Subscription found:`, subscription ? {
-        id: subscription.id,
-        planType: subscription.planType,
-        status: subscription.status,
-        planId: subscription.planId,
-      } : 'NULL');
-      
+      let subscription = await authStorage.getSubscriptionByUserId(userId);
+      let isEnterpriseSeat = false;
+      let licensePackage: Awaited<ReturnType<typeof authStorage.getActiveLicensePackage>> = null;
+
+      // If no personal subscription, check if user has an active enterprise seat (org member)
+      if (!subscription) {
+        const membership = await authStorage.getUserMembership(userId);
+        if (membership && membership.status === 'active') {
+          licensePackage = await authStorage.getActiveLicensePackage(membership.organizationId);
+          if (licensePackage) {
+            isEnterpriseSeat = true;
+            // Build synthetic subscription from organization's license package so UI shows same as individual
+            subscription = {
+              id: licensePackage.id,
+              userId,
+              planId: null,
+              planType: licensePackage.packageType || 'team',
+              status: 'active',
+              sessionsUsed: '0',
+              sessionsLimit: null,
+              minutesUsed: '0',
+              minutesLimit: 'unlimited',
+              sessionHistory: [],
+              currentPeriodStart: licensePackage.startDate,
+              currentPeriodEnd: licensePackage.endDate,
+              canceledAt: null,
+              createdAt: licensePackage.createdAt,
+            } as any;
+          }
+        }
+      }
+
       if (!subscription) {
         console.log(`[DEBUG] No subscription found for user ${userId}, returning free_trial`);
         return res.json({
@@ -2194,10 +2494,28 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
           message: "No active subscription"
         });
       }
+
+      if (isEnterpriseSeat && licensePackage) {
+        console.log(`[DEBUG] User ${userId} on enterprise seat, using org license package: ${licensePackage.id}`);
+      } else {
+        console.log(`[DEBUG] Subscription found:`, subscription ? {
+          id: subscription.id,
+          planType: subscription.planType,
+          status: subscription.status,
+          planId: subscription.planId,
+        } : 'NULL');
+      }
       
-      // Get plan details if planId exists
-      let planDetails = null;
-      if (subscription.planId) {
+      // Get plan details if planId exists (or synthetic for enterprise seat)
+      let planDetails: { name: string; price: string; currency: string; billingInterval: string } | null = null;
+      if (isEnterpriseSeat && licensePackage) {
+        planDetails = {
+          name: licensePackage.packageType?.replace(/-/g, ' ') || 'Team',
+          price: licensePackage.totalAmount || '0',
+          currency: licensePackage.currency || 'INR',
+          billingInterval: 'year',
+        };
+      } else if (subscription.planId) {
         planDetails = await authStorage.getPlanById(subscription.planId);
         console.log(`[DEBUG] Plan details:`, planDetails ? {
           name: planDetails.name,
@@ -3260,6 +3578,24 @@ Crawl-delay: 1`;
           expiryDate: null,
           source: 'enterprise'
         });
+      }
+
+      // Check for organization add-on (org purchased Train Me; assigned users get access)
+      const membership = await authStorage.getUserMembership(userId);
+      if (membership?.status === 'active') {
+        const orgAddons = await authStorage.getOrganizationAddons(membership.organizationId);
+        const orgTrainMe = orgAddons.find(a => a.type === 'train_me' && a.status === 'active' && (!a.endDate || new Date(a.endDate) > new Date()));
+        if (orgTrainMe) {
+          const endDate = orgTrainMe.endDate ? new Date(orgTrainMe.endDate) : null;
+          const daysRemaining = endDate ? Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 999;
+          return res.json({
+            active: true,
+            purchaseDate: orgTrainMe.startDate || null,
+            daysRemaining,
+            expiryDate: orgTrainMe.endDate || null,
+            source: 'organization'
+          });
+        }
       }
 
       // Check for old-style train_me_subscription_date in auth_users

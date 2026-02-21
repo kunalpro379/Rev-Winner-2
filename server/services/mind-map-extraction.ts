@@ -186,70 +186,7 @@ function buildSectionEdges(rawEdges: any[], nodeIds: Set<string>): TechEdge[] {
     }));
 }
 
-function addAutoFlowEdges(
-  sectionKey: keyof MultiSectionMap,
-  nodes: TechNode[],
-  existingEdges: TechEdge[]
-): TechEdge[] {
-  if (!nodes || nodes.length < 2) return existingEdges;
-
-  const edges = [...existingEdges];
-  const edgeKey = (e: { source: string; target: string; type?: string }) =>
-    `${e.source}::${e.target}::${e.type || 'default'}`;
-  const existing = new Set(edges.map(edgeKey));
-
-  const makeChainEdges = (orderedNodes: TechNode[], type: TechEdge['type'], label?: string) => {
-    for (let i = 0; i < orderedNodes.length - 1; i++) {
-      const sourceId = orderedNodes[i].id;
-      const targetId = orderedNodes[i + 1].id;
-      const key = edgeKey({ source: sourceId, target: targetId, type });
-      if (existing.has(key)) continue;
-
-      const newEdge: TechEdge = {
-        id: `auto_${sectionKey}_${type || 'default'}_${sourceId}_${targetId}`,
-        source: sourceId,
-        target: targetId,
-        type,
-        label
-      };
-
-      edges.push(newEdge);
-      existing.add(key);
-    }
-  };
-
-  if (sectionKey === 'businessProcesses' || sectionKey === 'callTimeline') {
-    const ordered = [...nodes].sort((a, b) => {
-      const ao = typeof a.sequenceOrder === 'number' ? a.sequenceOrder : 999;
-      const bo = typeof b.sequenceOrder === 'number' ? b.sequenceOrder : 999;
-      if (ao !== bo) return ao - bo;
-      return a.label.localeCompare(b.label);
-    });
-    makeChainEdges(ordered, 'sequence');
-  } else if (sectionKey === 'decisionMakers') {
-    const ordered = [...nodes].sort((a, b) => {
-      const al = typeof a.hierarchyLevel === 'number' ? a.hierarchyLevel : 999;
-      const bl = typeof b.hierarchyLevel === 'number' ? b.hierarchyLevel : 999;
-      if (al !== bl) return al - bl;
-      return a.label.localeCompare(b.label);
-    });
-    makeChainEdges(ordered, 'reports_to');
-  } else if (sectionKey === 'techEnvironment') {
-    if (existing.size === 0) {
-      const ordered = [...nodes].sort((a, b) => {
-        const ao = typeof a.sequenceOrder === 'number' ? a.sequenceOrder : 999;
-        const bo = typeof b.sequenceOrder === 'number' ? b.sequenceOrder : 999;
-        if (ao !== bo) return ao - bo;
-        return a.label.localeCompare(b.label);
-      });
-      makeChainEdges(ordered, 'default');
-    }
-  }
-
-  return edges;
-}
-
-function buildSection(rawSection: any, sectionKey: keyof MultiSectionMap): MapSection {
+function buildSection(rawSection: any): MapSection {
   if (!rawSection || (!rawSection.nodes?.length && !rawSection.length)) {
     return { nodes: [], edges: [], sectionEmpty: true, emptyReason: 'Not discussed in conversation' };
   }
@@ -259,8 +196,7 @@ function buildSection(rawSection: any, sectionKey: keyof MultiSectionMap): MapSe
   
   const nodes: TechNode[] = rawNodes.map((n: any, i: number) => buildSectionNode(n, i));
   const nodeIds = new Set<string>(nodes.map(n => n.id));
-  const sectionEdges = buildSectionEdges(rawEdges, nodeIds);
-  const edges = addAutoFlowEdges(sectionKey, nodes, sectionEdges);
+  const edges = buildSectionEdges(rawEdges, nodeIds);
   
   return {
     nodes,
@@ -576,11 +512,11 @@ ${truncatedTranscript}`;
     
     if (result.techEnvironment || result.decisionMakers || result.businessProcesses || result.callTimeline || result.compliance) {
       sections = {
-        techEnvironment: buildSection(result.techEnvironment, 'techEnvironment'),
-        decisionMakers: buildSection(result.decisionMakers, 'decisionMakers'),
-        businessProcesses: buildSection(result.businessProcesses, 'businessProcesses'),
-        callTimeline: buildSection(result.callTimeline, 'callTimeline'),
-        compliance: buildSection(result.compliance, 'compliance')
+        techEnvironment: buildSection(result.techEnvironment),
+        decisionMakers: buildSection(result.decisionMakers),
+        businessProcesses: buildSection(result.businessProcesses),
+        callTimeline: buildSection(result.callTimeline),
+        compliance: buildSection(result.compliance)
       };
     } else if (result.nodes) {
       const allNodes = (result.nodes || []).map((n: any, i: number) => buildSectionNode(n, i));
@@ -592,23 +528,17 @@ ${truncatedTranscript}`;
       const tlNodes = allNodes.filter((n: TechNode) => n.category === 'timeline');
       const compNodes = allNodes.filter((n: TechNode) => n.category === 'compliance');
       
-      const makeSection = (sectionNodes: TechNode[], key: keyof MultiSectionMap): MapSection => {
+      const makeEdges = (sectionNodes: TechNode[]) => {
         const ids = new Set<string>(sectionNodes.map(n => n.id));
-        const baseEdges = buildSectionEdges(allEdges, ids);
-        const edges = addAutoFlowEdges(key, sectionNodes, baseEdges);
-        return {
-          nodes: sectionNodes,
-          edges,
-          sectionEmpty: sectionNodes.length === 0
-        };
+        return buildSectionEdges(allEdges, ids);
       };
       
       sections = {
-        techEnvironment: makeSection(techNodes, 'techEnvironment'),
-        decisionMakers: makeSection(dmNodes, 'decisionMakers'),
-        businessProcesses: makeSection(procNodes, 'businessProcesses'),
-        callTimeline: makeSection(tlNodes, 'callTimeline'),
-        compliance: makeSection(compNodes, 'compliance')
+        techEnvironment: { nodes: techNodes, edges: makeEdges(techNodes), sectionEmpty: techNodes.length === 0 },
+        decisionMakers: { nodes: dmNodes, edges: makeEdges(dmNodes), sectionEmpty: dmNodes.length === 0 },
+        businessProcesses: { nodes: procNodes, edges: makeEdges(procNodes), sectionEmpty: procNodes.length === 0 },
+        callTimeline: { nodes: tlNodes, edges: makeEdges(tlNodes), sectionEmpty: tlNodes.length === 0 },
+        compliance: { nodes: compNodes, edges: makeEdges(compNodes), sectionEmpty: compNodes.length === 0 }
       };
     } else {
       const emptySection: MapSection = { nodes: [], edges: [], sectionEmpty: true, emptyReason: 'No data returned' };
