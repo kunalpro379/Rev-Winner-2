@@ -2958,3 +2958,27 @@ export const userFeedback = pgTable("user_feedback", {
 
 export type UserFeedback = typeof userFeedback.$inferSelect;
 export type InsertUserFeedback = typeof userFeedback.$inferInsert;
+
+// System Configuration table - stores application settings
+export const systemConfig = pgTable("system_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: varchar("key", { length: 255 }).notNull().unique(),
+  value: text("value"),
+  section: varchar("section", { length: 50 }).notNull(), // email, payment, ai, system, security
+  description: text("description"),
+  updatedBy: varchar("updated_by").references(() => authUsers.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_system_config_section").on(table.section),
+  index("idx_system_config_key").on(table.key),
+]);
+
+export type SystemConfig = typeof systemConfig.$inferSelect;
+export type InsertSystemConfig = typeof systemConfig.$inferInsert;
+
+export const insertSystemConfigSchema = createInsertSchema(systemConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});

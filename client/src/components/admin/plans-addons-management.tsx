@@ -54,22 +54,43 @@ type PlanFormValues = z.infer<typeof planFormSchema>;
 
 // Add-on form schema with pricing tiers support
 const addonFormSchema = insertAddonSchema.extend({
-  pricingTiers: z.string().optional().transform((val) => {
-    if (!val || val.trim() === "") return null;
-    try {
-      return JSON.parse(val);
-    } catch {
-      return null;
-    }
-  }),
-  metadata: z.string().optional().transform((val) => {
-    if (!val || val.trim() === "") return {};
-    try {
-      return JSON.parse(val);
-    } catch {
-      return {};
-    }
-  }),
+  pricingTiers: z.union([
+    z.string().optional().transform((val) => {
+      if (!val || val.trim() === "") return null;
+      try {
+        return JSON.parse(val);
+      } catch {
+        return null;
+      }
+    }),
+    z.array(z.object({
+      threshold: z.string().min(1, "Threshold is required"),
+      pricePerUnit: z.string().min(1, "Price per unit is required")
+    })).transform((arr) => arr.map(item => ({
+      threshold: parseInt(item.threshold),
+      pricePerUnit: parseFloat(item.pricePerUnit)
+    })))
+  ]).optional(),
+  metadata: z.union([
+    z.string().optional().transform((val) => {
+      if (!val || val.trim() === "") return {};
+      try {
+        return JSON.parse(val);
+      } catch {
+        return {};
+      }
+    }),
+    z.array(z.object({
+      key: z.string().min(1, "Key is required"),
+      value: z.string().min(1, "Value is required")
+    })).transform((arr) => {
+      const obj: Record<string, string> = {};
+      arr.forEach(item => {
+        obj[item.key] = item.value;
+      });
+      return obj;
+    })
+  ]).optional(),
 });
 
 type AddonFormValues = z.infer<typeof addonFormSchema>;
@@ -142,9 +163,20 @@ export function PlansAddonsManagement() {
       currency: "INR",
       isActive: true,
       publishedOnWebsite: false,
-      pricingTiers: undefined,
-      metadata: "{}",
+      pricingTiers: [],
+      metadata: [],
     },
+  });
+
+  // Field arrays for addon form
+  const { fields: pricingTierFields, append: appendPricingTier, remove: removePricingTier } = useFieldArray({
+    control: addonForm.control,
+    name: "pricingTiers" as any,
+  });
+
+  const { fields: metadataFields, append: appendMetadata, remove: removeMetadata } = useFieldArray({
+    control: addonForm.control,
+    name: "metadata" as any,
   });
 
   // Create/Update Plan Mutation
@@ -295,6 +327,23 @@ export function PlansAddonsManagement() {
   // Handle addon edit
   const handleEditAddon = (addon: Addon) => {
     setEditingAddon(addon);
+    
+    // Convert pricing tiers to field array format
+    const pricingTiersArray = Array.isArray(addon.pricingTiers)
+      ? addon.pricingTiers.map(tier => ({
+          threshold: tier.threshold?.toString() || "",
+          pricePerUnit: tier.pricePerUnit?.toString() || ""
+        }))
+      : [];
+    
+    // Convert metadata object to field array format
+    const metadataArray = addon.metadata && typeof addon.metadata === 'object'
+      ? Object.entries(addon.metadata).map(([key, value]) => ({
+          key,
+          value: String(value)
+        }))
+      : [];
+    
     addonForm.reset({
       slug: addon.slug,
       displayName: addon.displayName,
@@ -303,8 +352,8 @@ export function PlansAddonsManagement() {
       currency: addon.currency,
       isActive: addon.isActive ?? true,
       publishedOnWebsite: addon.publishedOnWebsite ?? false,
-      pricingTiers: addon.pricingTiers ? JSON.stringify(addon.pricingTiers) : undefined,
-      metadata: addon.metadata ? JSON.stringify(addon.metadata) : "{}",
+      pricingTiers: pricingTiersArray as any,
+      metadata: metadataArray as any,
     });
     setAddonDialogOpen(true);
   };
@@ -759,7 +808,17 @@ export function PlansAddonsManagement() {
             setAddonDialogOpen(open);
             if (!open) {
               setEditingAddon(null);
-              addonForm.reset();
+              addonForm.reset({
+                slug: "",
+                displayName: "",
+                type: "service",
+                flatPrice: undefined,
+                currency: "INR",
+                isActive: true,
+                publishedOnWebsite: false,
+                pricingTiers: [],
+                metadata: [],
+              });
             }
           }}>
             <DialogTrigger asChild>
@@ -878,49 +937,155 @@ export function PlansAddonsManagement() {
                   )}
 
                   {addonForm.watch("type") === "usage_bundle" && (
-                    <FormField
-                      control={addonForm.control}
-                      name="pricingTiers"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Pricing Tiers (JSON)</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder='[{"threshold": 100, "pricePerUnit": 0.99}, {"threshold": 500, "pricePerUnit": 0.79}]'
-                              {...field}
-                              data-testid="textarea-addon-pricing-tiers"
-                              className="font-mono text-sm"
-                              rows={4}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Define pricing tiers with threshold and pricePerUnit
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <FormLabel>Pricing Tiers</FormLabel>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => appendPricingTier({ threshold: "", pricePerUnit: "" })}
+                          data-testid="button-add-pricing-tier"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Tier
+                        </Button>
+                      </div>
+                      
+                      {pricingTierFields.length === 0 && (
+                        <div className="text-sm text-muted-foreground p-4 border border-dashed rounded-md text-center">
+                          No pricing tiers added. Click "Add Tier" to define tiered pricing.
+                        </div>
                       )}
-                    />
+                      
+                      {pricingTierFields.map((field, index) => (
+                        <div key={field.id} className="flex items-center gap-2 p-3 border rounded-md">
+                          <FormField
+                            control={addonForm.control}
+                            name={`pricingTiers.${index}.threshold` as any}
+                            render={({ field: inputField }) => (
+                              <FormItem className="flex-1">
+                                <FormLabel className="text-xs">Threshold (Units)</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    placeholder="e.g., 100"
+                                    {...inputField}
+                                    data-testid={`input-tier-threshold-${index}`}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={addonForm.control}
+                            name={`pricingTiers.${index}.pricePerUnit` as any}
+                            render={({ field: inputField }) => (
+                              <FormItem className="flex-1">
+                                <FormLabel className="text-xs">Price per Unit</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="e.g., 0.99"
+                                    {...inputField}
+                                    data-testid={`input-tier-price-${index}`}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removePricingTier(index)}
+                            className="mt-6"
+                            data-testid={`button-remove-tier-${index}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <FormDescription>
+                        Define pricing based on quantity thresholds (e.g., 0-100 units at $0.99 each)
+                      </FormDescription>
+                    </div>
                   )}
 
-                  <FormField
-                    control={addonForm.control}
-                    name="metadata"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Metadata (JSON - Optional)</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder='{"description": "Additional information"}'
-                            {...field}
-                            data-testid="textarea-addon-metadata"
-                            className="font-mono text-sm"
-                          />
-                        </FormControl>
-                        <FormDescription>Additional metadata as JSON object</FormDescription>
-                        <FormMessage />
-                      </FormItem>
+                  {/* Metadata Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Metadata (Optional)</FormLabel>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => appendMetadata({ key: "", value: "" })}
+                        data-testid="button-add-metadata"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Field
+                      </Button>
+                    </div>
+                    
+                    {metadataFields.length === 0 && (
+                      <div className="text-sm text-muted-foreground p-4 border border-dashed rounded-md text-center">
+                        No metadata fields. Click "Add Field" to add custom metadata.
+                      </div>
                     )}
-                  />
+                    
+                    {metadataFields.map((field, index) => (
+                      <div key={field.id} className="flex items-center gap-2">
+                        <FormField
+                          control={addonForm.control}
+                          name={`metadata.${index}.key` as any}
+                          render={({ field: inputField }) => (
+                            <FormItem className="flex-1">
+                              <FormControl>
+                                <Input
+                                  placeholder="Key (e.g., description)"
+                                  {...inputField}
+                                  data-testid={`input-metadata-key-${index}`}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={addonForm.control}
+                          name={`metadata.${index}.value` as any}
+                          render={({ field: inputField }) => (
+                            <FormItem className="flex-1">
+                              <FormControl>
+                                <Input
+                                  placeholder="Value"
+                                  {...inputField}
+                                  data-testid={`input-metadata-value-${index}`}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeMetadata(index)}
+                          data-testid={`button-remove-metadata-${index}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <FormDescription>
+                      Add custom key-value pairs for additional information
+                    </FormDescription>
+                  </div>
 
                   <FormField
                     control={addonForm.control}
@@ -973,7 +1138,17 @@ export function PlansAddonsManagement() {
                       onClick={() => {
                         setAddonDialogOpen(false);
                         setEditingAddon(null);
-                        addonForm.reset();
+                        addonForm.reset({
+                          slug: "",
+                          displayName: "",
+                          type: "service",
+                          flatPrice: undefined,
+                          currency: "INR",
+                          isActive: true,
+                          publishedOnWebsite: false,
+                          pricingTiers: [],
+                          metadata: [],
+                        });
                       }}
                       data-testid="button-cancel-addon"
                     >

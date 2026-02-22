@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function PaymentSuccess() {
   const [, setLocation] = useLocation();
@@ -161,9 +161,12 @@ export default function PaymentSuccess() {
             description: successDescription,
           });
 
-          // Invalidate relevant queries to ensure fresh data
+          // Invalidate relevant queries so profile and session minutes show updated data
           queryClient.invalidateQueries({ queryKey: ["/api/enterprise/overview"] });
           queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/session-minutes/status"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/profile/subscription"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/profile/invoices"] });
 
           // Redirect after 2 seconds
           setTimeout(() => {

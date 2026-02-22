@@ -4,6 +4,8 @@ import { setupVite, serveStatic, log } from "./vite";
 import TeamsIntegration from "./teams-integration";
 import { storage } from "./storage";
 import { performanceMonitor } from "./middleware/performance-logger";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 import 'dotenv/config';
 
 // Global error handlers to prevent crashes from unhandled errors
@@ -110,10 +112,18 @@ app.use((req, res, next) => {
       console.log('Teams integration disabled - Microsoft App credentials not configured');
     }
 
-    // Initialize scheduled jobs for operations automation
+    // Initialize scheduled jobs for operations automation (only if database is healthy)
     try {
-      const { initializeScheduledJobs } = await import('./services/scheduled-jobs');
-      initializeScheduledJobs();
+      // Quick database health check
+      const dbHealthy = await db.execute(sql`SELECT 1 as health`).then(() => true).catch(() => false);
+      
+      if (dbHealthy) {
+        const { initializeScheduledJobs } = await import('./services/scheduled-jobs');
+        initializeScheduledJobs();
+      } else {
+        console.warn('⚠️  Database not available - scheduled jobs disabled');
+        console.warn('   Check your DATABASE_URL and Neon endpoint status');
+      }
     } catch (error) {
       console.error('Failed to initialize scheduled jobs:', error);
       // Continue without scheduled jobs - not critical for immediate app startup

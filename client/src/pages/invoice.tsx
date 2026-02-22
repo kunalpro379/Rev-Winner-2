@@ -376,7 +376,9 @@ export default function Invoice() {
         
         yPosition += 10;
         addText('Thank you for your business!', 12, true);
-        addText('For any questions, please contact support@revwinner.com', 10);
+        if (invoiceData?.company?.email) {
+          addText(`For any questions, please contact ${invoiceData.company.email}`, 10);
+        }
         
         const filename = `${invoiceData?.invoiceNumber || `invoice-${orderId}`}.pdf`;
         pdf.save(filename);
@@ -517,13 +519,20 @@ export default function Invoice() {
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <img src={logoPath} alt="Rev Winner Logo" className="h-10 w-auto" />
+                  <img src={logoPath} alt="Company Logo" className="h-10 w-auto" />
                   <div>
-                    <h2 className="text-xl font-bold" style={{ color: '#000000' }}>{invoiceData.company.name}</h2>
-                    <p className="text-sm" style={{ color: '#666666' }}>{invoiceData.company.address.split('\n')[0]}</p>
-                    <p className="text-sm" style={{ color: '#666666' }}>{invoiceData.company.address.split('\n')[1]}</p>
-                    <p className="text-xs" style={{ color: '#666666' }}>{invoiceData.company.email}</p>
-                    <p className="text-xs" style={{ color: '#666666' }}>{invoiceData.company.website}</p>
+                    {(invoiceData.company.name || invoiceData.company.email || invoiceData.company.website) ? (
+                      <>
+                        {invoiceData.company.name && <h2 className="text-xl font-bold" style={{ color: '#000000' }}>{invoiceData.company.name}</h2>}
+                        {invoiceData.company.address && invoiceData.company.address.split('\n').filter(Boolean).map((line, i) => (
+                          <p key={i} className="text-sm" style={{ color: '#666666' }}>{line}</p>
+                        ))}
+                        {invoiceData.company.email && <p className="text-xs" style={{ color: '#666666' }}>{invoiceData.company.email}</p>}
+                        {invoiceData.company.website && <p className="text-xs" style={{ color: '#666666' }}>{invoiceData.company.website}</p>}
+                      </>
+                    ) : (
+                      <h2 className="text-xl font-bold" style={{ color: '#000000' }}>Invoice</h2>
+                    )}
                   </div>
                 </div>
               </div>
@@ -637,7 +646,9 @@ export default function Invoice() {
                         </div>
                         <div>
                           <span style={{ color: '#666666' }}>Expiry Date:</span>
-                          <span className="font-semibold ml-2" style={{ color: '#000000' }}>{formatDate(item.endDate)}</span>
+                          <span className="font-semibold ml-2" style={{ color: '#000000' }}>
+                            {item.endDate ? formatDate(item.endDate) : 'No expiry'}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -707,7 +718,7 @@ export default function Invoice() {
               {/* Footer */}
               <div className="text-center text-sm" style={{ color: '#666666' }}>
                 <p className="font-semibold" style={{ color: '#000000' }}>Thank you for your business!</p>
-                <p className="mt-1">For any questions, please contact {invoiceData.company.email}</p>
+                {invoiceData.company.email && <p className="mt-1">For any questions, please contact {invoiceData.company.email}</p>}
                 <p className="text-xs mt-2">
                   Generated on {formatDate(invoiceData.generatedAt)} | 
                   Invoice #{invoiceData.invoiceNumber}

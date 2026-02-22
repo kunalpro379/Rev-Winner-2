@@ -217,6 +217,10 @@ export async function sendTrialExpiringEmail(email: string, firstName: string, s
 export async function sendPasswordResetEmail(email: string, resetToken: string, firstName: string): Promise<void> {
   const resetLink = `${getAppUrl()}/reset-password?token=${resetToken}`;
   
+  console.log(`[Password Reset Email] Generating reset link for ${email}`);
+  console.log(`[Password Reset Email] Base URL: ${getAppUrl()}`);
+  console.log(`[Password Reset Email] Full reset link: ${resetLink}`);
+  
   if (!transporter) {
     console.log(`\n====== PASSWORD RESET EMAIL (DEV MODE) ======`);
     console.log(`To: ${email}`);
