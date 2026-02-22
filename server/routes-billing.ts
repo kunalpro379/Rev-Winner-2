@@ -19,11 +19,49 @@ import {
   type AddonPurchase,
   addonPurchases,
   conversations,
+  systemConfig,
 } from "../shared/schema";
 import { z } from "zod";
 import { eventLogger } from './services/event-logger';
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
+
+/** Load company and terms for invoice from system_config (optional). No hardcoded branding. */
+async function getInvoiceConfig(): Promise<{
+  company: { name: string; address: string; email: string; website: string; gstNumber: string | null };
+  terms: string[];
+}> {
+  const defaults = {
+    company: {
+      name: "",
+      address: "",
+      email: "",
+      website: "",
+      gstNumber: null as string | null,
+    },
+    terms: [] as string[],
+  };
+  try {
+    const rows = await db.select().from(systemConfig).where(eq(systemConfig.section, "system"));
+    const map: Record<string, string> = {};
+    rows.forEach((r) => {
+      map[r.key] = r.value ?? "";
+    });
+    const name = (map.siteName || "").trim();
+    const address = (map.companyAddress || "").trim();
+    const email = (map.supportEmail || "").trim();
+    const website = (map.siteUrl || "").trim();
+    const gstNumber = (map.gstNumber || "").trim() || null;
+    const termsRaw = (map.invoiceTerms || "").trim();
+    const terms = termsRaw ? termsRaw.split(/\r?\n/).map((s) => s.trim()).filter(Boolean) : [];
+    return {
+      company: { name, address, email, website, gstNumber },
+      terms: terms.length > 0 ? terms : defaults.terms,
+    };
+  } catch {
+    return defaults;
+  }
+}
 
 // Helper function to get Razorpay credentials based on environment
 // RAZORPAY_MODE takes absolute precedence - if set to LIVE, use LIVE regardless of NODE_ENV
@@ -71,8 +109,8 @@ function getRazorpayKeySecret(): string | undefined {
  */
 async function activateCartCheckout(
   pendingOrder: any,
-  verifiedPaymentId: string,
-  gatewayTransactionId?: string,
+  verifiedPaymentId: string | undefined,
+  gatewayTransactionId: string | undefined,
   req?: Request
 ): Promise<{ success: boolean; activatedAddons: AddonPurchase[]; message?: string }> {
   try {
@@ -138,17 +176,24 @@ async function activateCartCheckout(
       if (item.addonType === 'usage_bundle') {
         // Session minutes are stored as 'usage_bundle' in cart but 'session_minutes' in addonPurchases
         mappedAddonType = 'session_minutes';
+        mappedAddonType = 'session_minutes';
         console.log(`[Cart Activation] Mapping addonType: ${item.addonType} → ${mappedAddonType} for package ${item.packageSku} (${pkg.name})`);
       } else if (item.addonType === 'service') {
-        // Determine if it's train_me or dai based on package SKU or metadata
+        // Determine if it's train_me, dai, or session_minutes based on package SKU or metadata
         const packageSkuLower = item.packageSku.toLowerCase();
         const packageNameLower = (pkg.name || '').toLowerCase();
-        if (packageSkuLower.includes('train') || packageNameLower.includes('train')) {
+        
+        // Check for session minutes first (might be labeled as service)
+        if (packageSkuLower.includes('session') || packageSkuLower.includes('minute') || 
+            packageNameLower.includes('session') || packageNameLower.includes('minute')) {
+          mappedAddonType = 'session_minutes';
+        } else if (packageSkuLower.includes('train') || packageNameLower.includes('train')) {
           mappedAddonType = 'train_me';
         } else if (packageSkuLower.includes('dai') || packageNameLower.includes('dai')) {
           mappedAddonType = 'dai';
         } else {
-          // Default to train_me for service type if unclear
+          // If still unclear, default to train_me for service type
+          // (SKU/name-based detection above should handle most cases)
           mappedAddonType = 'train_me';
         }
         console.log(`[Cart Activation] Mapping addonType: ${item.addonType} → ${mappedAddonType} for package ${item.packageSku} (${pkg.name})`);
@@ -188,7 +233,17 @@ async function activateCartCheckout(
       // This handles the unique constraint that prevents multiple active purchases per user per addon type
       if (mappedAddonType === 'session_minutes') {
         const existingPurchase = await billingStorage.getActiveAddonPurchase(userId, 'session_minutes');
-        const newMinutes = (pkg.totalUnits || 0) * item.quantity;
+        // Use pkg.totalUnits, or fall back to cart-stored totalUnits (in case addon uses pricingTiers not metadata.minutes)
+        let unitsPerItem = pkg.totalUnits ?? (item.metadata as any)?.totalUnits ?? 0;
+        if (unitsPerItem === 0 && (item.packageName || pkg.name)) {
+          const nameMatch = (item.packageName || pkg.name).match(/(\d+)\s*minutes?/i);
+          if (nameMatch) unitsPerItem = parseInt(nameMatch[1], 10);
+        }
+        const newMinutes = Math.max(0, Number(unitsPerItem) || 0) * item.quantity;
+        if (newMinutes === 0) {
+          console.warn(`[Cart Activation] Session minutes item skipped: packageSku=${item.packageSku}, totalUnits/unitsPerItem=0. Fix addon metadata.minutes or pricingTiers.`);
+          continue;
+        }
         const startDate = new Date();
         const endDate = pkg.validityDays ? calculateEndDate(startDate, pkg.validityDays) : null;
 
@@ -1011,7 +1066,7 @@ export function setupBillingRoutes(app: Router) {
 
         // Increment promo code usage if applicable
         if (validatedPromo) {
-          await authStorage.incrementPromoCodeUsage(validatedPromo.id);
+          await authStorage.incrementPromoCodeUses(validatedPromo.id);
         }
 
         console.log(`[Session Minutes] ✅ Free purchase completed: ${pkg.totalUnits} minutes added`);
@@ -1228,6 +1283,7 @@ export function setupBillingRoutes(app: Router) {
 
       let isPaid = false;
       let verifiedPaymentId: string | undefined;
+      let paymentStatus: any;
 
       if (pendingOrder.gatewayProvider === 'razorpay') {
         if (!razorpay_payment_id || !razorpay_signature) {
@@ -1241,12 +1297,12 @@ export function setupBillingRoutes(app: Router) {
         }
         
         // Double-check payment status
-        const paymentStatus = await gateway.getPaymentStatus(razorpay_payment_id);
+        paymentStatus = await gateway.getPaymentStatus(razorpay_payment_id);
         isPaid = paymentStatus.status === 'captured' || paymentStatus.status === 'authorized';
         verifiedPaymentId = razorpay_payment_id;
       } else {
         // Cashfree uses API-based verification
-        const paymentStatus = await gateway.getPaymentStatus(gatewayOrderId);
+        paymentStatus = await gateway.getPaymentStatus(gatewayOrderId);
         isPaid = paymentStatus.status === 'PAID' || 
                  paymentStatus.status === 'SUCCESS' || 
                  paymentStatus.status === 'captured';
@@ -1530,7 +1586,11 @@ export function setupBillingRoutes(app: Router) {
       }
       
       // Check if user is an org member with active enterprise seat → use organization's session minutes
-      const membership = await authStorage.getUserMembership(userId);
+      let membership = await authStorage.getUserMembership(userId);
+      // Fix: assigned users who never got org membership (e.g. assigned before we created membership on assign)
+      if (!membership) {
+        membership = await authStorage.ensureOrganizationMembershipFromAssignment(userId) || null;
+      }
       const licensePackage = membership && membership.status === 'active'
         ? await authStorage.getActiveLicensePackage(membership.organizationId)
         : null;
@@ -1858,6 +1918,7 @@ export function setupBillingRoutes(app: Router) {
 
       let isPaid = false;
       let verifiedPaymentId: string | undefined;
+      let paymentStatus: any;
 
       if (pendingOrder.gatewayProvider === 'razorpay') {
         if (!razorpay_payment_id || !razorpay_signature) {
@@ -1871,13 +1932,13 @@ export function setupBillingRoutes(app: Router) {
         }
         
         // Double-check payment status
-        const paymentStatus = await gateway.getPaymentStatus(razorpay_payment_id);
+        paymentStatus = await gateway.getPaymentStatus(razorpay_payment_id);
         isPaid = paymentStatus.status === 'captured' || paymentStatus.status === 'authorized';
         verifiedPaymentId = razorpay_payment_id;
       } else {
         // Cashfree uses API-based verification
         const verifyOrderId = cashfreeOrderId || gatewayOrderId;
-        const paymentStatus = await gateway.getPaymentStatus(verifyOrderId);
+        paymentStatus = await gateway.getPaymentStatus(verifyOrderId);
         isPaid = paymentStatus.status === 'PAID' || 
                  paymentStatus.status === 'SUCCESS' || 
                  paymentStatus.status === 'captured';
@@ -2291,6 +2352,7 @@ export function setupBillingRoutes(app: Router) {
 
       let isPaid = false;
       let paymentId = cfPaymentId;
+      let paymentStatus: any;
 
       if (pendingOrder.gatewayProvider === 'razorpay') {
         const { razorpayPaymentId, razorpaySignature } = req.body;
@@ -2307,14 +2369,14 @@ export function setupBillingRoutes(app: Router) {
         }
         
         // Step 2: Double-check payment status from Razorpay API
-        const paymentStatus = await gateway.getPaymentStatus(razorpayPaymentId);
+        paymentStatus = await gateway.getPaymentStatus(razorpayPaymentId);
         console.log(`Razorpay payment status for ${razorpayPaymentId}:`, paymentStatus.status);
         
         isPaid = paymentStatus.status === 'captured' || paymentStatus.status === 'authorized';
         paymentId = razorpayPaymentId;
       } else {
         // Cashfree uses API-based verification
-        const paymentStatus = await gateway.getPaymentStatus(gatewayOrderId);
+        paymentStatus = await gateway.getPaymentStatus(gatewayOrderId);
         isPaid = paymentStatus.status === 'PAID' || 
                  paymentStatus.status === 'SUCCESS' || 
                  paymentStatus.status === 'captured';
@@ -3279,6 +3341,7 @@ export function setupBillingRoutes(app: Router) {
       
       let isPaid = false;
       let verifiedPaymentId: string | undefined;
+      let paymentStatus: any;
 
       if (pendingOrder.gatewayProvider === 'razorpay') {
         // Razorpay uses signature-based verification
@@ -3296,14 +3359,14 @@ export function setupBillingRoutes(app: Router) {
         }
         
         // Step 2: Double-check payment status from Razorpay API
-        const paymentStatus = await gateway.getPaymentStatus(razorpayPaymentId);
+        paymentStatus = await gateway.getPaymentStatus(razorpayPaymentId);
         console.log(`Razorpay payment status for ${razorpayPaymentId}:`, paymentStatus.status);
         
         isPaid = paymentStatus.status === 'captured' || paymentStatus.status === 'authorized';
         verifiedPaymentId = razorpayPaymentId;
       } else {
         // Cashfree uses API-based verification
-        const paymentStatus = await gateway.getPaymentStatus(gatewayOrderId);
+        paymentStatus = await gateway.getPaymentStatus(gatewayOrderId);
         console.log(`${pendingOrder.gatewayProvider} payment status:`, paymentStatus);
         
         isPaid = paymentStatus.status === 'PAID' || 
@@ -3587,47 +3650,80 @@ export function setupBillingRoutes(app: Router) {
       
       console.log(`[Invoice Debug] Cart metadata - subtotal: ${cartSubtotal}, discount: ${cartDiscount}, gst: ${cartGstAmount}, total: ${cartTotal}`);
 
-      // Enhanced invoice items formatting with proper GST calculation
-      const items = orderPurchases.length > 0 ? orderPurchases.map((purchase: any) => {
-        const metadata = purchase.metadata as any || {};
-        
-        // Use actual purchase amount and currency
-        const totalWithGst = parseFloat(purchase.purchaseAmount || '0');
-        const currency = purchase.currency || 'USD';
-        
-        let baseAmount: number;
-        let gstAmount: number;
-        let gstRate: number;
-        
-        // Check if we have the actual paid amount stored in metadata
-        const actualPaidAmount = metadata.actualPaidAmount ? parseFloat(metadata.actualPaidAmount) : totalWithGst;
-        const actualCurrency = metadata.actualCurrency || currency;
-        
-        // For USD (Razorpay), no GST is applied
-        gstRate = 0;
-        baseAmount = actualPaidAmount;
-        gstAmount = 0;
-        
-        const quantity = metadata.quantity || 1;
-        const unitPrice = baseAmount / quantity;
+      // CRITICAL: Prefer cart metadata.items so invoice line items match exactly what was purchased
+      const cartItems = Array.isArray(orderMetadata.items) && orderMetadata.items.length > 0 ? orderMetadata.items : null;
+      let items: any[];
 
-        return {
-          packageSku: purchase.packageSku,
-          packageName: metadata.packageName || purchase.packageSku,
-          addonType: purchase.addonType,
-          quantity,
-          unitPrice: unitPrice.toFixed(2),
-          basePrice: unitPrice.toFixed(2),
-          totalAmount: baseAmount.toFixed(2), // Subtotal without GST
-          gstRate: gstRate,
-          gstAmount: gstAmount.toFixed(2),
-          totalWithGst: actualPaidAmount.toFixed(2),
-          currency: actualCurrency,
-          startDate: purchase.startDate?.toISOString() || new Date().toISOString(),
-          endDate: purchase.endDate ? purchase.endDate.toISOString() : null,
-          description: getItemDescription(purchase.addonType, metadata),
-        };
-      }) : [
+      if (cartItems && cartItems.length > 0) {
+        // Build line items from the actual cart at checkout (source of truth for what was bought)
+        items = cartItems.map((cartItem: any) => {
+          const basePrice = parseFloat(cartItem.basePrice || '0');
+          const quantity = Math.max(1, parseInt(String(cartItem.quantity), 10) || 1);
+          const totalAmount = basePrice * quantity;
+          const currency = cartItem.currency || pendingOrder.currency || 'USD';
+          const matchingPurchase = orderPurchases.find((p: any) => p.packageSku === cartItem.packageSku);
+          const metaForDesc = { packageName: cartItem.packageName };
+          const startDate = matchingPurchase?.startDate || new Date();
+          const startIso = matchingPurchase?.startDate?.toISOString() || new Date().toISOString();
+          // End date: from purchase, or derive from cart item validityDays so invoice doesn't show N/A
+          let endDate: Date | null = matchingPurchase?.endDate ?? null;
+          if (!endDate) {
+            const validityDays = cartItem.metadata?.validityDays != null
+              ? parseInt(String(cartItem.metadata.validityDays), 10)
+              : (cartItem.addonType === 'usage_bundle' ? 30 : null); // session minutes default 30 days
+            if (validityDays != null && !isNaN(validityDays) && validityDays > 0) {
+              endDate = new Date(startDate);
+              endDate.setDate(endDate.getDate() + validityDays);
+            }
+          }
+          return {
+            packageSku: cartItem.packageSku,
+            packageName: cartItem.packageName || cartItem.packageSku,
+            addonType: cartItem.addonType || 'cart_checkout',
+            quantity,
+            unitPrice: basePrice.toFixed(2),
+            basePrice: basePrice.toFixed(2),
+            totalAmount: totalAmount.toFixed(2),
+            gstRate: 0,
+            gstAmount: '0.00',
+            totalWithGst: totalAmount.toFixed(2),
+            currency,
+            startDate: startIso,
+            endDate: endDate ? endDate.toISOString() : null,
+            description: getItemDescription(cartItem.addonType || '', metaForDesc),
+          };
+        });
+        console.log(`[Invoice Debug] Built ${items.length} line items from cart metadata (matches purchase)`);
+      } else if (orderPurchases.length > 0) {
+        // Fallback: build from addon purchases (legacy or when cart metadata missing)
+        items = orderPurchases.map((purchase: any) => {
+          const metadata = purchase.metadata as any || {};
+          const totalWithGst = parseFloat(purchase.purchaseAmount || '0');
+          const currency = purchase.currency || 'USD';
+          const actualPaidAmount = metadata.actualPaidAmount ? parseFloat(metadata.actualPaidAmount) : totalWithGst;
+          const actualCurrency = metadata.actualCurrency || currency;
+          const quantity = metadata.quantity || 1;
+          const unitPrice = actualPaidAmount / quantity;
+          const displayName = metadata.packageName || purchase.packageSku;
+          return {
+            packageSku: purchase.packageSku,
+            packageName: displayName,
+            addonType: purchase.addonType,
+            quantity,
+            unitPrice: unitPrice.toFixed(2),
+            basePrice: unitPrice.toFixed(2),
+            totalAmount: actualPaidAmount.toFixed(2),
+            gstRate: 0,
+            gstAmount: '0.00',
+            totalWithGst: actualPaidAmount.toFixed(2),
+            currency: actualCurrency,
+            startDate: purchase.startDate?.toISOString() || new Date().toISOString(),
+            endDate: purchase.endDate ? purchase.endDate.toISOString() : null,
+            description: getItemDescription(purchase.addonType, metadata),
+          };
+        });
+      } else {
+        items = [
         // Fallback item from pending order - use metadata breakdown if available
         (() => {
           const metadata = pendingOrder.metadata as any || {};
@@ -3686,7 +3782,8 @@ export function setupBillingRoutes(app: Router) {
             };
           }
         })()
-      ];
+        ];
+      }
 
       // CRITICAL FIX: Calculate totals using cart metadata if available (includes discount)
       let subtotal: number;
@@ -3713,7 +3810,7 @@ export function setupBillingRoutes(app: Router) {
 
       console.log(`[Invoice Debug] Calculated totals - subtotal: ${subtotal}, discount: ${discount}, gst: ${totalGst}, total: ${grandTotal}, currency: ${currency}`);
 
-      // Enhanced invoice data with professional formatting
+      const invoiceBranding = await getInvoiceConfig();
       const invoiceData = {
         // Invoice Header
         invoiceNumber: `INV-${orderId.slice(-8).toUpperCase()}`,
@@ -3721,14 +3818,8 @@ export function setupBillingRoutes(app: Router) {
         invoiceDate: new Date().toISOString(),
         dueDate: new Date().toISOString(), // Immediate payment
         
-        // Company Information
-        company: {
-          name: "Rev Winner",
-          address: "AI-Powered Sales Intelligence Platform\nHealthcaa Technologies Inc.",
-          email: "support@revwinner.com",
-          website: "https://revwinner.com",
-          gstNumber: null, // No GST for USD transactions
-        },
+        // Company and terms from system_config (no hardcoded branding)
+        company: invoiceBranding.company,
         
         // Customer Information
         customer: {
@@ -3768,16 +3859,13 @@ export function setupBillingRoutes(app: Router) {
         createdAt: pendingOrder.createdAt?.toISOString() || new Date().toISOString(),
         generatedAt: new Date().toISOString(),
         
-        // Terms and Conditions
-        terms: [
-          "This is a computer-generated invoice and does not require a signature.",
-          "Payment has been processed successfully via secure payment gateway.",
-          "All Rev Winner services are subject to our Terms of Service available at revwinner.com/terms",
-          "Refunds are processed as per our refund policy. Contact support for assistance.",
-          "For technical support or billing queries, contact support@revwinner.com",
-          "No GST applicable for USD transactions.",
-          "This invoice serves as your receipt for tax and accounting purposes.",
-        ],
+        terms: invoiceBranding.terms.length > 0
+          ? invoiceBranding.terms
+          : [
+              "This is a computer-generated invoice and does not require a signature.",
+              "Payment has been processed successfully via secure payment gateway.",
+              "This invoice serves as your receipt for tax and accounting purposes.",
+            ],
       };
 
       res.json(invoiceData);
@@ -3789,19 +3877,45 @@ export function setupBillingRoutes(app: Router) {
 
   // Helper function to get item description
   function getItemDescription(addonType: string, metadata: any): string {
+    // CRITICAL FIX: Always use packageName from metadata if available
+    // The addonType might be mapped (e.g., 'service' -> 'train_me') but packageName is the actual product
+    const packageName = metadata.packageName || '';
+    
+    // If we have a package name, use it as the primary source of truth
+    if (packageName) {
+      // Determine the description based on the actual package name
+      const nameLower = packageName.toLowerCase();
+      
+      if (nameLower.includes('session') || nameLower.includes('minute')) {
+        return `${packageName}. Provides AI-powered conversation analysis and real-time sales insights.`;
+      } else if (nameLower.includes('train')) {
+        return `${packageName}. Personalized AI coaching and sales skill development.`;
+      } else if (nameLower.includes('dai') || nameLower.includes('domain')) {
+        return `${packageName}. Domain-specific AI intelligence and industry insights.`;
+      } else if (nameLower.includes('platform') || nameLower.includes('access')) {
+        return `${packageName}. Complete access to the sales intelligence platform.`;
+      } else if (nameLower.includes('enterprise')) {
+        return `${packageName} - ${metadata.seats || 1} seats. Full platform access with team management and advanced analytics.`;
+      } else {
+        // Generic description for any other package
+        return `${packageName}. Professional sales assistance features.`;
+      }
+    }
+    
+    // Fallback to addonType-based descriptions if no packageName
     switch (addonType) {
       case 'session_minutes':
-        return `Session Minutes Package - ${metadata.packageName || 'Standard Package'}. Provides AI-powered conversation analysis and real-time sales insights.`;
+        return `Session Minutes Package - Standard Package. Provides AI-powered conversation analysis and real-time sales insights.`;
       case 'train_me':
         return 'Train Me Add-on - 30 Days Access to AI Training Features. Personalized AI coaching and sales skill development.';
       case 'enterprise_license':
         return `Enterprise License - ${metadata.seats || 1} seats. Full platform access with team management and advanced analytics.`;
       case 'platform_access':
-        return `Platform Access - ${metadata.packageName || 'Standard Access'}. Complete access to Rev Winner sales intelligence platform.`;
+        return `Platform Access - Standard Access. Complete access to the sales intelligence platform.`;
       case 'cart_checkout':
-        return `Cart Purchase - ${metadata.packageName || 'Multiple Items'}. Bundle purchase with multiple Rev Winner features.`;
+        return `Cart Purchase - Multiple Items. Bundle purchase with multiple platform features.`;
       default:
-        return metadata.packageName || `${addonType.replace('_', ' ').toUpperCase()} - Professional sales assistance features`;
+        return `${addonType.replace('_', ' ').toUpperCase()} - Professional sales assistance features`;
     }
   }
 
@@ -3949,7 +4063,7 @@ export function setupBillingRoutes(app: Router) {
         if (isCartCheckout) {
           // Handle cart checkout activation
           console.log(`🛒 Processing cart checkout order: ${orderId}`);
-          const result = await activateCartCheckout(pendingOrder, paymentId, req);
+          const result = await activateCartCheckout(pendingOrder, paymentId, undefined, req);
           
           if (result.success) {
             console.log(`Cart checkout activated: ${result.activatedAddons.length} items`);

@@ -122,33 +122,60 @@ export async function getPackageOrAddonBySku(sku: string): Promise<PricingPackag
     };
   }
   
-  // Check if SKU is an add-on
+  // Check if SKU is an add-on (exact id or tiered id like "addonId-500" for session minutes)
   const addons = await billingStorage.getPublishedAddons();
-  const addon = addons.find(a => a.id === sku);
-  
+  let addon = addons.find(a => a.id === sku);
+  let tierMinutes: number | undefined;
+  if (!addon && sku.includes('-')) {
+    const lastHyphen = sku.lastIndexOf('-');
+    const suffix = sku.slice(lastHyphen + 1);
+    const parsed = parseInt(suffix, 10);
+    if (!isNaN(parsed) && parsed > 0 && parsed < 100000) {
+      const baseId = sku.slice(0, lastHyphen);
+      addon = addons.find(a => a.id === baseId);
+      tierMinutes = parsed;
+    }
+  }
+
   if (addon) {
     const metadata = (addon.metadata as { minutes?: number }) || {};
     const features = Array.isArray(addon.features) ? addon.features : [];
-    
-    // Session minutes (usage_bundle type) should always have 30 days validity
     const isSessionMinutes = addon.type === 'usage_bundle' || addon.slug === 'session-minutes';
-    const validityDays = addon.billingInterval === 'monthly' 
-      ? 30 
-      : (isSessionMinutes ? 30 : undefined); // Default to 30 days for session minutes
-    
+    const validityDays = addon.billingInterval === 'monthly'
+      ? 30
+      : (isSessionMinutes ? 30 : undefined);
+
+    // totalUnits: tiered id (e.g. uuid-500) -> use 500; else metadata.minutes; else first pricingTiers tier
+    let totalUnits: number | undefined = tierMinutes ?? metadata.minutes;
+    if (totalUnits == null && addon.pricingTiers && Array.isArray(addon.pricingTiers)) {
+      const tiers = addon.pricingTiers as Array<{ minutes?: number }>;
+      if (tierMinutes != null) {
+        const tier = tiers.find((t: any) => t.minutes === tierMinutes);
+        totalUnits = tier?.minutes;
+      }
+      if (totalUnits == null && tiers.length > 0) totalUnits = (tiers[0] as any).minutes;
+    }
+
+    const flatPrice = addon.flatPrice;
+    let price = parseFloat(flatPrice || '0');
+    if (price === 0 && addon.pricingTiers && Array.isArray(addon.pricingTiers) && tierMinutes != null) {
+      const tier = (addon.pricingTiers as Array<{ minutes: number; price: string }>).find(t => t.minutes === tierMinutes);
+      if (tier) price = parseFloat(tier.price);
+    }
+
     return {
       sku: addon.id,
-      name: addon.displayName,
-      price: parseFloat(addon.flatPrice || '0'),
+      name: tierMinutes != null ? `${addon.displayName} - ${tierMinutes} minutes` : addon.displayName,
+      price,
       currency: addon.currency,
       billingType: addon.billingInterval === 'monthly' ? 'monthly' : 'one_time',
-      totalUnits: metadata.minutes,
+      totalUnits: totalUnits ?? undefined,
       validityDays,
       description: (addon as any).description || addon.displayName,
       features,
     };
   }
-  
+
   return undefined;
 }
 
@@ -163,14 +190,19 @@ export async function getAddonTypeFromSku(sku: string): Promise<'platform_access
   const isPlatformSubscription = subscriptionPlans.some(plan => plan.id === sku);
   if (isPlatformSubscription) return 'platform_access';
   
-  // Check if SKU is an add-on
+  // Check if SKU is an add-on (exact id or tiered id like "addonId-500")
   const addons = await billingStorage.getPublishedAddons();
-  const addon = addons.find(a => a.id === sku);
-  
+  let addon = addons.find(a => a.id === sku);
+  if (!addon && sku.includes('-')) {
+    const lastHyphen = sku.lastIndexOf('-');
+    const suffix = sku.slice(lastHyphen + 1);
+    if (!isNaN(parseInt(suffix, 10)) && parseInt(suffix, 10) > 0) {
+      addon = addons.find(a => a.id === sku.slice(0, lastHyphen));
+    }
+  }
   if (addon) {
     return addon.type as 'usage_bundle' | 'service';
   }
-  
   return null;
 }
 

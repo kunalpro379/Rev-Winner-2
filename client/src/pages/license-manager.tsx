@@ -50,6 +50,16 @@ export default function LicenseManager() {
   const [additionalSeats, setAdditionalSeats] = useState("");
   const [activeTab, setActiveTab] = useState("assignments");
   const [resendTargetId, setResendTargetId] = useState<string | null>(null);
+  const [isRefetchingAfterPayment, setIsRefetchingAfterPayment] = useState(false);
+
+  // Check if coming from payment on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const fromPayment = urlParams.get('fromPayment');
+    if (fromPayment === 'true') {
+      setIsRefetchingAfterPayment(true);
+    }
+  }, []);
 
   // Check authentication first - API returns { user, subscription }
   const { data: authResponse, isLoading: userLoading, error: userError } = useQuery<AuthResponse>({
@@ -321,7 +331,7 @@ export default function LicenseManager() {
 
   // Refetch data when coming from payment success
   useEffect(() => {
-    if (user && !isLoading) {
+    if (user && !isLoading && isRefetchingAfterPayment) {
       // Check if we're coming from a payment redirect
       const urlParams = new URLSearchParams(window.location.search);
       const fromPayment = urlParams.get('fromPayment');
@@ -330,11 +340,19 @@ export default function LicenseManager() {
         // Clear the URL parameter
         window.history.replaceState({}, '', '/license-manager');
         
-        // Force refetch to get the latest data
-        refetch();
+        // Force refetch both user data and organization overview to get the latest data
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/enterprise/overview"] });
+        
+        // Wait a bit for the data to be ready, then refetch
+        setTimeout(() => {
+          refetch().then(() => {
+            setIsRefetchingAfterPayment(false);
+          });
+        }, 500);
       }
     }
-  }, [user, isLoading, refetch]);
+  }, [user, isLoading, refetch, isRefetchingAfterPayment]);
 
   // Show error if user doesn't have license_manager role AND is not a super user
   if (user && user.role !== 'license_manager' && !user.superUser && !isLoading) {
@@ -368,12 +386,14 @@ export default function LicenseManager() {
   }
 
   // Show loading state
-  if (userLoading || isLoading) {
+  if (userLoading || isLoading || isRefetchingAfterPayment) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 dark:from-background dark:to-muted/10 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading License Manager...</p>
+          <p className="text-muted-foreground">
+            {isRefetchingAfterPayment ? 'Setting up your License Manager access...' : 'Loading License Manager...'}
+          </p>
         </div>
       </div>
     );

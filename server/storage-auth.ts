@@ -364,6 +364,8 @@ export interface IAuthStorage {
   
   getOrganizationMemberships(organizationId: string): Promise<import("@shared/schema").OrganizationMembership[]>;
   getUserMembership(userId: string): Promise<import("@shared/schema").OrganizationMembership | null>;
+  /** If user has active license assignment but no org membership, create membership from assignment's org. Returns membership or null. */
+  ensureOrganizationMembershipFromAssignment(userId: string): Promise<import("@shared/schema").OrganizationMembership | null>;
   updateMembershipStatus(id: string, status: string): Promise<import("@shared/schema").OrganizationMembership>;
   updateMembershipRole(id: string, role: string): Promise<import("@shared/schema").OrganizationMembership>;
   removeMembership(id: string): Promise<void>;
@@ -2906,6 +2908,22 @@ export class AuthStorage implements IAuthStorage {
       ));
     
     return membership || null;
+  }
+
+  /** If user has active license assignment but no org membership, create membership from assignment's org. Fixes assigned users who never got membership. */
+  async ensureOrganizationMembershipFromAssignment(userId: string): Promise<OrganizationMembership | null> {
+    const assignment = await this.getUserActiveLicenseAssignment(userId);
+    if (!assignment) return null;
+    const pkg = await this.getLicensePackageById(assignment.licensePackageId);
+    if (!pkg?.organizationId) return null;
+    const existing = await this.getUserMembership(userId);
+    if (existing) return existing;
+    return this.createOrganizationMembership({
+      organizationId: pkg.organizationId,
+      userId,
+      role: 'member',
+      status: 'active',
+    });
   }
   
   async updateMembershipStatus(id: string, status: string): Promise<OrganizationMembership> {

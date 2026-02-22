@@ -53,6 +53,5 @@ waitForPort = 5000
 APP_URL = "https://revwinner.com"
 
 [userenv.shared]
-GMAIL_USER = "revwinner2025@gmail.com"
 
 [userenv.development]

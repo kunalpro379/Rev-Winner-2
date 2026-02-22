@@ -2736,15 +2736,23 @@ export async function generateMeetingMinutes(
 ): Promise<MeetingMinutes> {
   try {
     // VALIDATION: Check if conversation has sufficient content
+    // Filter out very short messages (like "hi", "ok", etc.) for meaningful content check
+    const meaningfulMessages = conversationHistory.filter(msg => {
+      const trimmed = msg.content.trim();
+      const words = trimmed.split(/\s+/).filter(w => w.length > 0);
+      return words.length >= 3; // Message must have at least 3 words to be meaningful
+    });
+    
     const conversationText = conversationHistory.map(msg => msg.content).join(' ').trim();
     const words = conversationText.split(/\s+/).filter(w => w.length > 0); // Filter empty strings
     const wordCount = words.length;
     
-    console.log(`📝 Meeting Minutes: Conversation has ${wordCount} words, ${conversationHistory.length} messages`);
+    console.log(`📝 Meeting Minutes: Conversation has ${wordCount} words, ${conversationHistory.length} messages (${meaningfulMessages.length} meaningful)`);
     
-    if (conversationHistory.length < 3 || wordCount < 50) {
-      console.warn(`⚠️ Insufficient conversation content for meeting minutes (${conversationHistory.length} messages, ${wordCount} words)`);
-      throw new Error(`Conversation is too short to generate meaningful meeting minutes. Current: ${conversationHistory.length} messages with ${wordCount} words. Required: At least 3 messages with 50+ words total.`);
+    // FIXED: Check for meaningful messages, not just any messages
+    if (meaningfulMessages.length < 3 || wordCount < 50) {
+      console.warn(`⚠️ Insufficient conversation content for meeting minutes (${meaningfulMessages.length} meaningful messages, ${wordCount} words)`);
+      throw new Error(`Please have a longer conversation before generating meeting minutes. We need at least 3 messages with meaningful content.`);
     }
     
     let client;

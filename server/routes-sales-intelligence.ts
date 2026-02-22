@@ -3,6 +3,7 @@ import { z } from "zod";
 import { salesIntelligenceAgent } from "./services/sales-intelligence-agent";
 import { authenticateToken } from "./middleware/auth";
 import { SALES_INTENT_TYPES } from "@shared/schema";
+import { sendErrorResponse } from "./utils/error-handler";
 
 export function setupSalesIntelligenceRoutes(app: Express) {
   // Process customer question passively (main endpoint for frontend hook)
@@ -228,7 +229,7 @@ export function setupSalesIntelligenceRoutes(app: Express) {
       res.status(201).json({ knowledge });
     } catch (error: any) {
       console.error("[SalesIntelligence] Add knowledge error:", error);
-      res.status(400).json({ error: error.message || "Failed to add knowledge" });
+      sendErrorResponse(res, error, "Failed to add knowledge");
     }
   });
 
@@ -325,7 +326,7 @@ export function setupSalesIntelligenceRoutes(app: Express) {
       res.json(result);
     } catch (error: any) {
       console.error("[SalesIntelligence] Export error:", error);
-      res.status(400).json({ error: error.message || "Failed to export data" });
+      sendErrorResponse(res, error, "Failed to export data");
     }
   });
 

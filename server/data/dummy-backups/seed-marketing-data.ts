@@ -1,26 +1,34 @@
 import { db } from "../../db";
-import { conversationMinutesBackup, users, conversations } from "@shared/schema";
+import { conversationMinutesBackup, authUsers, conversations } from "@shared/schema";
 import { dummyMarketingBackups } from "./marketing-test-data";
 import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
+import bcrypt from "bcrypt";
 
 async function getOrCreateDummyUser(companyDomain: string, companyName: string): Promise<string | null> {
   try {
     const testEmail = `testuser@${companyDomain}.com`;
     
     const [existingUser] = await db.select()
-      .from(users)
-      .where(eq(users.email, testEmail))
+      .from(authUsers)
+      .where(eq(authUsers.email, testEmail))
       .limit(1);
     
     if (existingUser) {
       return existingUser.id;
     }
     
-    const [newUser] = await db.insert(users).values({
+    const username = `test_${companyDomain.replace(/\s+/g, '_').toLowerCase()}`;
+    const hashedPassword = await bcrypt.hash('testpassword123', 10);
+    
+    const [newUser] = await db.insert(authUsers).values({
       email: testEmail,
+      username: username,
+      hashedPassword: hashedPassword,
       firstName: "Test",
       lastName: companyName,
+      role: "user",
+      status: "active",
     }).returning();
     
     console.log(`  👤 Created test user: ${testEmail}`);
@@ -130,8 +138,8 @@ export async function clearMarketingDummyData(): Promise<{ success: boolean; bac
     const testEmail = `testuser@${domain}.com`;
     
     const [user] = await db.select()
-      .from(users)
-      .where(eq(users.email, testEmail))
+      .from(authUsers)
+      .where(eq(authUsers.email, testEmail))
       .limit(1);
     
     if (user) {

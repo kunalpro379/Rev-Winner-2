@@ -68,10 +68,13 @@ const DEFAULT_SPEAKERS: Speaker[] = [
 
 const isMobileDevice = () => {
   const ua = navigator.userAgent;
+  // FIXED: Accurate mobile detection - Windows/Mac/Linux are NEVER mobile
+  const isDesktopOS = /Windows|Macintosh|Mac OS X|Linux|X11/i.test(ua);
   const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
   const hasTouch = navigator.maxTouchPoints && navigator.maxTouchPoints > 2;
-  const isMobile = isMobileUA || hasTouch;
-  console.log(`📱 isMobileDevice check: UA=${isMobileUA}, Touch=${hasTouch}, Result=${isMobile}`);
+  // If it's a desktop OS, it's NOT mobile regardless of touch support
+  const isMobile = isDesktopOS ? false : (isMobileUA || hasTouch);
+  console.log(`📱 isMobileDevice check: UA="${ua.substring(0, 50)}...", Desktop OS=${isDesktopOS}, Mobile UA=${isMobileUA}, Touch=${hasTouch}, Result=${isMobile}`);
   return isMobile;
 };
 

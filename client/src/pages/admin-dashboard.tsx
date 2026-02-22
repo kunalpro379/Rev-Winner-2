@@ -89,6 +89,7 @@ import { AnalyticsDashboard } from "@/components/admin/analytics-dashboard";
 import { AnalyticsDashboardEnhanced } from "@/components/admin/analytics-dashboard-enhanced";
 import { SubscriptionManagement } from "@/components/admin/subscription-management";
 import { PlansAddonsManagement } from "@/components/admin/plans-addons-management";
+import { SystemConfiguration } from "@/components/admin/system-configuration";
 import { PromoCodeManagement } from "@/components/admin/promo-code-management";
 import UserManagement from "@/components/admin/user-management";
 import { AdminBillingPortal } from "@/components/admin-billing-portal";
@@ -758,30 +759,7 @@ export default function AdminDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  {/* Placeholder for configuration settings */}
-                  <div className="rounded-lg border border-dashed border-slate-300 dark:border-slate-700 p-8 text-center">
-                    <Settings className="h-12 w-12 mx-auto text-slate-400 mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">
-                      Configuration Settings
-                    </h3>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-                      System configuration panel coming soon
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      This section will allow you to configure:
-                      <br />
-                      • Email templates and settings
-                      <br />
-                      • Payment gateway configuration
-                      <br />
-                      • Subscription plans and pricing
-                      <br />
-                      • AI model settings
-                      <br />• System-wide preferences
-                    </p>
-                  </div>
-                </div>
+                <SystemConfiguration />
               </CardContent>
             </Card>
           </TabsContent>

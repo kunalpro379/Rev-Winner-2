@@ -22,6 +22,7 @@ import { registerBackupRoutes } from "./routes-backup";
 
 import { registerMarketingRoutes } from "./routes-marketing";
 import { setupSalesIntelligenceRoutes } from "./routes-sales-intelligence";
+import { setupSystemConfigRoutes } from "./routes-system-config";
 import { registerBibleRoutes } from "./routes-bible";
 import apiDocsRouter from "./routes-api-docs";
 import recordingsRouter from "./routes-recordings";
@@ -356,12 +357,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Send message and get AI response
   app.post("/api/conversations/:sessionId/messages", authenticateToken, checkEntitlement, async (req, res) => {
     try {
+      console.log(`📨 Processing message for session: ${req.params.sessionId}`);
       const conversation = await storage.getConversation(req.params.sessionId);
       if (!conversation) {
+        console.log(`❌ Conversation not found: ${req.params.sessionId}`);
         return res.status(404).json({ message: "Conversation not found" });
       }
 
       if (conversation.status === "ended") {
+        console.log(`❌ Conversation already ended: ${req.params.sessionId}`);
         return res.status(400).json({ message: "Conversation has ended" });
       }
 
@@ -376,6 +380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         audioSourceId: req.body.audioSourceId || defaultAudioSource.id
       };
       
+      console.log(`✅ Message data prepared, validating...`);
       const validatedMessage = insertMessageSchema.parse(messageData);
       
       // Check for /end command
@@ -482,6 +487,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
     } catch (error: any) {
+      console.error('❌ Error in /api/conversations/:sessionId/messages:', error);
+      console.error('Error stack:', error.stack);
       res.status(500).json({ message: "Failed to process message", error: error.message });
     }
   });
@@ -995,12 +1002,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Generate meeting minutes
   app.get("/api/conversations/:sessionId/meeting-minutes", authenticateToken, checkEntitlement, async (req, res) => {
     try {
+      console.log(`📝 Generating meeting minutes for session: ${req.params.sessionId}`);
       const conversation = await storage.getConversation(req.params.sessionId);
       if (!conversation) {
+        console.log(`❌ Conversation not found: ${req.params.sessionId}`);
         return res.status(404).json({ message: "Conversation not found" });
       }
 
+      console.log(`✅ Found conversation: ${conversation.id}`);
       const messages = await storage.getMessages(conversation.id);
+      console.log(`✅ Found ${messages.length} messages`);
+      
       const conversationHistory = messages.map(m => ({
         sender: m.sender,
         content: m.content,
@@ -1008,6 +1020,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
 
       const domainExpertise = req.query.domain as string || "Generic Product";
+      console.log(`🎯 Domain: ${domainExpertise}`);
+      
       const { generateMeetingMinutes } = await import("./services/openai");
       
       // Calculate actual duration from transcription start (when user clicked Start) to now
@@ -1045,13 +1059,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessionStart  // Pass actual session start time for accurate date/time
       );
 
+      console.log(`✅ Meeting minutes generated successfully`);
+      
       // Override duration with calculated value and add rep name
       meetingMinutes.duration = formattedDuration;
       (meetingMinutes as any).repName = repName;
 
       res.json(meetingMinutes);
     } catch (error: any) {
-      console.error('Meeting minutes generation error:', error);
+      console.error('❌ Meeting minutes generation error:', error);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
       
       // Handle validation errors (conversation too short) with 400 status
       if (error.message && error.message.includes('Conversation is too short')) {
@@ -2350,6 +2368,27 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
         status: "ended"
       });
       
+      // CRITICAL FIX: Check if meeting minutes exist for this session and include summary
+      let sessionSummary: string | null = null;
+      try {
+        const { callMeetingMinutes } = await import("@shared/schema");
+        const minutesResult = await db.select().from(callMeetingMinutes)
+          .where(and(
+            eq(callMeetingMinutes.userId, userId),
+            eq(callMeetingMinutes.status, "active"),
+            sql`${callMeetingMinutes.structuredMinutes}->>'sessionId' = ${sessionId}`
+          ))
+          .limit(1);
+        
+        if (minutesResult.length > 0) {
+          sessionSummary = minutesResult[0].summary;
+          console.log(`✅ Found meeting minutes summary for session ${sessionId}`);
+        }
+      } catch (error) {
+        console.error('Error fetching meeting minutes:', error);
+        // Continue without summary if there's an error
+      }
+      
       // Update subscription with minutes used and session history
       // Note: sessionsUsed was already incremented when session started
       const subscription = await authStorage.getSubscriptionByUserId(userId);
@@ -2360,11 +2399,13 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
           ? subscription.sessionHistory 
           : [];
         
+        // CRITICAL FIX: Include summary in session history
         sessionHistory.push({
           sessionId,
           startTime: startTime.toISOString(),
           endTime: endTime.toISOString(),
-          durationMinutes
+          durationMinutes,
+          summary: sessionSummary || undefined // Add summary if available
         });
         
         await authStorage.updateSubscription(subscription.id, {
@@ -2460,7 +2501,11 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
 
       // If no personal subscription, check if user has an active enterprise seat (org member)
       if (!subscription) {
-        const membership = await authStorage.getUserMembership(userId);
+        let membership = await authStorage.getUserMembership(userId);
+        // Fix: assigned users who never got org membership (e.g. assigned before we created membership on assign)
+        if (!membership) {
+          membership = await authStorage.ensureOrganizationMembershipFromAssignment(userId) || null;
+        }
         if (membership && membership.status === 'active') {
           licensePackage = await authStorage.getActiveLicensePackage(membership.organizationId);
           if (licensePackage) {
@@ -2521,6 +2566,10 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
           name: planDetails.name,
           price: planDetails.price,
         } : 'NULL');
+      }
+      // If plan still unknown but planType looks like a plan ID (UUID), resolve it so we show plan name not raw UUID
+      if (!planDetails && subscription.planType && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subscription.planType.trim())) {
+        planDetails = await authStorage.getPlanById(subscription.planType.trim());
       }
 
       // FIXED: Get session history from conversations table directly
@@ -2831,15 +2880,47 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
       // Import billing storage
       const { billingStorage } = await import("./storage-billing");
       
-      // Get all addon purchases for this user
-      const allPurchases = await billingStorage.getUserAddonPurchases(userId);
-      
-      // Build invoice list from all purchases
       const invoices: any[] = [];
-      
+      const seenOrderIds = new Set<string>();
+
+      // 1) One row per completed pending order (cart/checkout) so invoice list matches orders and receipt link works
+      const completedOrders = await db.select()
+        .from(pendingOrders)
+        .where(and(eq(pendingOrders.userId, userId), eq(pendingOrders.status, 'completed')))
+        .orderBy(desc(pendingOrders.completedAt))
+        .limit(100);
+      for (const order of completedOrders) {
+        const amount = parseFloat(order.amount || '0');
+        const currency = order.currency || 'USD';
+        const meta = (order.metadata as any) || {};
+        invoices.push({
+          id: order.id,
+          orderId: order.id,
+          amount: amount.toFixed(2),
+          currency,
+          status: 'succeeded',
+          paymentMethod: order.gatewayProvider === 'razorpay' ? 'razorpay' : 'online',
+          razorpayOrderId: order.gatewayOrderId || order.id,
+          razorpayPaymentId: null,
+          receiptUrl: `/api/billing/invoice?orderId=${order.id}`,
+          createdAt: order.completedAt || order.createdAt,
+          metadata: {
+            itemCount: meta.itemCount || 1,
+            subtotal: meta.subtotal != null ? String(meta.subtotal) : amount.toFixed(2),
+            gst: meta.gstAmount != null ? String(meta.gstAmount) : '0',
+            total: amount.toFixed(2),
+            packageName: meta.items?.length ? meta.items.map((i: any) => i.packageName).join(', ') : 'Cart purchase',
+          },
+        });
+        seenOrderIds.add(order.id);
+      }
+
+      // 2) Add addon purchases that are NOT from cart (standalone) so we don't duplicate cart orders
+      const allPurchases = await billingStorage.getUserAddonPurchases(userId);
       allPurchases.forEach((purchase: any) => {
         const metadata = purchase.metadata as any || {};
-        
+        if (metadata.cartOrderId && seenOrderIds.has(metadata.cartOrderId)) return; // already from completed orders
+
         // Check if this purchase has a purchaseHistory (for session_minutes that were merged)
         if (metadata.purchaseHistory && Array.isArray(metadata.purchaseHistory)) {
           // Create separate invoices for each purchase in the history
@@ -2883,11 +2964,6 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
                 minutesAdded: historyItem.minutesAdded,
                 description: `${historyItem.packageName} - Session Minutes`,
                 invoiceNumber: `INV-${historyItem.orderId?.substring(0, 8) || 'TEST'}`,
-                customerName: 'Rev Winner Customer',
-                customerEmail: 'customer@revwinner.com',
-                companyName: 'Rev Winner',
-                companyAddress: 'Digital Services Platform',
-                gstNumber: 'TEST-GST-123456789',
                 paymentMode: historyItem.paymentMethod || 'Online Payment',
                 originalAmount: amount,
                 originalCurrency: currency,
@@ -3547,7 +3623,13 @@ Crawl-delay: 1`;
 
       // Check for active Train Me addon purchase
       const { billingStorage } = await import("./storage-billing");
-      const trainMePurchase = await billingStorage.getActiveAddonPurchase(userId, 'train_me');
+      let trainMePurchase = null;
+      try {
+        trainMePurchase = await billingStorage.getActiveAddonPurchase(userId, 'train_me');
+      } catch (purchaseError: any) {
+        console.error("❌ Error checking addon purchase:", purchaseError);
+        // Continue to check other sources
+      }
       
       if (trainMePurchase) {
         const now = new Date();
@@ -3569,7 +3651,14 @@ Crawl-delay: 1`;
       }
 
       // Check for enterprise license with Train Me enabled
-      const enterpriseAssignment = await billingStorage.getEnterpriseAssignmentByUser(userId);
+      let enterpriseAssignment = null;
+      try {
+        enterpriseAssignment = await billingStorage.getEnterpriseAssignmentByUser(userId);
+      } catch (enterpriseError: any) {
+        console.error("❌ Error checking enterprise assignment:", enterpriseError);
+        // Continue to check other sources
+      }
+      
       if (enterpriseAssignment?.trainMeEnabled) {
         return res.json({
           active: true,
@@ -3581,43 +3670,63 @@ Crawl-delay: 1`;
       }
 
       // Check for organization add-on (org purchased Train Me; assigned users get access)
-      const membership = await authStorage.getUserMembership(userId);
+      let membership = null;
+      try {
+        membership = await authStorage.getUserMembership(userId);
+        if (!membership) {
+          membership = await authStorage.ensureOrganizationMembershipFromAssignment(userId) || null;
+        }
+      } catch (membershipError: any) {
+        console.error("❌ Error checking organization membership:", membershipError);
+        // Continue to check other sources
+      }
+      
       if (membership?.status === 'active') {
-        const orgAddons = await authStorage.getOrganizationAddons(membership.organizationId);
-        const orgTrainMe = orgAddons.find(a => a.type === 'train_me' && a.status === 'active' && (!a.endDate || new Date(a.endDate) > new Date()));
-        if (orgTrainMe) {
-          const endDate = orgTrainMe.endDate ? new Date(orgTrainMe.endDate) : null;
-          const daysRemaining = endDate ? Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 999;
-          return res.json({
-            active: true,
-            purchaseDate: orgTrainMe.startDate || null,
-            daysRemaining,
-            expiryDate: orgTrainMe.endDate || null,
-            source: 'organization'
-          });
+        try {
+          const orgAddons = await authStorage.getOrganizationAddons(membership.organizationId);
+          const orgTrainMe = orgAddons.find(a => a.type === 'train_me' && a.status === 'active' && (!a.endDate || new Date(a.endDate) > new Date()));
+          if (orgTrainMe) {
+            const endDate = orgTrainMe.endDate ? new Date(orgTrainMe.endDate) : null;
+            const daysRemaining = endDate ? Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 999;
+            return res.json({
+              active: true,
+              purchaseDate: orgTrainMe.startDate || null,
+              daysRemaining,
+              expiryDate: orgTrainMe.endDate || null,
+              source: 'organization'
+            });
+          }
+        } catch (orgAddonError: any) {
+          console.error("❌ Error checking organization addons:", orgAddonError);
+          // Continue to check other sources
         }
       }
 
       // Check for old-style train_me_subscription_date in auth_users
-      const user = await authStorage.getUserById(userId);
-      if (user && user.trainMeSubscriptionDate) {
-        const subscriptionDate = new Date(user.trainMeSubscriptionDate);
-        const expiryDate = new Date(subscriptionDate);
-        expiryDate.setDate(expiryDate.getDate() + 30); // 30-day access
-        
-        const now = new Date();
-        if (expiryDate > now) {
-          const diffTime = expiryDate.getTime() - now.getTime();
-          const daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+      try {
+        const user = await authStorage.getUserById(userId);
+        if (user && user.trainMeSubscriptionDate) {
+          const subscriptionDate = new Date(user.trainMeSubscriptionDate);
+          const expiryDate = new Date(subscriptionDate);
+          expiryDate.setDate(expiryDate.getDate() + 30); // 30-day access
           
-          return res.json({
-            active: true,
-            purchaseDate: subscriptionDate.toISOString(),
-            daysRemaining,
-            expiryDate: expiryDate.toISOString(),
-            source: 'legacy'
-          });
+          const now = new Date();
+          if (expiryDate > now) {
+            const diffTime = expiryDate.getTime() - now.getTime();
+            const daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+            
+            return res.json({
+              active: true,
+              purchaseDate: subscriptionDate.toISOString(),
+              daysRemaining,
+              expiryDate: expiryDate.toISOString(),
+              source: 'legacy'
+            });
+          }
         }
+      } catch (legacyError: any) {
+        console.error("❌ Error checking legacy subscription:", legacyError);
+        // Continue to return no access
       }
 
       // No active Train Me subscription
@@ -3629,8 +3738,10 @@ Crawl-delay: 1`;
         source: 'none'
       });
     } catch (error: any) {
-      console.error("Train Me status error:", error);
-      res.status(500).json({ error: "Failed to check Train Me status" });
+      console.error("❌ Train Me status error:", error);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+      res.status(500).json({ error: "Failed to check Train Me status", message: error.message });
     }
   });
 
@@ -4551,6 +4662,7 @@ Crawl-delay: 1`;
   console.log("🔑 API Keys routes registered");
   
   setupSalesIntelligenceRoutes(app); // Sales Intelligence Agent for real-time suggestions
+  setupSystemConfigRoutes(app); // System Configuration management
   registerBibleRoutes(app); // Rev Winner Bible PDF download
   app.use("/api/download", apiDocsRouter); // API Documentation PDF download
   app.use(recordingsRouter); // Call recordings and meeting minutes (7-day retention)

@@ -2420,6 +2420,14 @@ const refreshToken = generateRefreshToken({
 
       res.json({ success: true });
     } catch (error: any) {
+      // Check if it's a database connection error
+      if (error.message?.includes('endpoint has been disabled') || 
+          error.code === 'XX000') {
+        console.error("Database unavailable - visit tracking skipped");
+        // Return success to avoid breaking the user experience
+        return res.json({ success: true, skipped: true });
+      }
+      
       console.error("Track visit error:", error);
       res.status(500).json({ message: "Failed to track visit" });
     }

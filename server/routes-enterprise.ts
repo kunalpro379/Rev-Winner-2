@@ -13,6 +13,7 @@ function getBaseUrl(req: Request): string {
   if (process.env.APP_URL) {
     return process.env.APP_URL;
   }
+  
   const protocol = req.protocol;
   const host = req.get('host');
   return `${protocol}://${host}`;
@@ -195,16 +196,18 @@ export function setupEnterpriseRoutes(app: Express) {
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
         await authStorage.createPasswordResetToken(userEmail, resetToken, expiresAt);
         
-        // Send license assignment email with password setup link (async, don't block)
-        const { sendLicenseAssignmentEmail } = await import('./services/email');
-        sendLicenseAssignmentEmail(
-          userEmail,
-          targetUser.firstName,
-          resetToken,
-          organization.companyName
-        ).catch(err => {
-          console.error('Error sending license assignment email:', err);
-          // Don't fail the request if email fails
+        // Send license assignment email with password setup link (fire-and-forget, don't block)
+        import('./services/email').then(({ sendLicenseAssignmentEmail }) => {
+          sendLicenseAssignmentEmail(
+            userEmail,
+            targetUser!.firstName,
+            resetToken,
+            organization.companyName
+          ).catch(err => {
+            console.error('Error sending license assignment email:', err);
+          });
+        }).catch(err => {
+          console.error('Error importing email service:', err);
         });
         
         // Log user creation
@@ -236,43 +239,36 @@ export function setupEnterpriseRoutes(app: Express) {
         notes,
         status: 'active'
       });
+
+      // Ensure user has organization membership so profile/subscription/session minutes show org entitlements
+      const existingMembership = await authStorage.getUserMembership(targetUser.id);
+      if (!existingMembership) {
+        await authStorage.createOrganizationMembership({
+          organizationId: organization.id,
+          userId: targetUser.id,
+          role: 'member',
+          status: 'active',
+        });
+      }
       
-      // Send notification email for ALL license assignments (new and existing users)
-      const { sendLicenseAssignmentEmail, sendLicenseAccessNotificationEmail } = await import('./services/email');
-      
-      // Check if this is a new user account (just created above) or existing user needs password
-      const newUserNeedsPassword = !targetUser.hashedPassword || targetUser.hashedPassword === '';
-      
-      if (newUserNeedsPassword) {
-        // New user or user without password - send password setup email (async, don't block)
-        const resetToken = randomBytes(32).toString('hex');
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        await authStorage.createPasswordResetToken(userEmail, resetToken, expiresAt);
-        
-        sendLicenseAssignmentEmail(
+      // Send notification email for ALL license assignments
+      // ALWAYS send password setup/reset link (fire-and-forget - don't block the response)
+      const resetToken = randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      authStorage.createPasswordResetToken(userEmail, resetToken, expiresAt).then(() => {
+        return import('./services/email');
+      }).then(({ sendLicenseAssignmentEmail }) => {
+        return sendLicenseAssignmentEmail(
           userEmail,
           targetUser.firstName,
           resetToken,
           organization.companyName
-        ).then(() => {
-          console.log(`Password setup email sent to new user ${userEmail}`);
-        }).catch(err => {
-          console.error(`Error sending password setup email to ${userEmail}:`, err);
-          // Don't fail the request if email fails
-        });
-      } else {
-        // Existing user with password - send access notification (async, don't block)
-        sendLicenseAccessNotificationEmail(
-          userEmail,
-          targetUser.firstName,
-          organization.companyName
-        ).then(() => {
-          console.log(`License access notification sent to existing user ${userEmail}`);
-        }).catch(err => {
-          console.error(`Error sending access notification to ${userEmail}:`, err);
-          // Don't fail the request if email fails
-        });
-      }
+        );
+      }).then(() => {
+        console.log(`Password setup/reset email sent to ${userEmail}`);
+      }).catch(err => {
+        console.error(`Error sending password setup/reset email to ${userEmail}:`, err);
+      });
       
       // Create audit log
       await eventLogger.log({
@@ -380,32 +376,38 @@ export function setupEnterpriseRoutes(app: Express) {
       
       // Reassign license (transfers remaining validity, NOT add-ons)
       const newAssignment = await authStorage.reassignLicense(assignmentId, newUser.id, userId, notes);
+
+      // Ensure new user has organization membership so profile/subscription/session minutes show org entitlements
+      const existingMembership = await authStorage.getUserMembership(newUser.id);
+      if (!existingMembership) {
+        await authStorage.createOrganizationMembership({
+          organizationId: organization.id,
+          userId: newUser.id,
+          role: 'member',
+          status: 'active',
+        });
+      }
       
       // Send notification email to the new user
-      const { sendLicenseAssignmentEmail, sendLicenseAccessNotificationEmail } = await import('./services/email');
+      // ALWAYS send password setup/reset link
+      const { sendLicenseAssignmentEmail } = await import('./services/email');
       
-      if (isNewUser || !newUser.hashedPassword || newUser.hashedPassword === '') {
-        // New user or user without password - send password setup email
-        const resetToken = randomBytes(32).toString('hex');
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        await authStorage.createPasswordResetToken(newUserEmail, resetToken, expiresAt);
-        
-        await sendLicenseAssignmentEmail(
-          newUserEmail,
-          newUser.firstName,
-          resetToken,
-          organization.companyName
-        );
-        console.log(`Password setup email sent to new user ${newUserEmail} (via reassignment)`);
-      } else {
-        // Existing user with password - send access notification
-        await sendLicenseAccessNotificationEmail(
-          newUserEmail,
-          newUser.firstName,
-          organization.companyName
-        );
-        console.log(`License access notification sent to existing user ${newUserEmail} (via reassignment)`);
-      }
+      const resetToken = randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await authStorage.createPasswordResetToken(newUserEmail, resetToken, expiresAt);
+      
+      await sendLicenseAssignmentEmail(
+        newUserEmail,
+        newUser.firstName,
+        resetToken,
+        organization.companyName
+      );
+      
+      const emailType = isNewUser || !newUser.hashedPassword || newUser.hashedPassword === '' 
+        ? 'password_setup' 
+        : 'password_reset';
+      
+      console.log(`${emailType} email sent to ${newUserEmail} (via reassignment)`);
       
       // Create audit log
       await eventLogger.log({
@@ -552,32 +554,26 @@ export function setupEnterpriseRoutes(app: Express) {
         return res.status(404).json({ message: "User not found" });
       }
       
-      const { sendLicenseAssignmentEmail, sendLicenseAccessNotificationEmail } = await import('./services/email');
+      const { sendLicenseAssignmentEmail } = await import('./services/email');
       
-      // Check if user needs password setup or just notification
-      const needsPassword = !targetUser.hashedPassword || targetUser.hashedPassword === '';
+      // Always send password setup/reset link for resend
+      // Generate new password reset token
+      const resetToken = randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      await authStorage.createPasswordResetToken(targetUser.email, resetToken, expiresAt);
       
-      if (needsPassword) {
-        // Generate new password reset token
-        const resetToken = randomBytes(32).toString('hex');
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-        await authStorage.createPasswordResetToken(targetUser.email, resetToken, expiresAt);
-        
-        await sendLicenseAssignmentEmail(
-          targetUser.email,
-          targetUser.firstName,
-          resetToken,
-          organization.companyName
-        );
-        console.log(`Resent password setup email to ${targetUser.email}`);
-      } else {
-        await sendLicenseAccessNotificationEmail(
-          targetUser.email,
-          targetUser.firstName,
-          organization.companyName
-        );
-        console.log(`Resent license access notification to ${targetUser.email}`);
-      }
+      await sendLicenseAssignmentEmail(
+        targetUser.email,
+        targetUser.firstName,
+        resetToken,
+        organization.companyName
+      );
+      
+      const emailType = !targetUser.hashedPassword || targetUser.hashedPassword === '' 
+        ? 'password_setup' 
+        : 'password_reset';
+      
+      console.log(`Resent ${emailType} email to ${targetUser.email}`);
       
       // Create audit log
       await eventLogger.log({
@@ -588,15 +584,13 @@ export function setupEnterpriseRoutes(app: Express) {
         metadata: { 
           organizationId: organization.id,
           targetUserEmail: targetUser.email,
-          emailType: needsPassword ? 'password_setup' : 'access_notification'
+          emailType
         }
       });
       
       res.json({ 
         success: true, 
-        message: needsPassword 
-          ? "Password setup email sent successfully. Please check spam folder." 
-          : "Access notification email sent successfully. Please check spam folder."
+        message: "Password setup email sent successfully. User can create/reset their password using the link."
       });
     } catch (error: any) {
       console.error("Error resending email:", error);
@@ -993,7 +987,7 @@ export function setupEnterpriseRoutes(app: Express) {
         
         if (!orderIdToCheck) {
           // If cashfreeOrderId not provided, use the stored gateway order ID from payment
-          orderIdToCheck = existingPayment.razorpayOrderId; // This field stores gateway order ID for both Razorpay and Cashfree
+          orderIdToCheck = existingPayment.razorpayOrderId || undefined; // This field stores gateway order ID for both Razorpay and Cashfree
         }
         
         if (!orderIdToCheck) {
