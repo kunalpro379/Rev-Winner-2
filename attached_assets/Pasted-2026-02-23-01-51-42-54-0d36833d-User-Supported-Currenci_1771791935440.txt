@@ -1,0 +1,132 @@
+2026-02-23 01:51:42.54
+0d36833d
+User
+Supported Currencies: INR, USD
+2026-02-23 01:51:42.54
+0d36833d
+User
+Supported Currencies: INR, USD
+2026-02-23 01:51:42.54
+0d36833d
+User
+Configured: Yes
+2026-02-23 01:51:42.54
+0d36833d
+User
+Razorpay Key ID: rzp_test_S2vI1j...
+2026-02-23 01:51:42.54
+0d36833d
+User
+PAYMENT GATEWAY CONFIGURATION
+2026-02-23 01:51:42.54
+0d36833d
+User
+Features: orders, refunds, webhooks, subscriptions
+2026-02-23 01:51:42.54
+0d36833d
+User
+Razorpay Mode: TEST
+2026-02-23 01:51:42.54
+0d36833d
+User
+Source: Environment Variable
+2026-02-23 01:51:42.54
+0d36833d
+User
+Environment: DEV (TEST)
+2026-02-23 01:51:42.54
+0d36833d
+User
+[PaymentGatewayFactory] Default provider changed to: razorpay
+2026-02-23 01:51:42.54
+0d36833d
+User
+============================================================
+2026-02-23 01:51:42.54
+0d36833d
+User
+🔧 PaymentGatewayFactory default provider set to: razorpay
+2026-02-23 01:51:43.74
+0d36833d
+User
+error: [Function],
+2026-02-23 01:51:43.74
+0d36833d
+User
+message: [Function],
+2026-02-23 01:51:43.74
+0d36833d
+User
+[Symbol(kTarget)]: WebSocket {
+2026-02-23 01:51:43.74
+0d36833d
+User
+Failed to initialize payment gateway provider: ErrorEvent {
+2026-02-23 01:51:43.74
+0d36833d
+User
+},
+2026-02-23 01:51:43.74
+0d36833d
+User
+_events: [Object: null prototype] {
+2026-02-23 01:51:43.74
+0d36833d
+User
+close: [Function],
+2026-02-23 01:51:43.74
+0d36833d
+User
+error: [Function],
+2026-02-23 01:51:43.74
+0d36833d
+User
+message: [Function],
+2026-02-23 01:51:43.74
+0d36833d
+User
+[Symbol(kTarget)]: WebSocket {
+2026-02-23 01:51:43.74
+0d36833d
+User
+Failed to initialize payment gateway provider: ErrorEvent {
+2026-02-23 01:51:43.74
+0d36833d
+User
+},
+2026-02-23 01:51:43.74
+0d36833d
+User
+_events: [Object: null prototype] {
+2026-02-23 01:51:43.74
+0d36833d
+User
+close: [Function],
+2026-02-23 01:51:43.74
+0d36833d
+User
+error: [Function],
+2026-02-23 01:51:43.74
+0d36833d
+User
+message: [Function],
+2026-02-23 01:51:43.74
+0d36833d
+User
+[Symbol(kTarget)]: WebSocket {
+2026-02-23 01:51:43.74
+0d36833d
+User
+Failed to initialize payment gateway provider: ErrorEvent {
+2026-02-23 01:51:43.74
+0d36833d
+User
+},
+2026-02-23 01:51:43.74
+0d36833d
+User
+_events: [Object: null prototype] {
+2026-02-23 01:51:43.74
+0d36833d
+User
+close: [Function],
