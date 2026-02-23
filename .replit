@@ -51,7 +51,6 @@ waitForPort = 5000
 
 [userenv.production]
 APP_URL = "https://revwinner.com"
-DATABASE_URL = "postgresql://postgres:password@helium/heliumdb?sslmode=disable"
 
 [userenv.shared]
 
