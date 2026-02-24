@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb, boolean, integer, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, boolean, integer, bigint, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -566,7 +566,10 @@ export const sessionUsage = pgTable("session_usage", {
   startTime: timestamp("start_time").notNull(),
   endTime: timestamp("end_time"),
   durationSeconds: varchar("duration_seconds", { length: 20 }), // Duration in seconds (stored as string for precision)
-  status: varchar("status", { length: 20 }).notNull().default("active"), // 'active' or 'ended'
+  status: varchar("status", { length: 20 }).notNull().default("active"), // 'active', 'paused', or 'ended'
+  lastResumeTime: timestamp("last_resume_time"), // When session was last resumed (for calculating running time)
+  accumulatedDurationMs: bigint("accumulated_duration_ms", { mode: "number" }).notNull().default(0), // Total accumulated time in ms
+  isPaused: boolean("is_paused").notNull().default(false), // Whether session is currently paused
   createdAt: timestamp("created_at").defaultNow(),
 });
 

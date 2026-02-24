@@ -19,6 +19,7 @@ import {
   type AddonPurchase,
   addonPurchases,
   conversations,
+  sessionUsage,
   systemConfig,
 } from "../shared/schema";
 import { z } from "zod";
@@ -1646,26 +1647,24 @@ export function setupBillingRoutes(app: Router) {
         }
       }
       
-      // Calculate actual used minutes from filtered conversations (this user's usage)
+      // Calculate actual used minutes from session_usage table (source of truth for timing)
       let actualUsedMinutes = 0;
       try {
-        const userConversations = await db
+        const userSessions = await db
           .select()
-          .from(conversations)
-          .where(eq(conversations.userId, userId))
-          .orderBy(desc(conversations.createdAt));
+          .from(sessionUsage)
+          .where(and(
+            eq(sessionUsage.userId, userId),
+            eq(sessionUsage.status, "ended")
+          ));
         
-        actualUsedMinutes = userConversations
-          .filter(conv => !!conv.transcriptionStartedAt)
-          .reduce((total, conv) => {
-            const startTime = conv.transcriptionStartedAt || conv.createdAt || new Date();
-            const endTime = conv.endedAt || conv.createdAt || new Date();
-            const durationMs = endTime.getTime() - startTime.getTime();
-            const durationMinutes = Math.max(1, Math.ceil(durationMs / (1000 * 60)));
-            return total + durationMinutes;
-          }, 0);
+        actualUsedMinutes = userSessions.reduce((total, session) => {
+          const durationSeconds = parseInt(session.durationSeconds || '0');
+          const durationMinutes = Math.floor(durationSeconds / 60);
+          return total + durationMinutes;
+        }, 0);
         
-        console.log(`[Session Minutes Status] User ${userId}: ${actualUsedMinutes} minutes used (Total: ${totalMinutes}, Remaining: ${isOrgSeatUser ? balance.remainingMinutes : Math.max(0, totalMinutes - actualUsedMinutes)}, Has packages: ${hasPurchasedPackages})`);
+        console.log(`[Session Minutes Status] User ${userId}: ${actualUsedMinutes} minutes used from session_usage table (Total: ${totalMinutes}, Remaining: ${isOrgSeatUser ? balance.remainingMinutes : Math.max(0, totalMinutes - actualUsedMinutes)}, Has packages: ${hasPurchasedPackages})`);
       } catch (error) {
         console.error('[Session Minutes Status] Error calculating used minutes:', error);
         actualUsedMinutes = subscription?.minutesUsed ? parseInt(subscription.minutesUsed) : 0;

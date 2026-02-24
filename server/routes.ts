@@ -8,7 +8,7 @@ import { authStorage } from "./storage-auth";
 import { generateSalesResponse, generateCallSummary, generateCoachingSuggestions } from "./services/openai";
 import { insertConversationSchema, insertMessageSchema, insertTeamsMeetingSchema, insertAudioSourceSchema, insertSessionUsageSchema, AUDIO_SOURCE_TYPES, subscriptions, pendingOrders, addonPurchases, sessionUsage, conversations, userFeedback } from "../shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, or, sql } from "drizzle-orm";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupAuthRoutes } from "./routes-auth";
 import { setupAdminRoutes } from "./routes-admin";
@@ -2228,11 +2228,15 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
         });
         
         const sessionId = `usage_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const now = new Date();
 
         const sessionUsageData = {
           userId,
           sessionId,
-          startTime: new Date(),
+          startTime: now,
+          lastResumeTime: now,
+          accumulatedDurationMs: 0,
+          isPaused: false,
           endTime: null,
           durationSeconds: null,
           status: "active"
@@ -2252,11 +2256,15 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
       if (hasEnterpriseLicense) {
         // Enterprise license user - allow unlimited access
         const sessionId = `usage_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const now = new Date();
 
         const sessionUsageData = {
           userId,
           sessionId,
-          startTime: new Date(),
+          startTime: now,
+          lastResumeTime: now,
+          accumulatedDurationMs: 0,
+          isPaused: false,
           endTime: null,
           durationSeconds: null,
           status: "active"
@@ -2310,11 +2318,15 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
       }
       
       const sessionId = `usage_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const now = new Date();
 
       const sessionUsageData = {
         userId,
         sessionId,
-        startTime: new Date(),
+        startTime: now,
+        lastResumeTime: now,
+        accumulatedDurationMs: 0,
+        isPaused: false,
         endTime: null,
         durationSeconds: null,
         status: "active"
@@ -2356,14 +2368,22 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
       }
 
       const endTime = new Date();
-      const startTime = new Date(sessionUsage.startTime);
-      const durationSeconds = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
-      // FIXED: Use actual minutes instead of rounding up
-      // If session was 3 minutes, count it as 3 minutes, not 1 minute
+      
+      // Calculate final duration using accumulated time model
+      let totalDurationMs = sessionUsage.accumulatedDurationMs || 0;
+      
+      // If session is currently running (not paused), add time since last resume
+      if (!sessionUsage.isPaused && sessionUsage.lastResumeTime) {
+        const runningSinceMs = endTime.getTime() - new Date(sessionUsage.lastResumeTime).getTime();
+        totalDurationMs += runningSinceMs;
+      }
+      
+      const durationSeconds = Math.floor(totalDurationMs / 1000);
       const durationMinutes = Math.floor(durationSeconds / 60);
 
       const updatedSession = await storage.updateSessionUsage(sessionId, userId, {
         endTime,
+        accumulatedDurationMs: totalDurationMs,
         durationSeconds: durationSeconds.toString(),
         status: "ended"
       });
@@ -2402,7 +2422,7 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
         // CRITICAL FIX: Include summary in session history
         sessionHistory.push({
           sessionId,
-          startTime: startTime.toISOString(),
+          startTime: new Date(sessionUsage.startTime).toISOString(),
           endTime: endTime.toISOString(),
           durationMinutes,
           summary: sessionSummary || undefined // Add summary if available
@@ -2417,6 +2437,125 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
       res.json({ sessionUsage: updatedSession });
     } catch (error: any) {
       res.status(500).json({ message: "Failed to stop session timer", error: error.message });
+    }
+  });
+
+  // Pause an active session timer
+  app.put("/api/session-usage/:sessionId/pause", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const { sessionId } = req.params;
+
+      const sessionUsage = await storage.getSessionUsage(sessionId, userId);
+      if (!sessionUsage) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+
+      if (sessionUsage.status === "ended") {
+        return res.status(400).json({ message: "Session already ended" });
+      }
+
+      if (sessionUsage.isPaused) {
+        return res.status(400).json({ message: "Session already paused" });
+      }
+
+      const now = new Date();
+      
+      // Calculate time since last resume and add to accumulated duration
+      let accumulatedMs = sessionUsage.accumulatedDurationMs || 0;
+      if (sessionUsage.lastResumeTime) {
+        const runningSinceMs = now.getTime() - new Date(sessionUsage.lastResumeTime).getTime();
+        accumulatedMs += runningSinceMs;
+      }
+
+      const updatedSession = await storage.updateSessionUsage(sessionId, userId, {
+        accumulatedDurationMs: accumulatedMs,
+        isPaused: true,
+        status: "paused"
+      });
+
+      res.json({ sessionUsage: updatedSession });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to pause session timer", error: error.message });
+    }
+  });
+
+  // Resume a paused session timer
+  app.put("/api/session-usage/:sessionId/resume", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const { sessionId } = req.params;
+
+      const sessionUsage = await storage.getSessionUsage(sessionId, userId);
+      if (!sessionUsage) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+
+      if (sessionUsage.status === "ended") {
+        return res.status(400).json({ message: "Session already ended" });
+      }
+
+      if (!sessionUsage.isPaused) {
+        return res.status(400).json({ message: "Session is not paused" });
+      }
+
+      const now = new Date();
+
+      const updatedSession = await storage.updateSessionUsage(sessionId, userId, {
+        lastResumeTime: now,
+        isPaused: false,
+        status: "active"
+      });
+
+      res.json({ sessionUsage: updatedSession });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to resume session timer", error: error.message });
+    }
+  });
+
+  // Get current active session with calculated duration
+  app.get("/api/session-usage/current", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      
+      // Find active session
+      const sessions = await db
+        .select()
+        .from(sessionUsage)
+        .where(and(
+          eq(sessionUsage.userId, userId),
+          or(
+            eq(sessionUsage.status, "active"),
+            eq(sessionUsage.status, "paused")
+          )
+        ))
+        .orderBy(desc(sessionUsage.startTime))
+        .limit(1);
+
+      if (sessions.length === 0) {
+        return res.json({ session: null });
+      }
+
+      const session = sessions[0];
+      const now = new Date();
+      
+      // Calculate current duration - handle both number and bigint types
+      let currentDurationMs = Number(session.accumulatedDurationMs) || 0;
+      if (!session.isPaused && session.lastResumeTime) {
+        const runningSinceMs = now.getTime() - new Date(session.lastResumeTime).getTime();
+        currentDurationMs += runningSinceMs;
+      }
+
+      res.json({
+        session: {
+          ...session,
+          currentDurationMs,
+          currentDurationSeconds: Math.floor(currentDurationMs / 1000)
+        }
+      });
+    } catch (error: any) {
+      console.error('❌ Error in /api/session-usage/current:', error);
+      res.status(500).json({ message: "Failed to get current session", error: error.message });
     }
   });
 
@@ -2572,65 +2711,57 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
         planDetails = await authStorage.getPlanById(subscription.planType.trim());
       }
 
-      // FIXED: Get session history from conversations table directly
-      // This is the source of truth for AI feature usage
+      // FIXED: Get session history from session_usage table (source of truth for timing)
+      // This is the accurate source for AI feature usage tracking
       let sessionHistory: Array<{
         sessionId: string | null;
         startTime: string;
         endTime: string;
         durationMinutes: number;
         summary: any;
+        transcriptionStarted: boolean;
       }> = [];
       try {
-        console.log(`[DEBUG] Fetching conversations for user ${userId}`);
+        console.log(`[DEBUG] Fetching session usage for user ${userId}`);
         
-        // Get all conversations for this user
-        const userConversations = await db.select()
-          .from(conversations)
-          .where(eq(conversations.userId, userId))
-          .orderBy(desc(conversations.createdAt))
+        // Get all ended sessions from session_usage table
+        const userSessions = await db.select()
+          .from(sessionUsage)
+          .where(and(
+            eq(sessionUsage.userId, userId),
+            eq(sessionUsage.status, "ended")
+          ))
+          .orderBy(desc(sessionUsage.startTime))
           .limit(50);
         
-        console.log(`[DEBUG] Found ${userConversations.length} conversations`);
+        console.log(`[DEBUG] Found ${userSessions.length} ended sessions`);
 
-        // Convert conversations to session history format
-        // IMPORTANT: Use transcriptionStartedAt for accurate duration (when user clicked Start)
-        // FILTER OUT: Sessions where transcription never started (page loads without Start button click)
-        sessionHistory = userConversations
-          .map(conv => {
-            const startTime = conv.transcriptionStartedAt || conv.createdAt || new Date();
-            const endTime = conv.endedAt || conv.createdAt || new Date();
-            const durationMs = endTime.getTime() - startTime.getTime();
-            const durationMinutes = Math.max(1, Math.ceil(durationMs / (1000 * 60)));
+        // Convert sessions to history format
+        sessionHistory = userSessions.map(session => {
+          const durationSeconds = parseInt(session.durationSeconds || '0');
+          const durationMinutes = Math.floor(durationSeconds / 60);
 
-            return {
-              sessionId: conv.sessionId,
-              startTime: startTime.toISOString(),
-              endTime: endTime.toISOString(),
-              durationMinutes: durationMinutes,
-              summary: conv.callSummary || null,
-              transcriptionStarted: !!conv.transcriptionStartedAt,
-            };
-          })
-          .filter(session => {
-            // STRICT FILTER: Only show sessions where transcription actually started
-            // This means user clicked the Start button
-            // Sessions without transcriptionStartedAt are just page loads, not actual usage
-            return session.transcriptionStarted;
-          });
+          return {
+            sessionId: session.sessionId,
+            startTime: session.startTime.toISOString(),
+            endTime: session.endTime ? session.endTime.toISOString() : new Date().toISOString(),
+            durationMinutes: durationMinutes,
+            summary: null, // Can be joined with conversations if needed
+            transcriptionStarted: true, // All sessions in session_usage have started
+          };
+        });
 
-        console.log(`[DEBUG] Returning ${sessionHistory.length} sessions in history (filtered out non-transcription sessions)`);
+        console.log(`[DEBUG] Returning ${sessionHistory.length} sessions in history from session_usage table`);
       } catch (error) {
-        console.error(`[DEBUG] Error fetching conversations:`, error);
+        console.error(`[DEBUG] Error fetching session usage:`, error);
         // Fall back to empty array if query fails
         sessionHistory = [];
       }
       
-      // Calculate actual sessions used from filtered history (not from subscription.sessionsUsed)
-      // This ensures consistency between session count and session list
+      // Calculate actual sessions used from session_usage table
       const actualSessionsUsed = sessionHistory.length;
       
-      // Calculate actual minutes used from filtered history
+      // Calculate actual minutes used from session_usage table
       const actualMinutesUsed = sessionHistory.reduce((total, session) => {
         return total + (session.durationMinutes || 0);
       }, 0);
