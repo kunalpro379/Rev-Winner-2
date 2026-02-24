@@ -40,6 +40,8 @@ interface EnhancedLiveTranscriptProps {
   onStopped?: () => void;
   onStartTimer?: () => void;
   onStopTimer?: () => void;
+  onPauseTimer?: () => void;
+  onResumeTimer?: () => void;
   onTranscriptUpdate?: (transcriptText: string) => void;
   onTranscribingChange?: (isTranscribing: boolean) => void;
   onNewSession?: () => void;
@@ -86,7 +88,7 @@ const isDesktopBrowser = () => {
   return isDesktop;
 };
 
-export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing = false, shouldStop = false, onStopped, onStartTimer, onStopTimer, onTranscriptUpdate, onTranscribingChange, onNewSession, resetVersion = 0, sessionId, onStop }: EnhancedLiveTranscriptProps) {
+export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing = false, shouldStop = false, onStopped, onStartTimer, onStopTimer, onPauseTimer, onResumeTimer, onTranscriptUpdate, onTranscribingChange, onNewSession, resetVersion = 0, sessionId, onStop }: EnhancedLiveTranscriptProps) {
   const [interimTranscript, setInterimTranscript] = useState("");
   const [fullTranscript, setFullTranscript] = useState("");
   const [transcriptSegments, setTranscriptSegments] = useState<TranscriptSegment[]>([]);
@@ -104,6 +106,7 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
   const [transcriptionMarkedAsStarted, setTranscriptionMarkedAsStarted] = useState(false); // Track if we've marked transcription start in DB
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
   const prevIsTranscribingRef = useRef<boolean>(false);
+  const isResumingRef = useRef<boolean>(false); // Track if we're resuming from pause
   const analyzeOnSpeechRef = useRef<(() => void) | null>(null);
   const { toast } = useToast();
 
@@ -336,15 +339,24 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
     const prevIsTranscribing = prevIsTranscribingRef.current;
     
     if (isTranscribing && !prevIsTranscribing) {
-      // Started transcribing
-      onStartTimer?.();
-    } else if (!isTranscribing && prevIsTranscribing) {
-      // Stopped transcribing
+      // Started transcribing - check if we're resuming from pause
+      if (isResumingRef.current) {
+        // We're resuming - don't call onStartTimer, handleResume will call onResumeTimer
+        console.log('🔄 Transcription started (RESUME) - skipping onStartTimer');
+        isResumingRef.current = false; // Reset flag
+      } else {
+        // Fresh start - call onStartTimer
+        console.log('▶️ Transcription started (NEW) - calling onStartTimer');
+        onStartTimer?.();
+      }
+    } else if (!isTranscribing && prevIsTranscribing && !isPaused) {
+      // Stopped transcribing (but NOT paused - only call onStopTimer if actually stopping)
+      console.log('⏹️ Transcription stopped - calling onStopTimer');
       onStopTimer?.();
     }
     
     prevIsTranscribingRef.current = isTranscribing;
-  }, [isTranscribing, onStartTimer, onStopTimer]);
+  }, [isTranscribing, isPaused, onStartTimer, onStopTimer]);
 
   // Notify parent of transcript updates
   useEffect(() => {
@@ -465,25 +477,38 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
   const handlePause = () => {
     stopTranscription();
     setIsPaused(true);
-    // IMPORTANT: Do NOT stop timer on pause - session continues
-    // Timer will keep running to track total session duration
+    // Pause the session timer
+    if (onPauseTimer) {
+      onPauseTimer();
+    }
     toast({
       title: "Transcription paused",
-      description: "Click Resume to continue. Session timer continues running.",
+      description: "Click Resume to continue. Timer is paused.",
     });
   };
 
   const handleResume = async () => {
     try {
+      // Set flag to indicate we're resuming (not starting fresh)
+      isResumingRef.current = true;
+      
+      // Resume the session timer FIRST (before starting transcription)
+      if (onResumeTimer) {
+        onResumeTimer();
+      }
+      
       // IMPORTANT: Resume uses existing session - does NOT create new conversation
       // This prevents incrementing session count on pause/resume
       await startTranscription(true, captureMeetingAudio);
       setIsPaused(false);
+      
       toast({
         title: "Transcription resumed",
         description: "Listening for speech...",
       });
     } catch (error: any) {
+      // Reset flag on error
+      isResumingRef.current = false;
       toast({
         title: "Failed to resume transcription",
         description: error.message || "An error occurred",

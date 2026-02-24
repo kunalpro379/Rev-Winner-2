@@ -131,7 +131,7 @@ export default function SalesAssistant() {
   const queryClient = useQueryClient();
   
   // Session timer hook
-  const { isRunning: isTimerRunning, currentSessionTime, totalUsage, startTimer, stopTimer } = useSessionTimer();
+  const { isRunning: isTimerRunning, currentSessionTime, totalUsage, startTimer, stopTimer, pauseTimer, resumeTimer } = useSessionTimer();
   
   // Fetch Session Minutes status for display (moved after isTimerRunning is defined)
   const { data: sessionMinutesStatus } = useQuery<{
@@ -857,7 +857,7 @@ export default function SalesAssistant() {
                     }`} data-testid="text-session-status">
                       {sessionMinutesStatus.superUserAccess 
                         ? '∞ minutes' 
-                        : `${Math.max(0, sessionMinutesStatus.totalMinutesRemaining - (isTimerRunning ? Math.floor(currentSessionTime / 60) : 0))} min left`}
+                        : `${Math.max(0, sessionMinutesStatus.totalMinutesRemaining - Math.floor(currentSessionTime / 60))} min left`}
                     </p>
                   </div>
                 </div>
@@ -1021,6 +1021,8 @@ export default function SalesAssistant() {
                 }
               }}
               onStopTimer={stopTimer}
+              onPauseTimer={pauseTimer}
+              onResumeTimer={resumeTimer}
               onTranscriptUpdate={setCurrentTranscript}
               onTranscribingChange={setIsTranscribing}
               onNewSession={handleNewSession}
