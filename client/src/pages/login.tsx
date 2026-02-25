@@ -83,8 +83,8 @@ export default function Login() {
           variant: "destructive",
         });
         
-        // Redirect to subscription page after showing message
-        setTimeout(() => setLocation("/subscribe"), 2000);
+        // Redirect to packages page after showing message
+        setTimeout(() => setLocation("/packages"), 2000);
         return;
       }
 

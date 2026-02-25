@@ -253,8 +253,8 @@ export default function Register() {
                     description: "Redirecting to pricing...",
                   });
 
-                  // Redirect to pricing page
-                  setTimeout(() => setLocation("/subscribe"), 500);
+                  // Redirect to packages page
+                  setTimeout(() => setLocation("/packages"), 500);
                 } catch (error: any) {
                   toast({
                     title: "Verification Failed",

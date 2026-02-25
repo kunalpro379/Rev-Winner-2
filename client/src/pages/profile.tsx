@@ -172,7 +172,7 @@ export default function Profile() {
           "Authorization": `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
-          paymentGateway: 'cashfree' // Explicitly use Cashfree
+          // Let backend use the configured default payment gateway
         }),
       });
 

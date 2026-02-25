@@ -33,7 +33,7 @@ export default function SubscriptionCancel() {
           <div className="flex flex-col gap-2">
             <Button
               data-testid="button-try-again"
-              onClick={() => setLocation("/subscribe")}
+              onClick={() => setLocation("/packages")}
               className="w-full bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-700 hover:to-purple-700"
             >
               Try Again

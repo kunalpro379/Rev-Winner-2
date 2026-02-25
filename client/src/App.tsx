@@ -17,7 +17,6 @@ import Login from "@/pages/login";
 import Register from "@/pages/register";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
-import Subscribe from "@/pages/subscribe";
 import Packages from "@/pages/packages";
 import Cart from "@/pages/cart";
 import Checkout from "@/pages/checkout";
@@ -74,7 +73,6 @@ function Router() {
       <Route path="/register" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
-      <Route path="/subscribe" component={Subscribe} />
       <Route path="/packages" component={Packages} />
       <Route path="/cart" component={Cart} />
       <Route path="/checkout" component={Checkout} />

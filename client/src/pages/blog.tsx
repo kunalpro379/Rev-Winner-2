@@ -265,7 +265,7 @@ export default function Blog() {
                     </button>
                   </li>
                   <li>
-                    <button onClick={() => setLocation('/subscribe')} className="text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="footer-link-pricing">
+                    <button onClick={() => setLocation('/packages')} className="text-slate-600 dark:text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" data-testid="footer-link-pricing">
                       Pricing
                     </button>
                   </li>

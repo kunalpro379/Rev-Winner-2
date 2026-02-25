@@ -345,7 +345,7 @@ export default function ManageSubscription() {
               "/api/session-minutes/verify-payment",
               {
                 orderId: orderId,
-                paymentGateway: 'cashfree',
+                // Let backend determine payment gateway from order
               }
             ).then(async (verifyResponse) => {
               const verifyData = await verifyResponse.json();

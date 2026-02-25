@@ -2513,6 +2513,42 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
     }
   });
 
+  // Sync current time from frontend to backend (called every 10 seconds)
+  app.put("/api/session-usage/:sessionId/sync", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser!.userId;
+      const { sessionId } = req.params;
+      const { currentDurationSeconds } = req.body;
+
+      if (typeof currentDurationSeconds !== 'number') {
+        return res.status(400).json({ message: "currentDurationSeconds is required" });
+      }
+
+      const sessionUsage = await storage.getSessionUsage(sessionId, userId);
+      if (!sessionUsage) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+
+      if (sessionUsage.status === "ended") {
+        return res.status(400).json({ message: "Session already ended" });
+      }
+
+      // Update accumulated duration from frontend
+      const accumulatedMs = currentDurationSeconds * 1000;
+      
+      const updatedSession = await storage.updateSessionUsage(sessionId, userId, {
+        accumulatedDurationMs: accumulatedMs
+      });
+
+      res.json({ 
+        success: true,
+        sessionUsage: updatedSession 
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to sync session time", error: error.message });
+    }
+  });
+
   // Get current active session with calculated duration
   app.get("/api/session-usage/current", authenticateToken, async (req, res) => {
     try {
