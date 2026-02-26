@@ -66,17 +66,33 @@ export function useSessionTimer() {
       
       // Check if this is a fresh page load with existing session
       if (!hasUserStartedTimerRef.current && session.status === "active") {
-        // Load initial time from DB, but DON'T auto-start timer
-        console.log(`📥 Loading session from DB: ${session.currentDurationSeconds}s (Session ID: ${session.sessionId})`);
-        setActiveSessionId(session.sessionId);
-        setCurrentSessionTime(session.currentDurationSeconds);
+        // CRITICAL FIX: Stop the stale session in the database
+        // This prevents continuous background syncing
+        console.log(`🛑 Found stale active session ${session.sessionId} - stopping it in DB`);
         
-        // Don't auto-start - user needs to click Start/Resume
-        if (isRunning) {
-          setIsRunning(false);
-        }
+        // Stop the session in the background
+        (async () => {
+          try {
+            await apiRequest("PUT", `/api/session-usage/${session.sessionId}/stop`, {
+              finalDurationSeconds: session.currentDurationSeconds
+            });
+            console.log(`✅ Stopped stale session ${session.sessionId}`);
+            
+            // Refresh the current session data
+            queryClient.invalidateQueries({ queryKey: ["/api/session-usage/current"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/profile/subscription"] });
+          } catch (error) {
+            console.error('Failed to stop stale session:', error);
+          }
+        })();
         
-        console.log('⏸️ Session loaded but NOT auto-starting - user needs to click Resume');
+        // Don't load the session into the UI
+        setActiveSessionId(null);
+        setCurrentSessionTime(0);
+        setIsRunning(false);
+        setIsPaused(false);
+        
+        console.log('⏸️ Stale session stopped - user needs to click Start for new session');
       } else if (hasUserStartedTimerRef.current) {
         // User has started timer in THIS session - just keep session ID synced
         if (activeSessionId !== session.sessionId) {
@@ -130,7 +146,9 @@ export function useSessionTimer() {
   // Time is now purely client-side, only sync on explicit actions (start/stop/pause/resume)
   
   // ADDED BACK: Periodic sync to DB every 10 seconds (for backup/recovery)
+  // CRITICAL: Only sync if user has explicitly started the timer
   useEffect(() => {
+    // DEFENSIVE: Don't sync if user hasn't started timer OR timer isn't running
     if (!isRunning || !activeSessionId || !hasUserStartedTimerRef.current) {
       return;
     }
@@ -151,7 +169,7 @@ export function useSessionTimer() {
     return () => {
       clearInterval(syncInterval);
     };
-  }, [isRunning, activeSessionId, currentSessionTime]);
+  }, [isRunning, activeSessionId, currentSessionTime, hasUserStartedTimerRef.current]);
 
   // Calculate total usage from subscription data + current session
   // IMPORTANT: Always include current session time (whether running or paused)

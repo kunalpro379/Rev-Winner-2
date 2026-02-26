@@ -70,9 +70,21 @@ export default function TermsAndConditions() {
           {termsData.title}
         </h1>
         
-        <div className="whitespace-pre-wrap">
-          {termsData.content}
-        </div>
+        <div 
+          className="prose-headings:font-bold prose-h2:text-2xl prose-h2:mt-8 prose-h2:mb-4 prose-h3:text-xl prose-h3:mt-6 prose-h3:mb-3 prose-p:my-4 prose-ul:my-4 prose-li:my-2"
+          dangerouslySetInnerHTML={{ 
+            __html: termsData.content
+              .replace(/\n/g, '<br />')
+              .replace(/^# (.+)$/gm, '<h1 class="text-3xl font-bold mt-8 mb-4">$1</h1>')
+              .replace(/^## (.+)$/gm, '<h2 class="text-2xl font-bold mt-8 mb-4">$1</h2>')
+              .replace(/^### (.+)$/gm, '<h3 class="text-xl font-semibold mt-6 mb-3">$1</h3>')
+              .replace(/^\*\*(.+?)\*\*$/gm, '<p class="font-bold my-2">$1</p>')
+              .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+              .replace(/^- (.+)$/gm, '<li class="ml-6">$1</li>')
+              .replace(/(<li.*<\/li>)/s, '<ul class="list-disc my-4">$1</ul>')
+              .replace(/^---$/gm, '<hr class="my-8 border-border" />')
+          }}
+        />
 
         <hr className="my-8 border-border" />
 

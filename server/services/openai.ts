@@ -234,17 +234,14 @@ async function getTrainingDocumentContext(
     const cacheKey = domainName ? `${userId}:${domainName}` : userId;
     
     if (allKnowledgeEntries.length > 0) {
-      const { buildStructuredKnowledgeContext, semanticSearch, DEFAULT_SEMANTIC_SEARCH_LIMIT } = await import("./knowledgeExtraction");
+      const { buildStructuredKnowledgeContext } = await import("./knowledgeExtraction");
       
       let relevantEntries = allKnowledgeEntries;
       
-      if (searchQuery && allKnowledgeEntries.length > 0) {
-        const searchResults = await semanticSearch(searchQuery, allKnowledgeEntries, semanticLimit);
-        relevantEntries = searchResults.map(r => r.entry);
-        console.log(`🔍 Semantic search: Found ${relevantEntries.length} relevant entries for query (from ${allKnowledgeEntries.length} total)`);
-      } else if (allKnowledgeEntries.length > semanticLimit) {
+      // Simple filtering without vector search - just use most recent entries
+      if (allKnowledgeEntries.length > semanticLimit) {
         relevantEntries = allKnowledgeEntries.slice(0, semanticLimit);
-        console.log(`📋 Using ${relevantEntries.length} most recent knowledge entries`);
+        console.log(`📋 Using ${relevantEntries.length} most recent knowledge entries (from ${allKnowledgeEntries.length} total)`);
       }
       
       const context = buildStructuredKnowledgeContext(relevantEntries);
