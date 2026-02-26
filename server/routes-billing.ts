@@ -3796,15 +3796,16 @@ export function setupBillingRoutes(app: Router) {
         subtotal = cartSubtotal;
         discount = cartDiscount;
         totalGst = cartGstAmount;
-        grandTotal = cartTotal;
+        grandTotal = cartTotal; // This already includes discount calculation from cart
         console.log(`[Invoice Debug] Using cart metadata - subtotal: ${subtotal}, discount: ${discount}, gst: ${totalGst}, total: ${grandTotal}`);
       } else {
         // Fallback: Calculate from items (may not include discount)
         subtotal = items.reduce((sum: number, item: any) => sum + parseFloat(item.totalAmount), 0);
         totalGst = items.reduce((sum: number, item: any) => sum + parseFloat(item.gstAmount), 0);
         discount = 0;
-        grandTotal = subtotal + totalGst;
-        console.log(`[Invoice Debug] Using item calculation - subtotal: ${subtotal}, gst: ${totalGst}, total: ${grandTotal}`);
+        // CRITICAL FIX: Apply discount to total calculation
+        grandTotal = (subtotal - discount) + totalGst;
+        console.log(`[Invoice Debug] Using item calculation - subtotal: ${subtotal}, discount: ${discount}, gst: ${totalGst}, total: ${grandTotal}`);
       }
 
       console.log(`[Invoice Debug] Calculated totals - subtotal: ${subtotal}, discount: ${discount}, gst: ${totalGst}, total: ${grandTotal}, currency: ${currency}`);

@@ -35,15 +35,15 @@ export function useSessionTimer() {
   const [isRunning, setIsRunning] = useState(false);
   const [currentSessionTime, setCurrentSessionTime] = useState(0);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [lastSyncTime, setLastSyncTime] = useState<number>(Date.now());
   const [isPaused, setIsPaused] = useState(false);
+  const [clientStartTime, setClientStartTime] = useState<number | null>(null); // Client-side start time
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const hasUserStartedTimerRef = useRef<boolean>(false); // Track if user explicitly started timer in THIS session
+  const hasUserStartedTimerRef = useRef<boolean>(false);
 
-  // Query for current active session from backend (source of truth)
+  // Query for current active session from backend (only for session ID, not for time)
   const { data: currentSessionData } = useQuery<CurrentSessionResponse>({
     queryKey: ["/api/session-usage/current"],
-    refetchInterval: 5000, // Refetch every 5 seconds to sync with backend
+    refetchInterval: 30000, // Refetch every 30 seconds (less frequent, only for session status)
     enabled: true,
   });
 
@@ -54,74 +54,42 @@ export function useSessionTimer() {
     sessionsUsed?: string;
   }>({
     queryKey: ["/api/profile/subscription"],
-    refetchInterval: isRunning ? 10000 : false, // Refetch every 10 seconds when running
+    refetchInterval: isRunning ? 30000 : false, // Refetch every 30 seconds when running
   });
 
-  // Sync frontend state with backend session (every 5 seconds)
+  // Sync session status with backend (load initial time on refresh, then run client-side)
   useEffect(() => {
-    console.log('🔄 Sync effect triggered, currentSessionData:', currentSessionData);
+    console.log('🔄 Session status check:', currentSessionData);
     
     if (currentSessionData?.session) {
       const session = currentSessionData.session;
-      console.log('📊 Session data from backend:', {
-        sessionId: session.sessionId,
-        status: session.status,
-        isPaused: session.isPaused,
-        currentDurationSeconds: session.currentDurationSeconds,
-        hasUserStartedTimer: hasUserStartedTimerRef.current
-      });
       
-      // Backend has an active session
-      const shouldBeRunning = session.status === "active" && !session.isPaused;
-      const shouldBePaused = session.isPaused;
-      
-      // CRITICAL FIX: Only sync session data if user has started timer in THIS session
-      if (hasUserStartedTimerRef.current) {
-        // Set session ID and time from backend
+      // Check if this is a fresh page load with existing session
+      if (!hasUserStartedTimerRef.current && session.status === "active") {
+        // Load initial time from DB, but DON'T auto-start timer
+        console.log(`📥 Loading session from DB: ${session.currentDurationSeconds}s (Session ID: ${session.sessionId})`);
         setActiveSessionId(session.sessionId);
         setCurrentSessionTime(session.currentDurationSeconds);
-        setLastSyncTime(Date.now());
         
-        // Update running state only if user started timer
-        if (shouldBeRunning !== isRunning) {
-          setIsRunning(shouldBeRunning);
-          console.log(`⏱️ Timer state synced: ${shouldBeRunning ? 'RUNNING' : 'STOPPED'} at ${session.currentDurationSeconds}s`);
-        }
-        
-        // Update paused state
-        if (shouldBePaused !== isPaused) {
-          setIsPaused(shouldBePaused);
-          console.log(`⏸️ Timer paused at ${session.currentDurationSeconds}s`);
-        }
-      } else {
-        // After refresh, NEVER auto-start and DON'T show old session time
-        console.log('🛑 Session exists in backend but NOT syncing (hasUserStartedTimer=false)');
-        
-        // Keep session ID for potential resume, but don't show time
-        if (activeSessionId !== session.sessionId) {
-          setActiveSessionId(session.sessionId);
-        }
-        
-        // Force timer to stopped state
+        // Don't auto-start - user needs to click Start/Resume
         if (isRunning) {
-          console.log('🛑 Forcing timer to STOP (was running but user did not start in this session)');
           setIsRunning(false);
         }
-        if (!isPaused && shouldBePaused) {
-          setIsPaused(true); // Show paused state
-        }
         
-        // Keep time at 0 until user explicitly starts
-        if (currentSessionTime !== 0) {
-          setCurrentSessionTime(0);
+        console.log('⏸️ Session loaded but NOT auto-starting - user needs to click Resume');
+      } else if (hasUserStartedTimerRef.current) {
+        // User has started timer in THIS session - just keep session ID synced
+        if (activeSessionId !== session.sessionId) {
+          setActiveSessionId(session.sessionId);
+          console.log(`📝 Session ID synced: ${session.sessionId}`);
         }
+        // Time continues to run client-side, no sync from server
       }
     } else {
       console.log('❌ No active session from backend');
       
-      // No active session - reset to initial state
+      // No active session - reset
       if (isRunning) {
-        console.log('🛑 Stopping timer (no backend session)');
         setIsRunning(false);
       }
       if (isPaused) {
@@ -130,12 +98,10 @@ export function useSessionTimer() {
       if (activeSessionId) {
         setActiveSessionId(null);
       }
-      // Keep currentSessionTime to show last stopped time
     }
   }, [currentSessionData]);
 
-  // Local timer for smooth UI updates (ticks every second)
-  // CRITICAL: Only tick if user has explicitly started timer in THIS session
+  // CLIENT-SIDE TIMER: Runs purely on client, no server sync for time
   useEffect(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -143,7 +109,7 @@ export function useSessionTimer() {
 
     // DEFENSIVE: Only run timer if user started it AND isRunning is true
     if (isRunning && hasUserStartedTimerRef.current) {
-      console.log('⏱️ Starting local timer interval');
+      console.log('⏱️ Starting CLIENT-SIDE timer (no server sync for time)');
       intervalRef.current = setInterval(() => {
         setCurrentSessionTime(prev => prev + 1);
       }, 1000);
@@ -160,22 +126,25 @@ export function useSessionTimer() {
     };
   }, [isRunning]);
 
-  // CRITICAL: Sync current time to backend every 10 seconds while running
+  // REMOVED: No more periodic sync to backend for time
+  // Time is now purely client-side, only sync on explicit actions (start/stop/pause/resume)
+  
+  // ADDED BACK: Periodic sync to DB every 10 seconds (for backup/recovery)
   useEffect(() => {
-    if (!isRunning || !activeSessionId) {
+    if (!isRunning || !activeSessionId || !hasUserStartedTimerRef.current) {
       return;
     }
 
-    // Sync to backend every 10 seconds
+    // Sync current time to backend every 10 seconds
     const syncInterval = setInterval(async () => {
       try {
-        console.log(`🔄 Syncing current time to backend: ${currentSessionTime}s`);
+        console.log(`🔄 Syncing current time to DB: ${currentSessionTime}s`);
         await apiRequest("PUT", `/api/session-usage/${activeSessionId}/sync`, {
           currentDurationSeconds: currentSessionTime
         });
-        console.log(`✅ Synced ${currentSessionTime}s to backend`);
+        console.log(`✅ Synced ${currentSessionTime}s to DB`);
       } catch (error) {
-        console.error('Failed to sync time to backend:', error);
+        console.error('Failed to sync time to DB:', error);
       }
     }, 10000); // Every 10 seconds
 
@@ -208,11 +177,13 @@ export function useSessionTimer() {
           console.error('Failed to start session tracking:', data);
           throw new Error(data.message || 'Failed to start session');
         }
-        
+
+        // Start CLIENT-SIDE timer from 0
         setIsRunning(true);
-        setCurrentSessionTime(0); // Start from 0
+        setCurrentSessionTime(0);
         setActiveSessionId(data.sessionUsage.sessionId);
-        console.log('⏱️ Session timer started, Session ID:', data.sessionUsage.sessionId);
+        setClientStartTime(Date.now());
+        console.log('⏱️ CLIENT-SIDE timer started from 0, Session ID:', data.sessionUsage.sessionId);
         
         // Invalidate queries to refresh usage data immediately
         queryClient.invalidateQueries({ queryKey: ["/api/session-usage/current"] });
@@ -231,8 +202,13 @@ export function useSessionTimer() {
   const stopTimer = useCallback(async () => {
     if ((isRunning || isPaused) && activeSessionId) {
       try {
-        // Call backend API to stop session tracking
-        const response = await apiRequest("PUT", `/api/session-usage/${activeSessionId}/stop`, {});
+        // Send final time to backend before stopping
+        const finalTime = currentSessionTime;
+        console.log(`⏱️ Stopping session with final time: ${finalTime}s`);
+        
+        const response = await apiRequest("PUT", `/api/session-usage/${activeSessionId}/stop`, {
+          finalDurationSeconds: finalTime // Send client-side time to backend
+        });
         const data = await response.json();
         
         if (!response.ok) {
@@ -246,9 +222,10 @@ export function useSessionTimer() {
         // Reset current session to 0
         setIsRunning(false);
         setIsPaused(false);
-        setCurrentSessionTime(0); // RESET to 0
+        setCurrentSessionTime(0);
         setActiveSessionId(null);
-        hasUserStartedTimerRef.current = false; // Reset flag
+        setClientStartTime(null);
+        hasUserStartedTimerRef.current = false;
         
         // Invalidate queries to refresh total usage from DB
         queryClient.invalidateQueries({ queryKey: ["/api/session-usage/current"] });
@@ -256,23 +233,29 @@ export function useSessionTimer() {
         queryClient.invalidateQueries({ queryKey: ["/api/session-minutes/status"] });
         queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
         queryClient.invalidateQueries({ queryKey: ["/api/subscriptions/check-limits"] });
-        console.log('⏱️ Session timer stopped - current session reset to 0, refreshing total usage from DB');
+        console.log('⏱️ CLIENT-SIDE timer stopped and reset to 0');
       }
     }
-  }, [isRunning, isPaused, activeSessionId]);
+  }, [isRunning, isPaused, activeSessionId, currentSessionTime]);
 
   const pauseTimer = useCallback(async () => {
     if (isRunning && activeSessionId) {
       try {
-        const response = await apiRequest("PUT", `/api/session-usage/${activeSessionId}/pause`, {});
+        // Stop client-side timer first
+        setIsRunning(false);
+        setIsPaused(true);
+        console.log(`⏸️ CLIENT-SIDE timer paused at: ${currentSessionTime}s`);
+        
+        // Notify backend
+        const response = await apiRequest("PUT", `/api/session-usage/${activeSessionId}/pause`, {
+          currentDurationSeconds: currentSessionTime // Send current time
+        });
         const data = await response.json();
         
         if (!response.ok) {
           console.error('Failed to pause session:', data);
         } else {
-          console.log('⏱️ Session paused at:', currentSessionTime, 'seconds');
-          // Don't set isRunning here - let the backend sync handle it
-          // This ensures the timer value is preserved
+          console.log('⏱️ Session paused on backend');
           queryClient.invalidateQueries({ queryKey: ["/api/session-usage/current"] });
         }
       } catch (error) {
@@ -282,7 +265,7 @@ export function useSessionTimer() {
   }, [isRunning, activeSessionId, currentSessionTime]);
 
   const resumeTimer = useCallback(async () => {
-    // Always try to resume if we have an active session
+    // Resume if we have an active session
     if (activeSessionId) {
       try {
         // Mark that user has explicitly started/resumed the timer
@@ -294,8 +277,10 @@ export function useSessionTimer() {
         if (!response.ok) {
           console.error('Failed to resume session:', data);
         } else {
-          console.log('⏱️ Session resumed from:', currentSessionTime, 'seconds');
-          // Don't set isRunning here - let the backend sync handle it
+          // Resume client-side timer from current time
+          setIsRunning(true);
+          setClientStartTime(Date.now());
+          console.log(`⏱️ CLIENT-SIDE timer resumed from: ${currentSessionTime}s`);
           queryClient.invalidateQueries({ queryKey: ["/api/session-usage/current"] });
         }
       } catch (error) {
