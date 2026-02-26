@@ -2834,6 +2834,7 @@ export function setupBillingRoutes(app: Router) {
               packageName: item.packageName,
               addonType: item.addonType,
               basePrice: item.basePrice,
+              discount: item.appliedDiscountAmount || '0',  // CRITICAL FIX: Include per-item discount
               currency: item.currency,
               quantity: item.quantity,
               metadata: item.metadata,
@@ -3055,6 +3056,7 @@ export function setupBillingRoutes(app: Router) {
             packageName: item.packageName,
             addonType: item.addonType,
             basePrice: item.basePrice,
+            discount: item.appliedDiscountAmount || '0',  // CRITICAL FIX: Include per-item discount
             currency: item.currency,
             quantity: item.quantity,
             metadata: item.metadata,

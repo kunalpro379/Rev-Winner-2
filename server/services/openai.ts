@@ -234,14 +234,17 @@ async function getTrainingDocumentContext(
     const cacheKey = domainName ? `${userId}:${domainName}` : userId;
     
     if (allKnowledgeEntries.length > 0) {
-      const { buildStructuredKnowledgeContext } = await import("./knowledgeExtraction");
+      const { buildStructuredKnowledgeContext, semanticSearch, DEFAULT_SEMANTIC_SEARCH_LIMIT } = await import("./knowledgeExtraction");
       
       let relevantEntries = allKnowledgeEntries;
       
-      // Simple filtering without vector search - just use most recent entries
-      if (allKnowledgeEntries.length > semanticLimit) {
+      if (searchQuery && allKnowledgeEntries.length > 0) {
+        const searchResults = await semanticSearch(searchQuery, allKnowledgeEntries, semanticLimit);
+        relevantEntries = searchResults.map(r => r.entry);
+        console.log(`🔍 Semantic search: Found ${relevantEntries.length} relevant entries for query (from ${allKnowledgeEntries.length} total)`);
+      } else if (allKnowledgeEntries.length > semanticLimit) {
         relevantEntries = allKnowledgeEntries.slice(0, semanticLimit);
-        console.log(`📋 Using ${relevantEntries.length} most recent knowledge entries (from ${allKnowledgeEntries.length} total)`);
+        console.log(`📋 Using ${relevantEntries.length} most recent knowledge entries`);
       }
       
       const context = buildStructuredKnowledgeContext(relevantEntries);
@@ -3434,23 +3437,14 @@ Each tip: exact words to say (seller-ready, no fluff), expected prospect reactio
       }
     });
 
-    // SPEED OPTIMIZATION: Always use fastest models for Shift Gears
-    // Fast models are perfect for real-time coaching tips
-    const fastModel = model.includes('gpt-4o') ? 'gpt-4o-mini'  // GPT-4o → mini (10x faster)
-                    : model.includes('gpt-4') ? 'gpt-4o-mini'   // GPT-4 → mini (10x faster)
-                    : model.includes('claude-3-5-sonnet') ? 'claude-3-5-haiku-latest'  // Sonnet → Haiku (5x faster)
-                    : model.includes('claude') ? 'claude-3-5-haiku-latest'  // Any Claude → Haiku
-                    : model.includes('gemini-2.0-flash-exp') ? 'gemini-2.0-flash-exp'  // Already fast
-                    : model.includes('gemini') ? 'gemini-2.0-flash-exp'  // Any Gemini → Flash
-                    : model.includes('deepseek') ? 'deepseek-chat'  // Already fast
-                    : model.includes('grok-3') ? 'grok-3'  // Already fast
-                    : model.includes('grok') ? 'grok-3'  // Any Grok → 3
+    const fastModel = model.includes('gpt-4') ? 'gpt-4o-mini' 
+                    : model.includes('claude') ? 'claude-3-5-haiku-latest'
+                    : model.includes('gemini') ? 'gemini-2.0-flash'
                     : model;
     
     const aiStartTime = Date.now();
     let response;
-    // OPTIMIZATION: Only try fast model, don't fallback to slow model
-    const modelsToTry = [fastModel];
+    const modelsToTry = fastModel !== model ? [fastModel, model] : [model];
     
     for (const tryModel of modelsToTry) {
       try {
@@ -3462,8 +3456,8 @@ Each tip: exact words to say (seller-ready, no fluff), expected prospect reactio
             { role: "user", content: userPrompt }
           ],
           response_format: { type: "json_object" },
-          temperature: 0.0,  // OPTIMIZATION: 0.0 for fastest, most deterministic responses
-          max_tokens: 500,  // OPTIMIZATION: Reduced from 600 to 500 (only need 3 tips)
+          temperature: 0.12,
+          max_tokens: 600,
         });
         console.log(`⚡ ShiftGears AI call: ${Date.now() - aiStartTime}ms | Model: ${tryModel}`);
         break;
@@ -3643,16 +3637,9 @@ export async function generateQueryPitches(
         model = aiConfig.model;
         originalModel = model;
         
-        // SPEED OPTIMIZATION: Always use fastest models for Query Pitches
-        const fastModel = model.includes('gpt-4o') ? 'gpt-4o-mini'  // GPT-4o → mini (10x faster)
-                        : model.includes('gpt-4') ? 'gpt-4o-mini'   // GPT-4 → mini (10x faster)
-                        : model.includes('claude-3-5-sonnet') ? 'claude-3-5-haiku-latest'  // Sonnet → Haiku (5x faster)
-                        : model.includes('claude') ? 'claude-3-5-haiku-latest'  // Any Claude → Haiku
-                        : model.includes('gemini-2.0-flash-exp') ? 'gemini-2.0-flash-exp'  // Already fast
-                        : model.includes('gemini') ? 'gemini-2.0-flash-exp'  // Any Gemini → Flash
-                        : model.includes('deepseek') ? 'deepseek-chat'  // Already fast
-                        : model.includes('grok-3') ? 'grok-3'  // Already fast
-                        : model.includes('grok') ? 'grok-3'  // Any Grok → 3
+        const fastModel = model.includes('gpt-4') ? 'gpt-4o-mini'
+                        : model.includes('claude') ? 'claude-3-5-haiku-latest'
+                        : model.includes('gemini') ? 'gemini-2.0-flash'
                         : model;
         model = fastModel;
       } catch (error) {
@@ -3666,13 +3653,11 @@ export async function generateQueryPitches(
       model = "deepseek-chat";
     }
 
-    const userPrompt = `TRANSCRIPT (recent - LAST 2-3 EXCHANGES ONLY):
+    const userPrompt = `TRANSCRIPT (recent):
 ${conversationText.slice(-1200)}
 Focus: ${domainExpertise}
 
-CRITICAL: Only extract queries from the MOST RECENT customer messages (last 2-3 exchanges). Ignore old/answered questions.
-
-DETECT AND EXTRACT every NEW customer query, concern, objection, and challenge from the RECENT transcript above. Include:
+DETECT AND EXTRACT every customer query, concern, objection, and challenge from the transcript above. Include:
 - Direct questions ("what is", "how does", "can you", "tell me about")
 - Indirect questions ("I want to know", "we're looking at", "what are the offerings")
 - Objections disguised as questions ("isn't that expensive?", "why switch?")
@@ -3685,13 +3670,10 @@ If objection hidden in question: address surface question AND underlying concern
 For pricing: use EXACT values from training docs only. Never guess.
 End each pitch with a micro-close or leverage follow-up question.
 
-IMPORTANT: Return ONLY new/unanswered queries. Max 3-4 queries. Focus on quality over quantity.
-
 JSON: {"queries":[{"query":"exact question/concern","queryType":"technical|pricing|features|integration|support|general|comparison|challenge|objection|walking_away","pitch":"40-80 words: direct answer + value + risk reduction","keyPoints":["point1","point2","point3"],"followUpQuestion":"micro-close or leverage question"}]}`;
 
     let response;
-    // OPTIMIZATION: Only try fast model, don't fallback to slow model
-    const modelsToTry = [model];
+    const modelsToTry = (originalModel && originalModel !== model) ? [model, originalModel] : [model];
     
     for (const tryModel of modelsToTry) {
       try {
@@ -3703,8 +3685,8 @@ JSON: {"queries":[{"query":"exact question/concern","queryType":"technical|prici
             { role: "user", content: userPrompt }
           ],
           response_format: { type: "json_object" },
-          temperature: 0.0,  // OPTIMIZATION: 0.0 for fastest, most deterministic responses
-          max_tokens: 1200,  // OPTIMIZATION: Reduced from 1500 to 1200 (3-4 queries max)
+          temperature: 0.15,
+          max_tokens: 1500,
         });
         console.log(`💬 QueryPitches: Model ${tryModel} succeeded`);
         break;
@@ -3755,8 +3737,7 @@ JSON: {"queries":[{"query":"exact question/concern","queryType":"technical|prici
       queries: queries.map((q: QueryPitch) => q.query)
     });
     
-    // OPTIMIZED: Return max 3 queries for faster response and better UX
-    return queries.slice(0, 3);
+    return queries.slice(0, 5);
   } catch (error) {
     console.error("Query pitch generation error:", error);
     return [];
