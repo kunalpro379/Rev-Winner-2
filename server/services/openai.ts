@@ -3434,14 +3434,23 @@ Each tip: exact words to say (seller-ready, no fluff), expected prospect reactio
       }
     });
 
-    const fastModel = model.includes('gpt-4') ? 'gpt-4o-mini' 
-                    : model.includes('claude') ? 'claude-3-5-haiku-latest'
-                    : model.includes('gemini') ? 'gemini-2.0-flash'
+    // SPEED OPTIMIZATION: Always use fastest models for Shift Gears
+    // Fast models are perfect for real-time coaching tips
+    const fastModel = model.includes('gpt-4o') ? 'gpt-4o-mini'  // GPT-4o → mini (10x faster)
+                    : model.includes('gpt-4') ? 'gpt-4o-mini'   // GPT-4 → mini (10x faster)
+                    : model.includes('claude-3-5-sonnet') ? 'claude-3-5-haiku-latest'  // Sonnet → Haiku (5x faster)
+                    : model.includes('claude') ? 'claude-3-5-haiku-latest'  // Any Claude → Haiku
+                    : model.includes('gemini-2.0-flash-exp') ? 'gemini-2.0-flash-exp'  // Already fast
+                    : model.includes('gemini') ? 'gemini-2.0-flash-exp'  // Any Gemini → Flash
+                    : model.includes('deepseek') ? 'deepseek-chat'  // Already fast
+                    : model.includes('grok-3') ? 'grok-3'  // Already fast
+                    : model.includes('grok') ? 'grok-3'  // Any Grok → 3
                     : model;
     
     const aiStartTime = Date.now();
     let response;
-    const modelsToTry = fastModel !== model ? [fastModel, model] : [model];
+    // OPTIMIZATION: Only try fast model, don't fallback to slow model
+    const modelsToTry = [fastModel];
     
     for (const tryModel of modelsToTry) {
       try {
@@ -3453,8 +3462,8 @@ Each tip: exact words to say (seller-ready, no fluff), expected prospect reactio
             { role: "user", content: userPrompt }
           ],
           response_format: { type: "json_object" },
-          temperature: 0.12,
-          max_tokens: 600,
+          temperature: 0.0,  // OPTIMIZATION: 0.0 for fastest, most deterministic responses
+          max_tokens: 500,  // OPTIMIZATION: Reduced from 600 to 500 (only need 3 tips)
         });
         console.log(`⚡ ShiftGears AI call: ${Date.now() - aiStartTime}ms | Model: ${tryModel}`);
         break;
@@ -3634,9 +3643,16 @@ export async function generateQueryPitches(
         model = aiConfig.model;
         originalModel = model;
         
-        const fastModel = model.includes('gpt-4') ? 'gpt-4o-mini'
-                        : model.includes('claude') ? 'claude-3-5-haiku-latest'
-                        : model.includes('gemini') ? 'gemini-2.0-flash'
+        // SPEED OPTIMIZATION: Always use fastest models for Query Pitches
+        const fastModel = model.includes('gpt-4o') ? 'gpt-4o-mini'  // GPT-4o → mini (10x faster)
+                        : model.includes('gpt-4') ? 'gpt-4o-mini'   // GPT-4 → mini (10x faster)
+                        : model.includes('claude-3-5-sonnet') ? 'claude-3-5-haiku-latest'  // Sonnet → Haiku (5x faster)
+                        : model.includes('claude') ? 'claude-3-5-haiku-latest'  // Any Claude → Haiku
+                        : model.includes('gemini-2.0-flash-exp') ? 'gemini-2.0-flash-exp'  // Already fast
+                        : model.includes('gemini') ? 'gemini-2.0-flash-exp'  // Any Gemini → Flash
+                        : model.includes('deepseek') ? 'deepseek-chat'  // Already fast
+                        : model.includes('grok-3') ? 'grok-3'  // Already fast
+                        : model.includes('grok') ? 'grok-3'  // Any Grok → 3
                         : model;
         model = fastModel;
       } catch (error) {
@@ -3674,7 +3690,8 @@ IMPORTANT: Return ONLY new/unanswered queries. Max 3-4 queries. Focus on quality
 JSON: {"queries":[{"query":"exact question/concern","queryType":"technical|pricing|features|integration|support|general|comparison|challenge|objection|walking_away","pitch":"40-80 words: direct answer + value + risk reduction","keyPoints":["point1","point2","point3"],"followUpQuestion":"micro-close or leverage question"}]}`;
 
     let response;
-    const modelsToTry = (originalModel && originalModel !== model) ? [model, originalModel] : [model];
+    // OPTIMIZATION: Only try fast model, don't fallback to slow model
+    const modelsToTry = [model];
     
     for (const tryModel of modelsToTry) {
       try {
@@ -3686,8 +3703,8 @@ JSON: {"queries":[{"query":"exact question/concern","queryType":"technical|prici
             { role: "user", content: userPrompt }
           ],
           response_format: { type: "json_object" },
-          temperature: 0.15,
-          max_tokens: 1500,
+          temperature: 0.0,  // OPTIMIZATION: 0.0 for fastest, most deterministic responses
+          max_tokens: 1200,  // OPTIMIZATION: Reduced from 1500 to 1200 (3-4 queries max)
         });
         console.log(`💬 QueryPitches: Model ${tryModel} succeeded`);
         break;

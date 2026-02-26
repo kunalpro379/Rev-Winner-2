@@ -3658,7 +3658,12 @@ export function setupBillingRoutes(app: Router) {
         items = cartItems.map((cartItem: any) => {
           const basePrice = parseFloat(cartItem.basePrice || '0');
           const quantity = Math.max(1, parseInt(String(cartItem.quantity), 10) || 1);
-          const totalAmount = basePrice * quantity;
+          
+          // CRITICAL FIX: Calculate discounted price per item
+          const itemDiscount = parseFloat(cartItem.discount || '0');
+          const discountedPrice = basePrice - itemDiscount;
+          const totalAmount = discountedPrice * quantity;
+          
           const currency = cartItem.currency || pendingOrder.currency || 'USD';
           const matchingPurchase = orderPurchases.find((p: any) => p.packageSku === cartItem.packageSku);
           const metaForDesc = { packageName: cartItem.packageName };
@@ -3680,9 +3685,10 @@ export function setupBillingRoutes(app: Router) {
             packageName: cartItem.packageName || cartItem.packageSku,
             addonType: cartItem.addonType || 'cart_checkout',
             quantity,
-            unitPrice: basePrice.toFixed(2),
-            basePrice: basePrice.toFixed(2),
-            totalAmount: totalAmount.toFixed(2),
+            unitPrice: discountedPrice.toFixed(2),  // CRITICAL FIX: Show discounted price
+            basePrice: basePrice.toFixed(2),  // Keep original price for reference
+            discount: itemDiscount.toFixed(2),  // CRITICAL FIX: Show discount per item
+            totalAmount: totalAmount.toFixed(2),  // CRITICAL FIX: Total after discount
             gstRate: 0,
             gstAmount: '0.00',
             totalWithGst: totalAmount.toFixed(2),

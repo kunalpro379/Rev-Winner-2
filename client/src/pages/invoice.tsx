@@ -28,6 +28,7 @@ interface InvoiceItem {
   quantity: number;
   unitPrice: string;
   basePrice: string;
+  discount?: string;  // CRITICAL FIX: Add discount field
   totalAmount: string;
   gstRate: number;
   gstAmount: string;
@@ -335,7 +336,14 @@ export default function Invoice() {
             addText(`${index + 1}. ${item.packageName}`, 11, true);
             addText(`   SKU: ${item.packageSku}`, 9);
             addText(`   ${item.description}`, 9);
-            addText(`   Quantity: ${item.quantity} | Unit Price: $${item.unitPrice}`, 9);
+            
+            // Show discount if applicable
+            if (item.discount && parseFloat(item.discount) > 0) {
+              addText(`   Quantity: ${item.quantity} | Original: $${item.basePrice} | Discounted: $${item.unitPrice}`, 9);
+            } else {
+              addText(`   Quantity: ${item.quantity} | Unit Price: $${item.unitPrice}`, 9);
+            }
+            
             addText(`   Total: $${item.totalWithGst}`, 10, true);
             yPosition += 5;
           });
@@ -638,7 +646,14 @@ export default function Invoice() {
                         </div>
                         <div>
                           <span style={{ color: '#666666' }}>Unit Price:</span>
-                          <span className="font-semibold ml-2" style={{ color: '#000000' }}>${item.unitPrice}</span>
+                          {item.discount && parseFloat(item.discount) > 0 ? (
+                            <span className="ml-2">
+                              <span className="line-through text-muted-foreground mr-2" style={{ color: '#999999' }}>${item.basePrice}</span>
+                              <span className="font-semibold" style={{ color: '#16a34a' }}>${item.unitPrice}</span>
+                            </span>
+                          ) : (
+                            <span className="font-semibold ml-2" style={{ color: '#000000' }}>${item.unitPrice}</span>
+                          )}
                         </div>
                         <div>
                           <span style={{ color: '#666666' }}>Start Date:</span>
