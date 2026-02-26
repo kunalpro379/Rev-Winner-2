@@ -44,21 +44,11 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
+args = "npm install && npm run dev"
 waitForPort = 5000
 
-[[workflows.workflow]]
-name = "Run"
-mode = "sequential"
-author = 52786279
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm install"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run dev"
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [userenv]
 
