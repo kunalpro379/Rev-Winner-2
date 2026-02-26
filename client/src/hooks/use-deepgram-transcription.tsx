@@ -353,6 +353,7 @@ export function useDeepgramTranscription({
       finalAudioNode.connect(processor); // Connect from the correct final node
       processor.connect(audioContext.destination);
 
+      let audioChunksSent = 0;
       processor.onaudioprocess = (e) => {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
           const inputData = e.inputBuffer.getChannelData(0);
@@ -364,6 +365,12 @@ export function useDeepgramTranscription({
           }
           
           wsRef.current.send(pcmData.buffer);
+          audioChunksSent++;
+          
+          // Log every 100 chunks to confirm audio is flowing
+          if (audioChunksSent % 100 === 0) {
+            console.log(`🎵 Audio flowing: ${audioChunksSent} chunks sent to Deepgram`);
+          }
         }
       };
 

@@ -173,6 +173,8 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
   const { isConnected, isTranscribing, startTranscription, stopTranscription, audioStream } = useDeepgramTranscription({
     enabled: true,
     onResult: (result) => {
+      console.log(`📝 Transcript received: isFinal=${result.isFinal}, text="${result.transcript.substring(0, 50)}..."`);
+      
       if (autoDetectEnabled) {
         analyzeOnSpeechRef.current?.();
       }
@@ -265,6 +267,7 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
           }
         }
       } else {
+        console.log(`📝 Interim transcript: "${result.transcript.substring(0, 30)}..."`);
         setInterimTranscript(result.transcript);
       }
     },
@@ -371,6 +374,10 @@ export function EnhancedLiveTranscript({ onSendMessage, onAnalyze, isAnalyzing =
   const [, setLocation] = useLocation();
 
   const handleStart = async () => {
+    console.log('🚀 handleStart called - User clicked Start button');
+    console.log(`📊 Limits data:`, limitsData);
+    console.log(`⏱️ Session minutes data:`, sessionMinutesData);
+    
     try {
       // Check subscription limits before starting
       if (limitsData && !limitsData.canUseService) {

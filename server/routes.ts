@@ -2760,21 +2760,33 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
       try {
         console.log(`[DEBUG] Fetching session usage for user ${userId}`);
         
-        // Get all ended sessions from session_usage table
+        // Get ALL sessions from session_usage table (both ended and active)
+        // CRITICAL FIX: Include active sessions in total usage calculation
         const userSessions = await db.select()
           .from(sessionUsage)
-          .where(and(
-            eq(sessionUsage.userId, userId),
-            eq(sessionUsage.status, "ended")
-          ))
+          .where(eq(sessionUsage.userId, userId))
           .orderBy(desc(sessionUsage.startTime))
           .limit(50);
         
-        console.log(`[DEBUG] Found ${userSessions.length} ended sessions`);
+        console.log(`[DEBUG] Found ${userSessions.length} total sessions (including active)`);
 
         // Convert sessions to history format
         sessionHistory = userSessions.map(session => {
-          const durationSeconds = parseInt(session.durationSeconds || '0');
+          // For active sessions, calculate current duration
+          let durationSeconds: number;
+          if (session.status === "ended") {
+            durationSeconds = parseInt(session.durationSeconds || '0');
+          } else {
+            // Active session: calculate duration from accumulated time + current running time
+            let totalDurationMs = session.accumulatedDurationMs || 0;
+            if (!session.isPaused && session.lastResumeTime) {
+              const now = new Date();
+              const runningSinceMs = now.getTime() - new Date(session.lastResumeTime).getTime();
+              totalDurationMs += runningSinceMs;
+            }
+            durationSeconds = Math.floor(totalDurationMs / 1000);
+          }
+          
           const durationMinutes = Math.floor(durationSeconds / 60);
 
           return {
@@ -2787,7 +2799,7 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
           };
         });
 
-        console.log(`[DEBUG] Returning ${sessionHistory.length} sessions in history from session_usage table`);
+        console.log(`[DEBUG] Returning ${sessionHistory.length} sessions in history from session_usage table (including active)`);
       } catch (error) {
         console.error(`[DEBUG] Error fetching session usage:`, error);
         // Fall back to empty array if query fails

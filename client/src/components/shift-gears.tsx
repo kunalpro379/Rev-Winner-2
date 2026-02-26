@@ -184,11 +184,18 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
     },
     onSuccess: (data) => {
       const newPitches = data.pitches || [];
-      const pitchesChanged = JSON.stringify(newPitches) !== JSON.stringify(pitches);
+      
+      // FIXED: Replace old pitches instead of accumulating
+      // Only keep unique queries based on query text
+      const uniquePitches = newPitches.filter((newPitch: QueryPitch, index: number, self: QueryPitch[]) => 
+        index === self.findIndex((p) => p.query.toLowerCase().trim() === newPitch.query.toLowerCase().trim())
+      );
+      
+      const pitchesChanged = JSON.stringify(uniquePitches) !== JSON.stringify(pitches);
       
       if (pitchesChanged) {
-        setPitches(newPitches);
-        if (newPitches.length > 0 && !isPitchesOpen) {
+        setPitches(uniquePitches);
+        if (uniquePitches.length > 0 && !isPitchesOpen) {
           setIsPitchesOpen(true);
         }
       }
@@ -196,7 +203,7 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
       setLastPitchTranscript(transcriptText);
       setLastPitchUpdateTime(Date.now());
       
-      if (newPitches.length > 0) {
+      if (uniquePitches.length > 0) {
         setIsPitchesAutoPaused(true);
         if (!hasReceivedFirstPitch) {
           setHasReceivedFirstPitch(true);

@@ -3650,11 +3650,13 @@ export async function generateQueryPitches(
       model = "deepseek-chat";
     }
 
-    const userPrompt = `TRANSCRIPT (recent):
+    const userPrompt = `TRANSCRIPT (recent - LAST 2-3 EXCHANGES ONLY):
 ${conversationText.slice(-1200)}
 Focus: ${domainExpertise}
 
-DETECT AND EXTRACT every customer query, concern, objection, and challenge from the transcript above. Include:
+CRITICAL: Only extract queries from the MOST RECENT customer messages (last 2-3 exchanges). Ignore old/answered questions.
+
+DETECT AND EXTRACT every NEW customer query, concern, objection, and challenge from the RECENT transcript above. Include:
 - Direct questions ("what is", "how does", "can you", "tell me about")
 - Indirect questions ("I want to know", "we're looking at", "what are the offerings")
 - Objections disguised as questions ("isn't that expensive?", "why switch?")
@@ -3666,6 +3668,8 @@ For each detected query generate a pitch (40-80 words): direct answer + business
 If objection hidden in question: address surface question AND underlying concern.
 For pricing: use EXACT values from training docs only. Never guess.
 End each pitch with a micro-close or leverage follow-up question.
+
+IMPORTANT: Return ONLY new/unanswered queries. Max 3-4 queries. Focus on quality over quantity.
 
 JSON: {"queries":[{"query":"exact question/concern","queryType":"technical|pricing|features|integration|support|general|comparison|challenge|objection|walking_away","pitch":"40-80 words: direct answer + value + risk reduction","keyPoints":["point1","point2","point3"],"followUpQuestion":"micro-close or leverage question"}]}`;
 
@@ -3734,7 +3738,8 @@ JSON: {"queries":[{"query":"exact question/concern","queryType":"technical|prici
       queries: queries.map((q: QueryPitch) => q.query)
     });
     
-    return queries.slice(0, 5);
+    // OPTIMIZED: Return max 3 queries for faster response and better UX
+    return queries.slice(0, 3);
   } catch (error) {
     console.error("Query pitch generation error:", error);
     return [];
