@@ -64,6 +64,7 @@ args = "npm run dev"
 
 [userenv.production]
 APP_URL = "https://revwinner.com"
+NODE_ENV = "production"
 
 [userenv.shared]
 
