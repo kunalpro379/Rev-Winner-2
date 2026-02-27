@@ -223,31 +223,26 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
   });
 
   // Auto-update logic for tips: trigger when transcript changes significantly
-  // OPTIMIZED: Near real-time updates (3s throttle + 1s debounce = ~4s response time)
+  // OPTIMIZED: Near real-time updates (2s throttle + 0.5s debounce = ~2.5s response time)
   useEffect(() => {
-    // Skip auto-updates if paused
     if (isAutoPaused || !isTranscribing || !transcriptText.trim()) {
       return;
     }
 
-    // OPTIMIZED: Lower threshold (15 chars) for faster detection of conversation changes
     const transcriptChanged = Math.abs(transcriptText.length - lastTranscript.length) > 15;
     
     if (!transcriptChanged || fetchTipsMutation.isPending) {
       return;
     }
 
-    // OPTIMIZED: Calculate when we can next fetch (3 seconds after last update for near real-time speed)
     const timeSinceLastUpdate = Date.now() - lastUpdateTime;
-    const timeUntilNextAllowedFetch = Math.max(0, 3000 - timeSinceLastUpdate);
+    const timeUntilNextAllowedFetch = Math.max(0, 2000 - timeSinceLastUpdate);
 
-    // Clear any existing timer
     if (updateTimerRef.current) {
       clearTimeout(updateTimerRef.current);
     }
 
-    // OPTIMIZED: Minimal debounce (1 second) for near real-time response
-    const delayMs = timeUntilNextAllowedFetch + 1000;
+    const delayMs = timeUntilNextAllowedFetch + 500;
     
     updateTimerRef.current = setTimeout(() => {
       if (!fetchTipsMutation.isPending) {
@@ -281,17 +276,14 @@ export function ShiftGears({ sessionId, transcriptText, domainExpertise, isTrans
       return;
     }
 
-    // Calculate when we can next fetch (3 seconds after last update for real-time speed)
     const timeSinceLastPitchUpdate = Date.now() - lastPitchUpdateTime;
-    const timeUntilNextAllowedFetch = Math.max(0, 3000 - timeSinceLastPitchUpdate);
+    const timeUntilNextAllowedFetch = Math.max(0, 2000 - timeSinceLastPitchUpdate);
 
-    // Clear any existing timer
     if (pitchTimerRef.current) {
       clearTimeout(pitchTimerRef.current);
     }
 
-    // Schedule fetch: minimal debounce (1 second) for near real-time response
-    const delayMs = timeUntilNextAllowedFetch + 1000;
+    const delayMs = timeUntilNextAllowedFetch + 500;
     
     pitchTimerRef.current = setTimeout(() => {
       if (!fetchPitchesMutation.isPending) {

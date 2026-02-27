@@ -3382,12 +3382,14 @@ export async function generateShiftGearsTips(
     
     let client;
     let model;
+    let engineName = "deepseek";
     
     if (userId) {
       try {
         const aiConfig = await getAIClient(userId);
         client = aiConfig.client;
         model = aiConfig.model;
+        engineName = aiConfig.engine;
       } catch (error) {
         if (!deepseek) throw new Error("AI engine not configured");
         client = deepseek;
@@ -3399,43 +3401,15 @@ export async function generateShiftGearsTips(
       model = "deepseek-chat";
     }
 
-    // CRITICAL FIX: Extract last 10 conversation turns for contextual grounding
     const conversationLines = conversationText.trim().split('\n').filter(line => line.trim());
     const recentTurns = conversationLines.slice(-10).join('\n');
-    const conversationKeywords = conversationLines
-      .join(' ')
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(w => w.length > 3)
-      .slice(0, 30)
-      .join(', ');
 
     const userPrompt = `LIVE CALL (last turns):
 ${recentTurns}
 ${domainExpertise ? `Domain: ${domainExpertise}` : ''}
 
-STEP 1: Detect customer intent - Is customer: asking question? objecting? comparing competitor? signaling disinterest? walking away? negotiating? deflecting? requesting technical clarification? escalating to procurement? delaying?
-STEP 2: Analyze conversation state. Auto-detect best framework. Detect stage, buyer intent, emotional signals, deal risk.
-STEP 3: Generate exactly 3 coaching tips for the rep RIGHT NOW based on detected intent.
-Each tip: exact words to say (seller-ready, no fluff), expected prospect reaction, next likely branch. Respond to what was JUST said. JSON only:
-{"lrm_reasoning":{"stage":"opening|discovery|pain_identification|qualification|positioning|objection_handling|decision|closing","buyer_intent":"1 sentence","our_goal":"1 sentence","strategy":"1 sentence","framework":"auto-detected","deal_risk":"low|medium|high","emotional_signal":"dominant signal","detected_intent":"question|objection|disinterest|walking_away|negotiation|deflection|technical_clarification|procurement_escalation|delay|normal"},"tips":[{"type":"next_step|objection|rebuttal|technical|psychological|closure|competitive|discovery|qualification|trust_building|risk_alert|walking_away_recovery|negotiation|re_alignment","title":"10 words max","action":"exact words to say (30-50 words)","priority":"high|medium|low","expected_reaction":"what prospect will likely do"}]}`;
-
-    // STRUCTURED LOGGING: Verify knowledge retrieval and context
-    console.log('📊 Shift Gears Context:', {
-      domain: domainExpertise,
-      transcriptLength: conversationText.length,
-      recentConversationLines: conversationLines.slice(-10).length,
-      extractedKeywords: {
-        problem: keywords.problemKeywords.slice(0, 5),
-        product: keywords.productKeywords.slice(0, 5),
-        industries: keywords.industries
-      },
-      knowledge: {
-        products: knowledge.relevantProducts.map(p => `${p.name} (${p.code})`),
-        caseStudies: knowledge.relevantCaseStudies.map(c => `${c.title} - ${c.industry}`),
-        playbooks: knowledge.relevantPlaybooks.map(p => p.title)
-      }
-    });
+Detect customer intent. Generate exactly 3 coaching tips for the rep RIGHT NOW. Each tip: exact words to say, expected reaction. JSON only:
+{"lrm_reasoning":{"stage":"...","buyer_intent":"1 sentence","our_goal":"1 sentence","strategy":"1 sentence","framework":"auto-detected","deal_risk":"low|medium|high","emotional_signal":"dominant signal","detected_intent":"question|objection|disinterest|walking_away|negotiation|deflection|technical_clarification|procurement_escalation|delay|normal"},"tips":[{"type":"next_step|objection|rebuttal|technical|psychological|closure|competitive|discovery|qualification|trust_building|risk_alert|walking_away_recovery|negotiation|re_alignment","title":"10 words max","action":"exact words to say (30-50 words)","priority":"high|medium|low","expected_reaction":"what prospect will likely do"}]}`;
 
     const fastModel = model.includes('gpt-4') ? 'gpt-4o-mini' 
                     : model.includes('claude') ? 'claude-3-5-haiku-latest'
@@ -3469,13 +3443,10 @@ Each tip: exact words to say (seller-ready, no fluff), expected prospect reactio
     
     if (!response) throw new Error("All models failed");
 
-    // Track token usage for Shift Gears - use engine from initial config, don't re-call getAIClient
     if (userId) {
       try {
-        const aiConfig = await getAIClient(userId);
-        await recordTokenUsage(userId, mapEngineToProvider(aiConfig.engine), response, 'shift_gears');
+        await recordTokenUsage(userId, mapEngineToProvider(engineName), response, 'shift_gears');
       } catch {
-        // If user API key is corrupted, still track usage as deepseek
         if (client === deepseek) {
           await recordTokenUsage(userId, 'deepseek', response, 'shift_gears');
         }
@@ -3592,34 +3563,20 @@ export async function generateQueryPitches(
       import("./knowledge-service")
     ]);
     
-    // Retrieve knowledge base context for enhanced responses (optimized - no playbooks for speed)
+    const hasDomainTraining = trainingContext && trainingContext.trim().length > 100;
+    
     const { knowledgeService } = knowledgeModule;
     const keywords = knowledgeService.extractKeywordsFromTranscript(conversationText);
-    const knowledge = await knowledgeService.buildKnowledgeContext({
-      problemKeywords: keywords.problemKeywords,
-      productKeywords: keywords.productKeywords,
-      industries: keywords.industries,
-      includePlaybooks: false // PERFORMANCE: Skip playbooks for faster response (not critical for query pitches)
-    });
+    const knowledge = hasDomainTraining 
+      ? { relevantProducts: [], relevantCaseStudies: [], relevantPlaybooks: [] }
+      : await knowledgeService.buildKnowledgeContext({
+          problemKeywords: keywords.problemKeywords,
+          productKeywords: keywords.productKeywords,
+          industries: keywords.industries,
+          includePlaybooks: false
+        });
     
-    // STRUCTURED LOGGING: Verify knowledge retrieval and context
-    console.log('📊 Customer Query Pitches Context:', {
-      domain: domainExpertise,
-      transcriptLength: conversationText.length,
-      trainingContextLength: trainingContext.length,
-      trainingContextPreview: trainingContext.slice(0, 500),
-      hasTrainingContext: trainingContext.length > 100,
-      extractedKeywords: {
-        problem: keywords.problemKeywords.slice(0, 5),
-        product: keywords.productKeywords.slice(0, 5),
-        industries: keywords.industries
-      },
-      knowledge: {
-        products: knowledge.relevantProducts.map(p => `${p.name} (${p.code})`),
-        caseStudies: knowledge.relevantCaseStudies.map(c => `${c.title} - ${c.industry}`),
-        playbooks: knowledge.relevantPlaybooks.map(p => p.title)
-      }
-    });
+    console.log(`⚡ QueryPitches prep: Domain: ${domainExpertise} | HasTraining: ${hasDomainTraining}`);
     
     // Get structured prompt from registry (pass conversationText for dynamic domain detection)
     const { promptRegistry } = await import("./prompt-registry");
@@ -3627,7 +3584,7 @@ export async function generateQueryPitches(
     
     let client;
     let model;
-    
+    let engineName = "deepseek";
     let originalModel = "";
     
     if (userId) {
@@ -3635,6 +3592,7 @@ export async function generateQueryPitches(
         const aiConfig = await getAIClient(userId);
         client = aiConfig.client;
         model = aiConfig.model;
+        engineName = aiConfig.engine;
         originalModel = model;
         
         const fastModel = model.includes('gpt-4') ? 'gpt-4o-mini'
@@ -3657,21 +3615,11 @@ export async function generateQueryPitches(
 ${conversationText.slice(-1200)}
 Focus: ${domainExpertise}
 
-DETECT AND EXTRACT every customer query, concern, objection, and challenge from the transcript above. Include:
-- Direct questions ("what is", "how does", "can you", "tell me about")
-- Indirect questions ("I want to know", "we're looking at", "what are the offerings")
-- Objections disguised as questions ("isn't that expensive?", "why switch?")
-- Walking-away signals ("we'll think about it", "send proposal", "not interested")
-- Pricing inquiries, technical queries, comparison requests
-
-Auto-detect buyer persona and conversation stage. Select best framework.
-For each detected query generate a pitch (40-80 words): direct answer + business value translation + risk reduction + confidence positioning.
-If objection hidden in question: address surface question AND underlying concern.
-For pricing: use EXACT values from training docs only. Never guess.
-End each pitch with a micro-close or leverage follow-up question.
+Detect all customer queries, objections, and concerns. For each, generate a pitch (40-80 words): direct answer + value + risk reduction. Use EXACT pricing from training only. End with micro-close.
 
 JSON: {"queries":[{"query":"exact question/concern","queryType":"technical|pricing|features|integration|support|general|comparison|challenge|objection|walking_away","pitch":"40-80 words: direct answer + value + risk reduction","keyPoints":["point1","point2","point3"],"followUpQuestion":"micro-close or leverage question"}]}`;
 
+    const aiStartTime = Date.now();
     let response;
     const modelsToTry = (originalModel && originalModel !== model) ? [model, originalModel] : [model];
     
@@ -3686,9 +3634,9 @@ JSON: {"queries":[{"query":"exact question/concern","queryType":"technical|prici
           ],
           response_format: { type: "json_object" },
           temperature: 0.15,
-          max_tokens: 1500,
+          max_tokens: 800,
         });
-        console.log(`💬 QueryPitches: Model ${tryModel} succeeded`);
+        console.log(`💬 QueryPitches AI call: ${Date.now() - aiStartTime}ms | Model: ${tryModel}`);
         break;
       } catch (modelError: any) {
         console.warn(`⚠️ QueryPitches: Model ${tryModel} failed: ${modelError.message}`);
