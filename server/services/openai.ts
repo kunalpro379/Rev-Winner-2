@@ -1322,11 +1322,14 @@ export async function generateSalesResponse(
       // Add domain expertise
       systemPrompt += `\n\nDOMAIN: ${domainExpertise}`;
       
-      const trainingContext = await getTrainingDocumentContext(userId, 3000, true, undefined, 5, domainExpertise);
+      // Fetch FULL training document context for high accuracy (pricing, products, processes)
+      // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
+      const trainingContext = await getTrainingDocumentContext(userId, 30000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise);
       if (trainingContext) {
         systemPrompt += `\n\n${trainingContext}`;
       }
     } else {
+      // Fallback to original system prompt if no user context
       const messageCount = conversationHistory.length;
       const hasRecommendedRecently = conversationHistory.slice(-3).some(msg => 
         msg.sender === 'assistant' && msg.content.includes('recommendedModules')
@@ -1334,7 +1337,9 @@ export async function generateSalesResponse(
       
       systemPrompt = generateSystemPrompt(domainExpertise, messageCount, hasRecommendedRecently);
       
-      const trainingContext = userId ? await getTrainingDocumentContext(userId, 3000, true, undefined, 5, domainExpertise) : "";
+      // Fetch FULL training document context for high accuracy (pricing, products, processes)
+      // DOMAIN ISOLATION: Pass domainExpertise to only load knowledge from the selected domain
+      const trainingContext = userId ? await getTrainingDocumentContext(userId, 30000, true, undefined, SEMANTIC_SEARCH_LIMIT, domainExpertise) : "";
       if (trainingContext) {
         systemPrompt = trainingContext + "\n" + systemPrompt;
       }
@@ -3316,35 +3321,15 @@ export interface ShiftGearsTip {
   expected_reaction?: string;
 }
 
-const shiftGearsInflight = new Map<string, Promise<ShiftGearsTip[]>>();
-const shiftGearsCache = new Map<string, { tips: ShiftGearsTip[], timestamp: number, transcriptLen: number }>();
-const queryPitchesInflight = new Map<string, Promise<QueryPitch[]>>();
-const queryPitchesCache = new Map<string, { queries: QueryPitch[], timestamp: number, transcriptLen: number }>();
-const RESULT_CACHE_TTL = 30_000;
-
 export async function generateShiftGearsTips(
   conversationText: string,
   domainExpertise: string = "Generic Product",
   userId?: string
 ): Promise<ShiftGearsTip[]> {
-  const userKey = `${userId || 'anon'}_${domainExpertise}`;
-  const sessionKey = userKey;
-  const transcriptLen = conversationText.length;
-
-  const existing = shiftGearsInflight.get(userKey);
-  if (existing) {
-    console.log(`⚡ ShiftGears: Request already in-flight, returning cached/pending`);
-    const cached = shiftGearsCache.get(userKey);
-    if (cached && Date.now() - cached.timestamp < RESULT_CACHE_TTL && Math.abs(transcriptLen - cached.transcriptLen) < 50) {
-      return cached.tips;
-    }
-    return existing;
-  }
-
-  const doWork = async (): Promise<ShiftGearsTip[]> => {
   try {
     const startTime = Date.now();
     
+    // CRITICAL FIX: Detect pricing queries and enhance semantic search
     const lowerText = conversationText.toLowerCase();
     const isPricingQuery = /pric(e|ing|es)|cost|fee|rate|subscription|per\s*(user|seat|month|year)|how\s*much|budget|quote|₹|\$|euro|inr|usd/.test(lowerText);
     
@@ -3438,31 +3423,20 @@ Detect customer intent. Generate exactly 3 coaching tips for the rep RIGHT NOW. 
     for (const tryModel of modelsToTry) {
       try {
         console.log(`⚡ ShiftGears: Trying model ${tryModel}...`);
-        const aiPromise = client.chat.completions.create({
+        response = await client.chat.completions.create({
           model: tryModel,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt }
           ],
           response_format: { type: "json_object" },
-          temperature: 0.05,
-          max_tokens: 700,
+          temperature: 0.12,
+          max_tokens: 600,
         });
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('ShiftGears AI timeout after 8s')), 8000)
-        );
-        response = await Promise.race([aiPromise, timeoutPromise]) as any;
         console.log(`⚡ ShiftGears AI call: ${Date.now() - aiStartTime}ms | Model: ${tryModel}`);
         break;
       } catch (modelError: any) {
         console.warn(`⚠️ ShiftGears: Model ${tryModel} failed: ${modelError.message}`);
-        if (modelError.message?.includes('timeout')) {
-          const cached = shiftGearsCache.get(sessionKey);
-          if (cached) {
-            console.log(`⚡ ShiftGears: Timeout, returning cached tips`);
-            return cached.tips;
-          }
-        }
         if (tryModel === modelsToTry[modelsToTry.length - 1]) throw modelError;
       }
     }
@@ -3517,24 +3491,17 @@ Detect customer intent. Generate exactly 3 coaching tips for the rep RIGHT NOW. 
       tipTitles: tips.map((t: ShiftGearsTip) => t.title)
     });
     
-    const finalTips = tips.length > 3 ? tips.slice(0, 3) : tips.length === 0 ? getDefaultShiftGearsTips(domainExpertise) : tips;
+    // Ensure exactly 3 tips
+    if (tips.length > 3) {
+      return tips.slice(0, 3);
+    } else if (tips.length === 0) {
+      return getDefaultShiftGearsTips(domainExpertise);
+    }
     
-    shiftGearsCache.set(sessionKey, { tips: finalTips, timestamp: Date.now(), transcriptLen });
-    return finalTips;
+    return tips;
   } catch (error) {
     console.error("Shift Gears tips generation error:", error);
-    const cached = shiftGearsCache.get(sessionKey);
-    if (cached) return cached.tips;
     return getDefaultShiftGearsTips(domainExpertise);
-  }
-  };
-
-  const promise = doWork();
-  shiftGearsInflight.set(userKey, promise);
-  try {
-    return await promise;
-  } finally {
-    shiftGearsInflight.delete(userKey);
   }
 }
 
@@ -3573,22 +3540,8 @@ export async function generateQueryPitches(
   domainExpertise: string = "Generic Product",
   userId?: string
 ): Promise<QueryPitch[]> {
-  const userKey = `${userId || 'anon'}_${domainExpertise}`;
-  const sessionKey = userKey;
-  const transcriptLen = conversationText.length;
-
-  const existing = queryPitchesInflight.get(userKey);
-  if (existing) {
-    console.log(`💬 QueryPitches: Request already in-flight, returning cached/pending`);
-    const cached = queryPitchesCache.get(userKey);
-    if (cached && Date.now() - cached.timestamp < RESULT_CACHE_TTL && Math.abs(transcriptLen - cached.transcriptLen) < 50) {
-      return cached.queries;
-    }
-    return existing;
-  }
-
-  const doWork = async (): Promise<QueryPitch[]> => {
   try {
+    // CRITICAL FIX: Detect pricing queries and use semantic search with pricing keywords
     const lowerText = conversationText.toLowerCase();
     const isPricingQuery = /pric(e|ing|es)|cost|fee|rate|subscription|per\s*(user|seat|month|year)|how\s*much|budget|quote|₹|\$|euro|inr|usd/.test(lowerText);
     
@@ -3673,31 +3626,20 @@ JSON: {"queries":[{"query":"exact question/concern","queryType":"technical|prici
     for (const tryModel of modelsToTry) {
       try {
         console.log(`💬 QueryPitches: Trying model ${tryModel}...`);
-        const aiPromise = client.chat.completions.create({
+        response = await client.chat.completions.create({
           model: tryModel,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt }
           ],
           response_format: { type: "json_object" },
-          temperature: 0.05,
+          temperature: 0.15,
           max_tokens: 800,
         });
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('QueryPitches AI timeout after 8s')), 8000)
-        );
-        response = await Promise.race([aiPromise, timeoutPromise]) as any;
         console.log(`💬 QueryPitches AI call: ${Date.now() - aiStartTime}ms | Model: ${tryModel}`);
         break;
       } catch (modelError: any) {
         console.warn(`⚠️ QueryPitches: Model ${tryModel} failed: ${modelError.message}`);
-        if (modelError.message?.includes('timeout')) {
-          const cached = queryPitchesCache.get(sessionKey);
-          if (cached) {
-            console.log(`💬 QueryPitches: Timeout, returning cached queries`);
-            return cached.queries;
-          }
-        }
         if (tryModel === modelsToTry[modelsToTry.length - 1]) throw modelError;
       }
     }
@@ -3737,30 +3679,16 @@ JSON: {"queries":[{"query":"exact question/concern","queryType":"technical|prici
     }
     const queries = result.queries || [];
     
-    const finalQueries = queries.slice(0, 5);
-    queryPitchesCache.set(sessionKey, { queries: finalQueries, timestamp: Date.now(), transcriptLen });
-    
     console.log('✅ Customer Query Pitches Response:', {
-      queriesCount: finalQueries.length,
-      queryTypes: finalQueries.map((q: QueryPitch) => q.queryType),
-      queries: finalQueries.map((q: QueryPitch) => q.query)
+      queriesCount: queries.length,
+      queryTypes: queries.map((q: QueryPitch) => q.queryType),
+      queries: queries.map((q: QueryPitch) => q.query)
     });
     
-    return finalQueries;
+    return queries.slice(0, 5);
   } catch (error) {
     console.error("Query pitch generation error:", error);
-    const cached = queryPitchesCache.get(sessionKey);
-    if (cached) return cached.queries;
     return [];
-  }
-  };
-
-  const promise = doWork();
-  queryPitchesInflight.set(userKey, promise);
-  try {
-    return await promise;
-  } finally {
-    queryPitchesInflight.delete(userKey);
   }
 }
 

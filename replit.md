@@ -72,7 +72,7 @@ Use `npm run db:push` to push schema changes to the database.
 - Deepgram SDK for live speech-to-text transcription
 - Multiple AI model support: OpenAI, Anthropic Claude, Google Gemini, DeepSeek, Grok
 - AI processing modules: Shift Gears, Customer Query Pitches, Conversation Analysis, Present to Win (Battle Cards, Case Studies, Pitch Decks), Meeting Minutes
-- **Performance optimizations (Feb-Mar 2026):** System prompts trimmed ~60%, max_tokens tuned (700 ShiftGears, 800 QueryPitches), frontend throttle 2s+0.5s debounce, redundant getAIClient calls eliminated, knowledge service skipped when domain training exists, fast model selection for non-DeepSeek engines, generateSalesResponse training context reduced from 30k to 3k tokens, server-side in-flight request deduplication per user/feature, 8-second hard timeout with cached fallback on AI calls, per-session result caching (30s TTL), temperature lowered to 0.05 for faster sampling
+- **Performance optimizations (Feb 2026):** System prompts trimmed ~60% for Shift Gears and Query Pitches, max_tokens reduced (600 for Shift Gears, 800 for Query Pitches), frontend throttle reduced to 2s+0.5s debounce, redundant getAIClient calls eliminated, knowledge service skipped when domain training exists, fast model selection (gpt-4o-mini, gemini-2.0-flash, claude-3-5-haiku) for real-time features
 
 ### Subscription & Billing Model
 - Individual and Enterprise subscription tiers
