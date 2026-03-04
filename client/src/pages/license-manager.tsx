@@ -72,8 +72,8 @@ export default function LicenseManager() {
   // Fetch organization overview only if authenticated
   const { data: overview, isLoading, error, refetch } = useQuery<OrganizationOverviewDTO>({
     queryKey: ["/api/enterprise/overview"],
-    retry: 1, // Retry once in case data is still being created
-    retryDelay: 1000, // Wait 1 second before retry
+    retry: isRefetchingAfterPayment ? 5 : 1, // More retries when coming from payment
+    retryDelay: isRefetchingAfterPayment ? 2000 : 1000, // Longer delay when coming from payment
     enabled: !!user,
     refetchOnMount: 'always', // Always refetch when component mounts to get fresh data
   });
@@ -370,6 +370,8 @@ export default function LicenseManager() {
                 <li>Visit the <a href="/enterprise-purchase" className="underline font-medium">Enterprise Purchase</a> page to buy bulk licenses</li>
                 <li>After completing your purchase, you'll automatically become a License Manager</li>
               </ul>
+              <br />
+              <strong>Note:</strong> If you purchased a team subscription for someone else, only the team manager (the person whose email you provided) can access the License Manager.
             </AlertDescription>
           </Alert>
           <div className="mt-6 flex gap-4">
@@ -399,8 +401,8 @@ export default function LicenseManager() {
     );
   }
 
-  // Show error if organization fetch failed
-  if (error && !overview) {
+  // Show error if organization fetch failed (but not if we're still refetching after payment)
+  if (error && !overview && !isRefetchingAfterPayment) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 dark:from-background dark:to-muted/10 p-4">
         <div className="container mx-auto max-w-2xl py-12">

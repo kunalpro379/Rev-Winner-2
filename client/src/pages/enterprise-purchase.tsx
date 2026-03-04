@@ -130,9 +130,9 @@ export default function EnterprisePurchase() {
                     description: "Your enterprise license has been activated. Redirecting to dashboard..."
                   });
 
-                  // Redirect to license manager dashboard
+                  // Redirect to license manager dashboard with fromPayment flag
                   setTimeout(() => {
-                    setLocation("/license-manager");
+                    setLocation("/license-manager?fromPayment=true");
                   }, 2000);
                 } else {
                   throw new Error(verifyData.message || "Verification failed");

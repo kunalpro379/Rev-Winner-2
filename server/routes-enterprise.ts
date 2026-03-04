@@ -72,7 +72,22 @@ export function setupEnterpriseRoutes(app: Express) {
   app.get("/api/enterprise/has-organization", authenticateToken, requireAuthenticated, withAuthenticated(async (req, res) => {
     try {
       const userId = (req as AuthenticatedRequest).jwtUser.userId;
+      
+      // Fetch current user role from database (not from JWT which might be stale)
+      const user = await authStorage.getUserById(userId);
+      const userRole = user?.role || (req as AuthenticatedRequest).jwtUser.role;
+      
+      console.log(`[has-organization] User ${userId} role: ${userRole}`);
+      
+      // Only check for organization if user is a license_manager
+      // Regular users who purchased team subscriptions shouldn't see the "add seats" message
+      if (userRole !== 'license_manager' && userRole !== 'admin' && userRole !== 'super_admin') {
+        console.log(`[has-organization] User ${userId} is not license_manager, returning false`);
+        return res.json({ hasOrganization: false });
+      }
+      
       const organization = await authStorage.getOrganizationByManagerId(userId);
+      console.log(`[has-organization] User ${userId} organization:`, organization ? organization.id : 'none');
       res.json({ hasOrganization: !!organization });
     } catch (error: any) {
       console.error("Error checking has-organization:", error);
@@ -736,6 +751,8 @@ export function setupEnterpriseRoutes(app: Express) {
     try {
       const userId = req.jwtUser.userId;
       
+      console.log(`[Enterprise Purchase] User ${userId} attempting to purchase`);
+      
       // Validate request body
       const validation = purchaseSchema.safeParse(req.body);
       if (!validation.success) {
@@ -752,9 +769,14 @@ export function setupEnterpriseRoutes(app: Express) {
       
       // Check if user already has an organization
       const existingOrg = await authStorage.getOrganizationByManagerId(userId);
+      console.log(`[Enterprise Purchase] Existing org check for user ${userId}:`, existingOrg ? `Found org ${existingOrg.id} (${existingOrg.companyName})` : 'No org found');
+      
       if (existingOrg) {
+        console.log(`[Enterprise Purchase] User ${userId} already has organization ${existingOrg.id} (${existingOrg.companyName})`);
         return res.status(400).json({ 
-          message: "You already have an organization. Use add-seats endpoint to purchase more licenses." 
+          message: `You already have an organization (${existingOrg.companyName}). Use the License Manager to add more seats.`,
+          organizationId: existingOrg.id,
+          organizationName: existingOrg.companyName
         });
       }
       

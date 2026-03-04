@@ -230,6 +230,18 @@ async function activateCartCheckout(
       
       console.log(`[Cart Activation] Creating purchase: addonType=${mappedAddonType}, packageSku=${item.packageSku}, totalUnits=${pkg.totalUnits || 0}, paidAmount=${itemPaidAmount.toFixed(2)} ${actualCurrency}`);
 
+      // Check if user is a license manager with an organization
+      // If yes, create add-on for the organization; otherwise create personal add-on
+      const userOrganizationId = await authStorage.getUserOrganizationId(userId);
+      const isLicenseManager = await authStorage.isLicenseManager(userId);
+      const targetOrganizationId = (isLicenseManager && userOrganizationId) ? userOrganizationId : null;
+      
+      if (targetOrganizationId) {
+        console.log(`[Cart Activation] User ${userId} is a license manager - creating ORGANIZATION add-on for org ${targetOrganizationId}`);
+      } else {
+        console.log(`[Cart Activation] Creating PERSONAL add-on for user ${userId}`);
+      }
+
       // For session_minutes: Check if user already has an active purchase and add to it
       // This handles the unique constraint that prevents multiple active purchases per user per addon type
       if (mappedAddonType === 'session_minutes') {
@@ -304,7 +316,7 @@ async function activateCartCheckout(
           // Create new purchase
           const addon = await billingStorage.createAddonPurchase({
             userId,
-            organizationId: null,
+            organizationId: targetOrganizationId, // ✅ Use organization ID if license manager
             addonType: mappedAddonType,
             packageSku: item.packageSku,
             billingType: 'one_time',
@@ -355,7 +367,7 @@ async function activateCartCheckout(
           try {
             const addon = await billingStorage.createAddonPurchase({
               userId,
-              organizationId: null,
+              organizationId: targetOrganizationId, // ✅ Use organization ID if license manager
               addonType: mappedAddonType,
               packageSku: item.packageSku,
               billingType: 'one_time',
@@ -552,96 +564,80 @@ async function runTeamCartActivation(
       buyerName,
     };
 
-    let licenseManager = await authStorage.getUserByEmail(teamManagerEmail);
-    if (!licenseManager) {
+    // Check if buyer already has an organization (for add-on purchases)
+    const existingOrg = await authStorage.getOrganizationByManagerId(userId);
+    const hasPlatformAccess = purchaseDetails.platformAccessCount > 0;
+    
+    if (existingOrg && !hasPlatformAccess) {
+      // Existing organization purchasing only add-ons (no platform access)
+      console.log(`[Team Purchase] License manager ${userId} purchasing add-ons for existing organization ${existingOrg.id}`);
+      
+      // Activate add-ons for the organization
+      const teamAddonTypes = ['session_minutes', 'train_me', 'dai'];
+      for (const item of cartItems.filter((i: any) => i.purchaseMode === 'team')) {
+        let mappedType = item.addonType;
+        if (item.addonType === 'usage_bundle') mappedType = 'session_minutes';
+        if (item.addonType === 'service') {
+          const sku = (item.packageSku || '').toLowerCase();
+          mappedType = sku.includes('train') ? 'train_me' : sku.includes('dai') ? 'dai' : 'train_me';
+        }
+        if (!teamAddonTypes.includes(mappedType)) continue;
+        const pkg = await getPackageOrAddonBySku(item.packageSku);
+        if (!pkg) continue;
+        const startDate = new Date();
+        const endDate = pkg.validityDays ? calculateEndDate(startDate, pkg.validityDays) : null;
+        const totalUnits = (pkg.totalUnits || 0) * (item.quantity || 1);
+        const itemPaidAmount = parseFloat(pendingOrder.amount || '0') / Math.max(1, cartItems.length);
+        try {
+          await billingStorage.createAddonPurchase({
+            userId: userId, // License manager who made the purchase
+            organizationId: existingOrg.id, // Attach to organization
+            addonType: mappedType,
+            packageSku: item.packageSku,
+            billingType: 'one_time',
+            purchaseAmount: itemPaidAmount.toFixed(2),
+            currency: pendingOrder.currency || 'USD',
+            totalUnits,
+            usedUnits: 0,
+            status: 'active',
+            startDate,
+            endDate,
+            metadata: { cartOrderId: pendingOrder.id, packageName: pkg.name },
+          });
+          console.log(`[Team Cart] Created organization addon: ${mappedType} for org ${existingOrg.id}, ${totalUnits} units`);
+        } catch (addonErr: any) {
+          console.error('[Team Cart] Failed to create organization addon:', addonErr);
+        }
+      }
+      
+      return { licenseManagerInvitationSent: false };
+    }
+
+    // Create or get the team manager user (but DON'T give them license_manager role)
+    let teamManager = await authStorage.getUserByEmail(teamManagerEmail);
+    if (!teamManager) {
       const tempPassword = crypto.randomBytes(32).toString('hex');
       const nameParts = teamManagerName.trim().split(' ');
       const firstName = nameParts[0] || teamManagerName;
       const lastName = nameParts.slice(1).join(' ') || '';
       const username = teamManagerEmail.split('@')[0] + '_' + crypto.randomBytes(4).toString('hex');
-      licenseManager = await authStorage.createUser({
+      teamManager = await authStorage.createUser({
         email: teamManagerEmail,
         username,
         password: tempPassword,
         firstName,
         lastName,
-        role: 'license_manager',
+        role: 'user', // ✅ Regular user role, NOT license_manager
       });
-      console.log(`Created License Manager user: ${licenseManager.id} (${teamManagerEmail})`);
-    } else if (licenseManager.role !== 'license_manager') {
-      await authStorage.updateUser(licenseManager.id, { role: 'license_manager' });
-      console.log(`Updated user ${licenseManager.id} role to license_manager`);
+      console.log(`Created team manager user: ${teamManager.id} (${teamManagerEmail}) with role 'user'`);
     }
 
-    const companyName = teamItem.companyName as string || `${teamManagerName}'s Organization`;
-    let organization = await authStorage.getOrganizationByManagerId(licenseManager.id);
-    if (!organization) {
-      organization = await authStorage.createOrganization({
-        companyName,
-        billingEmail: teamManagerEmail,
-        primaryManagerId: licenseManager.id,
-        status: 'active',
-      });
-      console.log(`Created organization: ${organization.id} (${companyName})`);
-      await authStorage.createOrganizationMembership({
-        organizationId: organization.id,
-        userId: licenseManager.id,
-        role: 'admin',
-        status: 'active',
-      });
-      console.log(`Added license manager to organization membership`);
-    } else {
-      if (organization.companyName !== companyName || organization.primaryManagerId !== licenseManager.id) {
-        await authStorage.updateOrganization(organization.id, {
-          companyName,
-          primaryManagerId: licenseManager.id,
-          billingEmail: teamManagerEmail,
-        });
-        console.log(`Updated organization: ${organization.id} (${companyName})`);
-      }
-      const existingMembership = await authStorage.getUserMembership(licenseManager.id);
-      if (!existingMembership || existingMembership.organizationId !== organization.id) {
-        try {
-          await authStorage.createOrganizationMembership({
-            organizationId: organization.id,
-            userId: licenseManager.id,
-            role: 'admin',
-            status: 'active',
-          });
-          console.log(`Added license manager to existing organization membership`);
-        } catch (membershipError: any) {
-          if (membershipError.code !== '23505') throw membershipError;
-          console.log(`License manager already has membership for organization`);
-        }
-      }
-    }
+    // NOTE: We do NOT create an organization for team subscriptions
+    // Organizations are ONLY created via enterprise purchase (/api/enterprise/purchase)
+    // Team subscriptions just activate features for the team manager user
+    console.log(`[Team Purchase] Activating features for team manager ${teamManager.id} (${teamManagerEmail}) - NO organization created`);
 
-    const teamPlatformAccessItems = teamItems.filter(item => item.addonType === 'platform_access');
-    const totalSeats = teamPlatformAccessItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
-    if (totalSeats > 0) {
-      const platformAccessItem = teamPlatformAccessItems[0];
-      const pricePerSeat = platformAccessItem?.basePrice || '0';
-      const currency = platformAccessItem?.currency || 'USD';
-      const pkg = platformAccessItem ? await getPackageOrAddonBySku(platformAccessItem.packageSku) : null;
-      const validityDays = pkg?.validityDays || 365;
-      const startDate = new Date();
-      const endDate = new Date(startDate.getTime() + validityDays * 24 * 60 * 60 * 1000);
-      const licensePackage = await authStorage.createLicensePackage({
-        organizationId: organization.id,
-        packageType: platformAccessItem?.packageSku || 'team-platform-access',
-        totalSeats,
-        pricePerSeat,
-        totalAmount: (parseFloat(pricePerSeat) * totalSeats).toString(),
-        currency,
-        startDate,
-        endDate,
-        status: 'active',
-      });
-      console.log(`Created license package: ${licensePackage.id} with ${totalSeats} seats for organization ${organization.id}`);
-      (purchaseDetails as any).licensePackageId = licensePackage.id;
-      (purchaseDetails as any).organizationId = organization.id;
-    }
-
+    // Activate add-ons directly for the team manager (no organization needed)
     const teamAddonTypes = ['session_minutes', 'train_me', 'dai'];
     for (const item of cartItems.filter((i: any) => i.purchaseMode === 'team')) {
       let mappedType = item.addonType;
@@ -659,8 +655,8 @@ async function runTeamCartActivation(
       const itemPaidAmount = parseFloat(pendingOrder.amount || '0') / Math.max(1, cartItems.length);
       try {
         await billingStorage.createAddonPurchase({
-          userId: licenseManager.id,
-          organizationId: organization.id,
+          userId: teamManager.id, // ✅ Activate for team manager directly
+          organizationId: null, // ✅ NO organization for team subscriptions
           addonType: mappedType,
           packageSku: item.packageSku,
           billingType: 'one_time',
@@ -673,24 +669,25 @@ async function runTeamCartActivation(
           endDate,
           metadata: { teamPurchase: true, cartOrderId: pendingOrder.id, packageName: pkg.name },
         });
-        console.log(`[Team Cart] Created org addon: ${mappedType} for org ${organization.id}, ${totalUnits} units`);
+        console.log(`[Team Cart] Created addon: ${mappedType} for user ${teamManager.id}, ${totalUnits} units (NO organization)`);
       } catch (addonErr: any) {
-        console.error('[Team Cart] Failed to create org addon:', addonErr);
+        console.error('[Team Cart] Failed to create addon:', addonErr);
       }
     }
 
+    // Send invitation email to team manager with password reset link
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await authStorage.createPasswordResetToken(teamManagerEmail, resetToken, resetTokenExpiry);
     await sendLicenseManagerInvitationEmail(teamManagerEmail, teamManagerName, resetToken, purchaseDetails);
     licenseManagerInvitationSent = true;
-    console.log(`License Manager invitation sent to ${teamManagerEmail}`);
+    console.log(`Team manager invitation sent to ${teamManagerEmail}`);
     await eventLogger.log({
       actorId: userId,
       action: 'team_purchase.completed',
-      targetType: 'license_manager',
-      targetId: licenseManager.id,
-      metadata: { licenseManagerEmail: teamManagerEmail, licenseManagerName: teamManagerName, purchaseDetails, orderId: pendingOrder.id },
+      targetType: 'user', // ✅ Changed from 'license_manager' to 'user'
+      targetId: teamManager.id,
+      metadata: { teamManagerEmail: teamManagerEmail, teamManagerName: teamManagerName, purchaseDetails, orderId: pendingOrder.id },
       ipAddress: req.ip,
       userAgent: req.get('user-agent'),
     });

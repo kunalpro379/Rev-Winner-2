@@ -145,6 +145,31 @@ export default function Packages() {
     retry: false,
   });
 
+  // Check if user has an existing organization (for add-on purchases)
+  const { data: orgData, isLoading: orgLoading, error: orgError } = useQuery<{ hasOrganization: boolean }>({
+    queryKey: ['/api/enterprise/has-organization', purchaseMode],
+    queryFn: async () => {
+      const token = localStorage.getItem('accessToken');
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const response = await fetch('/api/enterprise/has-organization', {
+        credentials: 'include',
+        headers
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to check organization: ${response.status}`);
+      }
+      return response.json();
+    },
+    enabled: !!authData, // Always check when authenticated
+    retry: false,
+    staleTime: 0, // Always fetch fresh data
+    gcTime: 0, // Don't cache (replaces cacheTime in newer versions)
+    refetchOnMount: true, // Always refetch when component mounts
+  });
+
   // Fetch packages from the pricing API (Platform Access + Add-ons)
   const { data: packagesData, isLoading } = useQuery<{
     platformAccess: PricingPackage[];
@@ -224,15 +249,30 @@ export default function Packages() {
     const sessionMinutesQty = getTotalSessionMinutesQuantity();
     const daiQty = teamQuantities.dai?.quantity || 0;
     const trainMeQty = teamQuantities.trainMe?.quantity || 0;
+    const hasExistingOrg = orgData?.hasOrganization || false;
 
-    if (platformAccessQty === 0) {
-      return { valid: false, message: "At least one Platform Access license is required" };
+    // For existing organizations purchasing only add-ons (no platform access)
+    if (hasExistingOrg && platformAccessQty === 0) {
+      // Must have at least one add-on to purchase
+      const totalAddons = sessionMinutesQty + daiQty + trainMeQty;
+      if (totalAddons === 0) {
+        return { valid: false, message: "Select at least one add-on to purchase" };
+      }
+      // Allow purchasing add-ons without platform access for existing orgs
+      return { valid: true };
     }
 
+    // For new organizations, platform access is required
+    if (platformAccessQty === 0) {
+      return { valid: false, message: "At least one Platform Access license is required for new organizations" };
+    }
+
+    // If purchasing platform access, session minutes must match
     if (sessionMinutesQty !== platformAccessQty) {
       return { valid: false, message: `Session Minutes packages (${sessionMinutesQty}) must equal Platform Access licenses (${platformAccessQty})` };
     }
 
+    // Add-ons cannot exceed platform access licenses
     if (daiQty > platformAccessQty) {
       return { valid: false, message: `DAI add-ons (${daiQty}) cannot exceed Platform Access licenses (${platformAccessQty})` };
     }
@@ -294,6 +334,7 @@ export default function Packages() {
     setTeamQuantities(prev => {
       // Get current Platform Access quantity for constraints
       const platformAccessQty = prev.platformAccess?.quantity || 0;
+      const hasExistingOrg = orgData?.hasOrganization || false;
       
       if (type === 'platformAccess') {
         const currentQty = prev.platformAccess?.sku === sku ? prev.platformAccess.quantity : 0;
@@ -348,9 +389,12 @@ export default function Packages() {
         // New quantity for this item
         let newQty = Math.max(0, currentQty + change);
         
-        // Enforce: Total session minutes cannot exceed Platform Access quantity
-        const maxAllowed = Math.max(0, platformAccessQty - otherSessionMinutesTotal);
-        newQty = Math.min(newQty, maxAllowed);
+        // For existing orgs with no platform access, allow unlimited session minutes
+        // Otherwise, enforce: Total session minutes cannot exceed Platform Access quantity
+        if (!hasExistingOrg || platformAccessQty > 0) {
+          const maxAllowed = Math.max(0, platformAccessQty - otherSessionMinutesTotal);
+          newQty = Math.min(newQty, maxAllowed);
+        }
         
         if (newQty === 0) {
           return {
@@ -370,8 +414,11 @@ export default function Packages() {
       } else if (type === 'dai') {
         const currentQty = prev.dai?.sku === sku ? prev.dai.quantity : 0;
         let newQty = Math.max(0, currentQty + change);
-        // DAI cannot exceed Platform Access quantity
-        newQty = Math.min(newQty, platformAccessQty);
+        // For existing orgs with no platform access, allow unlimited DAI
+        // Otherwise, DAI cannot exceed Platform Access quantity
+        if (!hasExistingOrg || platformAccessQty > 0) {
+          newQty = Math.min(newQty, platformAccessQty);
+        }
         return {
           ...prev,
           dai: newQty > 0 ? { sku, quantity: newQty } : null,
@@ -379,8 +426,11 @@ export default function Packages() {
       } else if (type === 'trainMe') {
         const currentQty = prev.trainMe?.sku === sku ? prev.trainMe.quantity : 0;
         let newQty = Math.max(0, currentQty + change);
-        // Train Me cannot exceed Platform Access quantity
-        newQty = Math.min(newQty, platformAccessQty);
+        // For existing orgs with no platform access, allow unlimited Train Me
+        // Otherwise, Train Me cannot exceed Platform Access quantity
+        if (!hasExistingOrg || platformAccessQty > 0) {
+          newQty = Math.min(newQty, platformAccessQty);
+        }
         return {
           ...prev,
           trainMe: newQty > 0 ? { sku, quantity: newQty } : null,
@@ -840,7 +890,9 @@ export default function Packages() {
                   <p className="text-purple-100">
                     {purchaseMode === 'user' 
                       ? 'Add session time to your account (required for platform access)'
-                      : `Select session minutes for your team (must equal ${getTotalPlatformAccessQuantity()} platform licenses)`
+                      : orgData?.hasOrganization && getTotalPlatformAccessQuantity() === 0
+                        ? 'Add session minutes for your organization'
+                        : `Select session minutes for your team (must equal ${getTotalPlatformAccessQuantity()} platform licenses)`
                     }
                   </p>
                 </div>
@@ -947,7 +999,9 @@ export default function Packages() {
                   <p className="text-purple-100">
                     {purchaseMode === 'user' 
                       ? 'Enhance your sales assistant with powerful features (optional)'
-                      : `Optional add-ons for your team (max ${getTotalPlatformAccessQuantity()} each)`
+                      : orgData?.hasOrganization && getTotalPlatformAccessQuantity() === 0
+                        ? 'Optional add-ons for your organization'
+                        : `Optional add-ons for your team (max ${getTotalPlatformAccessQuantity()} each)`
                     }
                   </p>
                 </div>
@@ -1048,7 +1102,12 @@ export default function Packages() {
                                   variant="outline"
                                   size="icon"
                                   onClick={() => updateTeamQuantity(addon.id, addonType, 1)}
-                                  disabled={teamQty >= getTotalPlatformAccessQuantity()}
+                                  disabled={
+                                    // For existing orgs with no platform access, allow unlimited add-ons
+                                    orgData?.hasOrganization && getTotalPlatformAccessQuantity() === 0
+                                      ? false
+                                      : teamQty >= getTotalPlatformAccessQuantity()
+                                  }
                                   data-testid={`button-increase-${addon.id}`}
                                 >
                                   <Plus className="h-4 w-4" />

@@ -466,13 +466,13 @@ export function setupAuthRoutes(app: Router) {
         return res.status(403).json({ message: "Session invalidated. Please log in again." });
       }
       
-      // Generate new access token with current sessionVersion
+      // Generate new access token with CURRENT user data from database (not from old token)
       const accessToken = generateAccessToken({
-        userId: payload.userId,
-        email: payload.email,
-        role: payload.role,
-        username: payload.username,
-        sessionVersion: payload.sessionVersion,
+        userId: user.id,
+        email: user.email,
+        role: user.role, // ✅ Use current role from database
+        username: user.username,
+        sessionVersion: user.sessionVersion,
       });
       
       res.json({ accessToken });

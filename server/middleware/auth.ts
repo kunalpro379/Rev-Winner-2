@@ -114,16 +114,21 @@ export function requireLicenseManager(req: Request, res: Response, next: NextFun
     return res.status(401).json({ message: 'Authentication required' });
   }
 
+  console.log(`[requireLicenseManager] Checking access for user ${req.jwtUser.userId}, role: ${req.jwtUser.role}, superUser: ${req.jwtUser.superUser}`);
+
   // Allow super users to access license manager routes (via superUserOverrides table)
   if (req.jwtUser.superUser) {
+    console.log(`[requireLicenseManager] ✅ Access granted - super user`);
     return next();
   }
 
   // Allow super_admin, admin, and license_manager roles
   if (req.jwtUser.role === 'super_admin' || req.jwtUser.role === 'admin' || req.jwtUser.role === 'license_manager') {
+    console.log(`[requireLicenseManager] ✅ Access granted - role: ${req.jwtUser.role}`);
     return next();
   }
 
+  console.log(`[requireLicenseManager] ❌ Access denied - role: ${req.jwtUser.role}`);
   return res.status(403).json({ message: 'License Manager access required' });
 }
 

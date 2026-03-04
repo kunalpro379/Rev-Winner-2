@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Who Am I?</title>
+</head>
+<body>
+    <h1>Current User Check</h1>
+    <button onclick="checkUser()">Check Who I Am</button>
+    <pre id="result"></pre>
+
+    <script>
+        async function checkUser() {
+            try {
+                const response = await fetch('/api/auth/me');
+                const data = await response.json();
+                document.getElementById('result').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('result').textContent = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>
