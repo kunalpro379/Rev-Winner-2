@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { HamburgerNav } from "@/components/hamburger-nav";
@@ -9,10 +9,12 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCart } from "@/contexts/cart-context";
 import { useToast } from "@/hooks/use-toast";
 import { useSEO } from "@/hooks/use-seo";
 import { StructuredData } from "@/components/structured-data";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   ShoppingCart, 
   Check, 
@@ -29,7 +31,10 @@ import {
   Plus,
   Minus,
   Mail,
-  UserCircle
+  UserCircle,
+  CreditCard,
+  Building2,
+  ArrowRight
 } from "lucide-react";
 
 interface PricingPackage {
@@ -102,6 +107,147 @@ const pricingSchema = {
   }
 };
 
+// Enterprise Purchase Form Component
+function EnterpriseForm() {
+  const [_, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [companyName, setCompanyName] = useState("");
+  const [billingEmail, setBillingEmail] = useState("");
+  const [packageType, setPackageType] = useState<"monthly" | "annual">("annual");
+  const [totalSeats, setTotalSeats] = useState("5");
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const pricePerSeat = packageType === "annual" ? 60 : 6;
+  const seats = parseInt(totalSeats, 10) || 0;
+  const totalAmount = seats * pricePerSeat;
+
+  const handlePurchase = async () => {
+    if (!companyName.trim()) {
+      toast({ title: "Company Name Required", description: "Please enter your company name", variant: "destructive" });
+      return;
+    }
+    if (!billingEmail.trim() || !billingEmail.includes("@")) {
+      toast({ title: "Valid Email Required", description: "Please enter a valid billing email", variant: "destructive" });
+      return;
+    }
+    if (seats < 5) {
+      toast({ title: "Minimum Seats Required", description: "Minimum 5 seats required for enterprise license", variant: "destructive" });
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const orderResponse = await apiRequest("POST", "/api/enterprise/purchase", { companyName, billingEmail, packageType, totalSeats: seats });
+      const orderData = await orderResponse.json();
+      if (!orderData.success) throw new Error(orderData.message || "Failed to create order");
+
+      // Razorpay payment flow
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      document.body.appendChild(script);
+      script.onload = () => {
+        const rzp = new (window as any).Razorpay({
+          key: orderData.razorpayKeyId,
+          amount: Math.round(orderData.amount * 100),
+          currency: orderData.currency || 'USD',
+          name: 'Rev Winner',
+          description: `Enterprise License - ${seats} Seats (${packageType})`,
+          order_id: orderData.razorpayOrderId,
+          handler: async function (response: any) {
+            try {
+              const verifyResponse = await apiRequest("POST", "/api/enterprise/verify-purchase", {
+                orderId: orderData.orderId, companyName, billingEmail, totalSeats: seats, packageType, pricePerSeat,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+              });
+              const verifyData = await verifyResponse.json();
+              if (verifyData.success) {
+                toast({ title: "Purchase Successful!", description: "Your enterprise license has been activated. Redirecting..." });
+                queryClient.invalidateQueries({ queryKey: ['/api/enterprise/has-organization'] });
+                setTimeout(() => setLocation("/license-manager?fromPayment=true"), 2000);
+              } else {
+                throw new Error(verifyData.message || "Verification failed");
+              }
+            } catch (error: any) {
+              toast({ title: "Verification Failed", description: error.message || "Failed to verify payment", variant: "destructive" });
+              setIsProcessing(false);
+            }
+          },
+          modal: { ondismiss: () => { toast({ title: "Payment Cancelled" }); setIsProcessing(false); } },
+          theme: { color: '#7c3aed' }
+        });
+        rzp.open();
+      };
+      script.onerror = () => { toast({ title: "Payment Gateway Error", variant: "destructive" }); setIsProcessing(false); };
+    } catch (error: any) {
+      toast({ title: "Purchase Failed", description: error?.message || "Failed to initiate purchase", variant: "destructive" });
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Organization Details</CardTitle>
+        <CardDescription>Enter your company information to get started</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div>
+          <Label htmlFor="companyName">Company Name *</Label>
+          <div className="relative">
+            <Building2 className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Input id="companyName" placeholder="Enter your company name" value={companyName} onChange={(e) => setCompanyName(e.target.value)} className="pl-10" />
+          </div>
+        </div>
+        <div>
+          <Label htmlFor="billingEmail">Billing Email *</Label>
+          <Input id="billingEmail" type="email" placeholder="billing@company.com" value={billingEmail} onChange={(e) => setBillingEmail(e.target.value)} />
+        </div>
+        <div>
+          <Label htmlFor="packageType">Package Type *</Label>
+          <Select value={packageType} onValueChange={(value: "monthly" | "annual") => setPackageType(value)}>
+            <SelectTrigger id="packageType"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="monthly">Monthly ($6/seat/month)</SelectItem>
+              <SelectItem value="annual">Annual ($60/seat/year - Save 17%)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="totalSeats">Number of Seats * (Minimum 5)</Label>
+          <div className="relative">
+            <Users className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <Input id="totalSeats" type="number" min="5" placeholder="Enter number of seats" value={totalSeats} onChange={(e) => setTotalSeats(e.target.value)} className="pl-10" />
+          </div>
+        </div>
+        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Seats:</span>
+            <span className="font-medium">{seats}</span>
+          </div>
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Price per seat:</span>
+            <span className="font-medium">${pricePerSeat.toLocaleString()}</span>
+          </div>
+          <div className="border-t dark:border-gray-700 pt-2 mt-2">
+            <div className="flex justify-between items-center">
+              <span className="text-lg font-bold">Total Amount:</span>
+              <span className="text-2xl font-bold text-purple-600">${totalAmount.toLocaleString()}</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">{packageType === "annual" ? "Billed annually" : "Billed monthly"} + 18% GST</p>
+          </div>
+        </div>
+        <Button onClick={handlePurchase} disabled={isProcessing} className="w-full" size="lg">
+          {isProcessing ? "Processing..." : `Purchase ${seats} Licenses - $${totalAmount.toLocaleString()}`}
+        </Button>
+        <p className="text-xs text-center text-muted-foreground">Secure payment powered by Razorpay</p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Packages() {
   const [location, setLocation] = useLocation();
   const { addToCart, cart, clearCart } = useCart();
@@ -146,7 +292,7 @@ export default function Packages() {
   });
 
   // Check if user has an existing organization (for add-on purchases)
-  const { data: orgData, isLoading: orgLoading, error: orgError } = useQuery<{ hasOrganization: boolean }>({
+  const { data: orgData, isLoading: orgLoading, error: orgError } = useQuery<{ hasOrganization: boolean; organization?: { id: string; name: string; licenseManagerId: string } }>({
     queryKey: ['/api/enterprise/has-organization', purchaseMode],
     queryFn: async () => {
       const token = localStorage.getItem('accessToken');
@@ -169,6 +315,52 @@ export default function Packages() {
     gcTime: 0, // Don't cache (replaces cacheTime in newer versions)
     refetchOnMount: true, // Always refetch when component mounts
   });
+
+  // Auto-populate team manager info from organization and user data when available
+  useEffect(() => {
+    if (purchaseMode === 'team') {
+      console.log('Team mode - populating manager info', { 
+        orgData, 
+        authData,
+        orgDataFull: JSON.stringify(orgData),
+        authDataFull: JSON.stringify(authData)
+      });
+      
+      // Auth data has user nested under .user property
+      const user = authData ? ((authData as any).user || authData) : null;
+      
+      // Populate company name from organization if exists, otherwise use user's organization field
+      if (orgData?.hasOrganization && orgData?.organization) {
+        console.log('Setting company name from org:', orgData.organization.name, 'Full org:', JSON.stringify(orgData.organization));
+        const companyName = orgData.organization?.name || (user?.organization) || 'My Organization';
+        setTeamManager(prev => ({
+          ...prev,
+          companyName: prev.companyName || companyName,
+        }));
+      } else if (user?.organization) {
+        // Fallback to user's organization field
+        console.log('Using user organization as company name:', user.organization);
+        setTeamManager(prev => ({
+          ...prev,
+          companyName: prev.companyName || user.organization,
+        }));
+      }
+      
+      // Populate user name and email from auth data
+      if (user) {
+        console.log('Auth user object:', JSON.stringify(user));
+        const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || '';
+        const userEmail = user.email || '';
+        
+        console.log('Setting user info:', { userName, userEmail, firstName: user.firstName, lastName: user.lastName, email: user.email });
+        setTeamManager(prev => ({
+          ...prev,
+          name: prev.name || userName,
+          email: prev.email || userEmail,
+        }));
+      }
+    }
+  }, [orgData, authData, purchaseMode]);
 
   // Fetch packages from the pricing API (Platform Access + Add-ons)
   const { data: packagesData, isLoading } = useQuery<{
@@ -251,25 +443,9 @@ export default function Packages() {
     const trainMeQty = teamQuantities.trainMe?.quantity || 0;
     const hasExistingOrg = orgData?.hasOrganization || false;
 
-    // For existing organizations purchasing only add-ons (no platform access)
-    if (hasExistingOrg && platformAccessQty === 0) {
-      // Must have at least one add-on to purchase
-      const totalAddons = sessionMinutesQty + daiQty + trainMeQty;
-      if (totalAddons === 0) {
-        return { valid: false, message: "Select at least one add-on to purchase" };
-      }
-      // Allow purchasing add-ons without platform access for existing orgs
-      return { valid: true };
-    }
-
-    // For new organizations, platform access is required
+    // CRITICAL RULE: Platform Access is ALWAYS required - no exceptions
     if (platformAccessQty === 0) {
-      return { valid: false, message: "At least one Platform Access license is required for new organizations" };
-    }
-
-    // If purchasing platform access, session minutes must match
-    if (sessionMinutesQty !== platformAccessQty) {
-      return { valid: false, message: `Session Minutes packages (${sessionMinutesQty}) must equal Platform Access licenses (${platformAccessQty})` };
+      return { valid: false, message: "Platform Access subscription is required. Please add at least one Platform Access license to continue." };
     }
 
     // Add-ons cannot exceed platform access licenses
@@ -389,12 +565,9 @@ export default function Packages() {
         // New quantity for this item
         let newQty = Math.max(0, currentQty + change);
         
-        // For existing orgs with no platform access, allow unlimited session minutes
-        // Otherwise, enforce: Total session minutes cannot exceed Platform Access quantity
-        if (!hasExistingOrg || platformAccessQty > 0) {
-          const maxAllowed = Math.max(0, platformAccessQty - otherSessionMinutesTotal);
-          newQty = Math.min(newQty, maxAllowed);
-        }
+        // Session minutes cannot exceed Platform Access quantity
+        const maxAllowed = Math.max(0, platformAccessQty - otherSessionMinutesTotal);
+        newQty = Math.min(newQty, maxAllowed);
         
         if (newQty === 0) {
           return {
@@ -414,11 +587,8 @@ export default function Packages() {
       } else if (type === 'dai') {
         const currentQty = prev.dai?.sku === sku ? prev.dai.quantity : 0;
         let newQty = Math.max(0, currentQty + change);
-        // For existing orgs with no platform access, allow unlimited DAI
-        // Otherwise, DAI cannot exceed Platform Access quantity
-        if (!hasExistingOrg || platformAccessQty > 0) {
-          newQty = Math.min(newQty, platformAccessQty);
-        }
+        // DAI cannot exceed Platform Access quantity
+        newQty = Math.min(newQty, platformAccessQty);
         return {
           ...prev,
           dai: newQty > 0 ? { sku, quantity: newQty } : null,
@@ -426,11 +596,8 @@ export default function Packages() {
       } else if (type === 'trainMe') {
         const currentQty = prev.trainMe?.sku === sku ? prev.trainMe.quantity : 0;
         let newQty = Math.max(0, currentQty + change);
-        // For existing orgs with no platform access, allow unlimited Train Me
-        // Otherwise, Train Me cannot exceed Platform Access quantity
-        if (!hasExistingOrg || platformAccessQty > 0) {
-          newQty = Math.min(newQty, platformAccessQty);
-        }
+        // Train Me cannot exceed Platform Access quantity
+        newQty = Math.min(newQty, platformAccessQty);
         return {
           ...prev,
           trainMe: newQty > 0 ? { sku, quantity: newQty } : null,
@@ -483,6 +650,19 @@ export default function Packages() {
       return;
     }
 
+    // Validate team manager info is populated
+    if (!teamManager.name || !teamManager.email || !teamManager.companyName) {
+      console.error('Team manager info incomplete:', teamManager);
+      toast({
+        title: "Missing Information",
+        description: "Please wait while we load your organization details, then try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    console.log('Adding team items to cart with manager:', teamManager);
+
     setAddingToCart('team');
     try {
       // Always clear cart first for team mode to avoid "Item already in cart" errors
@@ -525,6 +705,7 @@ export default function Packages() {
 
       setLocation('/cart');
     } catch (error: any) {
+      console.error('Failed to add team packages:', error);
       toast({
         title: "Failed to add team packages",
         description: error.message || "Could not add all items to cart",
@@ -679,72 +860,57 @@ export default function Packages() {
           )}
         </div>
 
-        {/* Team Manager Form (only for team mode, before showing packages) */}
-        {purchaseMode === 'team' && !teamFormSubmitted && (
-          <Card className="max-w-md mx-auto mb-12 bg-white/95 dark:bg-slate-900/95 backdrop-blur">
-            <CardHeader>
-              <CardTitle className="text-xl bg-gradient-to-r from-fuchsia-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
-                <UserCircle className="h-6 w-6 text-purple-600" />
-                License Manager Details
-              </CardTitle>
-              <CardDescription>
-                Enter the details of the person who will manage licenses for your team
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="company-name">Company Name</Label>
-                <Input
-                  id="company-name"
-                  placeholder="Enter your company or organization name"
-                  value={teamManager.companyName}
-                  onChange={(e) => setTeamManager(prev => ({ ...prev, companyName: e.target.value }))}
-                  data-testid="input-company-name"
-                />
-              </div>
-              <Separator />
-              <div className="space-y-2">
-                <Label htmlFor="manager-name">License Manager Full Name</Label>
-                <Input
-                  id="manager-name"
-                  placeholder="Enter license manager's name"
-                  value={teamManager.name}
-                  onChange={(e) => setTeamManager(prev => ({ ...prev, name: e.target.value }))}
-                  data-testid="input-manager-name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="manager-email">License Manager Email</Label>
-                <Input
-                  id="manager-email"
-                  type="email"
-                  placeholder="Enter license manager's email"
-                  value={teamManager.email}
-                  onChange={(e) => setTeamManager(prev => ({ ...prev, email: e.target.value }))}
-                  data-testid="input-manager-email"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                <Mail className="h-3 w-3 inline mr-1" />
-                After payment, the License Manager will receive an email with a link to set up their account and manage team licenses.
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button
-                className="w-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700"
-                onClick={handleTeamFormSubmit}
-                data-testid="button-continue-team"
-              >
-                Continue to Packages
-              </Button>
-            </CardFooter>
-          </Card>
+        {/* Enterprise Purchase Form (only for team mode without organization) */}
+        {purchaseMode === 'team' && !orgData?.hasOrganization && (
+          <div className="max-w-4xl mx-auto mb-12">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold text-white mb-2">Enterprise License Purchase</h2>
+              <p className="text-purple-100">Get bulk licenses for your organization with centralized management</p>
+            </div>
+            
+            {/* Pricing Info Cards */}
+            <div className="grid md:grid-cols-2 gap-6 mb-8">
+              <Card data-testid="card-pricing-monthly">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-purple-600" />
+                    Monthly Plan
+                  </CardTitle>
+                  <CardDescription>Pay as you go, cancel anytime</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-purple-600">$6</div>
+                  <p className="text-sm text-muted-foreground">per seat per month</p>
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-pricing-annual">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-blue-600" />
+                    Annual Plan
+                    <span className="ml-auto text-xs bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-300 px-2 py-1 rounded">
+                      Save 17%
+                    </span>
+                  </CardTitle>
+                  <CardDescription>Best value for your team</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-blue-600">$60</div>
+                  <p className="text-sm text-muted-foreground">per seat per year</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Enterprise Purchase Form */}
+            <EnterpriseForm />
+          </div>
         )}
 
-        {/* Show packages only if user mode OR team mode with form submitted */}
-        {(purchaseMode === 'user' || teamFormSubmitted) && (
+        {/* Show packages - for user mode always, for team mode only if has organization */}
+        {(purchaseMode === 'user' || (purchaseMode === 'team' && orgData?.hasOrganization)) && (
           <>
-            {/* Platform Access Subscriptions */}
+            {/* Platform Access Subscriptions - Show for both user and team mode */}
             <section className="mb-16">
               <div className="text-center mb-8">
                 <h2 className="text-3xl font-bold text-white mb-2 flex items-center justify-center gap-2">
@@ -754,7 +920,9 @@ export default function Packages() {
                 <p className="text-purple-100">
                   {purchaseMode === 'user' 
                     ? 'Choose your preferred billing cycle for platform access (one per user)'
-                    : 'Select platform access for your team members'
+                    : orgData?.hasOrganization
+                      ? 'Add platform access licenses for your team (required for new team purchases)'
+                      : 'Platform access licenses for your team'
                   }
                 </p>
               </div>
@@ -764,7 +932,7 @@ export default function Packages() {
                   const availability = availabilityMap.get(pkg.sku);
                   const teamQty = getTeamQuantity(pkg.sku, 'platformAccess');
                   const hasInCart = hasItemInCart('platform_access');
-                  const canAdd = purchaseMode === 'user' ? !hasInCart && availability?.available : availability?.available;
+                  const canAdd = !hasInCart && availability?.available;
 
                   return (
                     <Card
@@ -855,7 +1023,7 @@ export default function Packages() {
                               variant="outline"
                               size="icon"
                               onClick={() => updateTeamQuantity(pkg.sku, 'platformAccess', -1)}
-                              disabled={teamQty === 0 || Boolean(teamQuantities.platformAccess && teamQuantities.platformAccess.sku !== pkg.sku)}
+                              disabled={teamQty === 0}
                               data-testid={`button-decrease-${pkg.sku}`}
                             >
                               <Minus className="h-4 w-4" />
@@ -865,7 +1033,6 @@ export default function Packages() {
                               variant="outline"
                               size="icon"
                               onClick={() => updateTeamQuantity(pkg.sku, 'platformAccess', 1)}
-                              disabled={Boolean(teamQuantities.platformAccess && teamQuantities.platformAccess.sku !== pkg.sku && teamQuantities.platformAccess.quantity > 0)}
                               data-testid={`button-increase-${pkg.sku}`}
                             >
                               <Plus className="h-4 w-4" />
@@ -890,9 +1057,9 @@ export default function Packages() {
                   <p className="text-purple-100">
                     {purchaseMode === 'user' 
                       ? 'Add session time to your account (required for platform access)'
-                      : orgData?.hasOrganization && getTotalPlatformAccessQuantity() === 0
-                        ? 'Add session minutes for your organization'
-                        : `Select session minutes for your team (must equal ${getTotalPlatformAccessQuantity()} platform licenses)`
+                      : getTotalPlatformAccessQuantity() === 0
+                        ? 'Session minutes are required (add Platform Access first)'
+                        : `Select session minutes for your team (must equal ${getTotalPlatformAccessQuantity()} platform license${getTotalPlatformAccessQuantity() !== 1 ? 's' : ''})`
                     }
                   </p>
                 </div>
@@ -999,8 +1166,8 @@ export default function Packages() {
                   <p className="text-purple-100">
                     {purchaseMode === 'user' 
                       ? 'Enhance your sales assistant with powerful features (optional)'
-                      : orgData?.hasOrganization && getTotalPlatformAccessQuantity() === 0
-                        ? 'Optional add-ons for your organization'
+                      : getTotalPlatformAccessQuantity() === 0
+                        ? 'Optional add-ons (add Platform Access first to enable)'
                         : `Optional add-ons for your team (max ${getTotalPlatformAccessQuantity()} each)`
                     }
                   </p>
@@ -1102,12 +1269,7 @@ export default function Packages() {
                                   variant="outline"
                                   size="icon"
                                   onClick={() => updateTeamQuantity(addon.id, addonType, 1)}
-                                  disabled={
-                                    // For existing orgs with no platform access, allow unlimited add-ons
-                                    orgData?.hasOrganization && getTotalPlatformAccessQuantity() === 0
-                                      ? false
-                                      : teamQty >= getTotalPlatformAccessQuantity()
-                                  }
+                                  disabled={teamQty >= getTotalPlatformAccessQuantity()}
                                   data-testid={`button-increase-${addon.id}`}
                                 >
                                   <Plus className="h-4 w-4" />
@@ -1122,19 +1284,46 @@ export default function Packages() {
               </section>
             )}
 
-            {/* Team Cart Summary (for team mode) */}
-            {purchaseMode === 'team' && (
+            {/* Team Cart Summary (for team mode with organization) */}
+            {purchaseMode === 'team' && orgData?.hasOrganization && (
               <Card className="max-w-2xl mx-auto mb-8 bg-white/95 dark:bg-slate-900/95 backdrop-blur">
                 <CardHeader>
                   <CardTitle className="text-xl bg-gradient-to-r from-fuchsia-600 to-purple-600 bg-clip-text text-transparent">
                     Team Order Summary
                   </CardTitle>
                   <CardDescription>
-                    License Manager: {teamManager.name} ({teamManager.email})
+                    {teamManager.name && teamManager.email ? (
+                      <>License Manager: {teamManager.name} ({teamManager.email})</>
+                    ) : (
+                      <span className="text-amber-600">Loading organization details...</span>
+                    )}
+                    {teamManager.companyName && (
+                      <div className="text-xs text-muted-foreground mt-1">Company: {teamManager.companyName}</div>
+                    )}
                   </CardDescription>
-                  <p className="text-xs text-muted-foreground mt-2 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-md">
-                    Select your quantities above, then click the button below to add all items to your cart at once.
-                  </p>
+                  {/* Debug info - remove after testing */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="text-xs text-gray-500 mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded">
+                      Debug: name={teamManager.name || 'empty'}, email={teamManager.email || 'empty'}, company={teamManager.companyName || 'empty'}
+                    </div>
+                  )}
+                  {getTotalPlatformAccessQuantity() === 0 ? (
+                    <div className="mt-3 bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700 rounded-lg p-3">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-semibold text-red-700 dark:text-red-400">Platform Access Required</p>
+                          <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                            You must add at least one Platform Access license to purchase team packages. Scroll up to select Platform Access packages.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-2 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-md">
+                      Select your quantities above, then click the button below to add all items to your cart at once.
+                    </p>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between text-sm">
@@ -1162,6 +1351,7 @@ export default function Packages() {
                     <span>Estimated Total:</span>
                     <span className="text-purple-600">${calculateTeamTotal().toFixed(2)}</span>
                   </div>
+                  <p className="text-xs text-center text-muted-foreground mt-2">+ 18% GST will be added at checkout</p>
                   
                   {/* Validation message */}
                   {!validateTeamCart().valid && (
@@ -1175,13 +1365,24 @@ export default function Packages() {
                   <Button
                     className="w-full bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-700 hover:to-fuchsia-700"
                     onClick={handleAddTeamToCart}
-                    disabled={!validateTeamCart().valid || addingToCart === 'team'}
+                    disabled={
+                      !validateTeamCart().valid || 
+                      addingToCart === 'team' ||
+                      !teamManager.name ||
+                      !teamManager.email ||
+                      !teamManager.companyName
+                    }
                     data-testid="button-add-team-to-cart"
                   >
                     {addingToCart === 'team' ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Adding to Cart...
+                      </>
+                    ) : !teamManager.name || !teamManager.email || !teamManager.companyName ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Loading Details...
                       </>
                     ) : (
                       <>

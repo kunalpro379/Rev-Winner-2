@@ -564,16 +564,16 @@ async function runTeamCartActivation(
       buyerName,
     };
 
-    // Check if buyer already has an organization (for add-on purchases)
+    // Check if buyer already has an organization
     const existingOrg = await authStorage.getOrganizationByManagerId(userId);
     const hasPlatformAccess = purchaseDetails.platformAccessCount > 0;
     
-    if (existingOrg && !hasPlatformAccess) {
-      // Existing organization purchasing only add-ons (no platform access)
-      console.log(`[Team Purchase] License manager ${userId} purchasing add-ons for existing organization ${existingOrg.id}`);
+    if (existingOrg) {
+      // Existing organization purchasing add-ons (with or without platform access)
+      console.log(`[Team Purchase] License manager ${userId} purchasing for existing organization ${existingOrg.id}`);
       
-      // Activate add-ons for the organization
-      const teamAddonTypes = ['session_minutes', 'train_me', 'dai'];
+      // Activate ALL add-ons for the organization (session_minutes, train_me, dai, platform_access)
+      const teamAddonTypes = ['session_minutes', 'train_me', 'dai', 'platform_access'];
       for (const item of cartItems.filter((i: any) => i.purchaseMode === 'team')) {
         let mappedType = item.addonType;
         if (item.addonType === 'usage_bundle') mappedType = 'session_minutes';
@@ -591,7 +591,7 @@ async function runTeamCartActivation(
         try {
           await billingStorage.createAddonPurchase({
             userId: userId, // License manager who made the purchase
-            organizationId: existingOrg.id, // Attach to organization
+            organizationId: existingOrg.id, // ✅ ALWAYS attach to organization
             addonType: mappedType,
             packageSku: item.packageSku,
             billingType: 'one_time',
@@ -602,9 +602,9 @@ async function runTeamCartActivation(
             status: 'active',
             startDate,
             endDate,
-            metadata: { cartOrderId: pendingOrder.id, packageName: pkg.name },
+            metadata: { cartOrderId: pendingOrder.id, packageName: pkg.name, organizationPurchase: true },
           });
-          console.log(`[Team Cart] Created organization addon: ${mappedType} for org ${existingOrg.id}, ${totalUnits} units`);
+          console.log(`[Team Cart] ✅ Created organization addon: ${mappedType} for org ${existingOrg.id}, ${totalUnits} units`);
         } catch (addonErr: any) {
           console.error('[Team Cart] Failed to create organization addon:', addonErr);
         }
@@ -3015,10 +3015,10 @@ export function setupBillingRoutes(app: Router) {
           .filter(item => item.addonType === 'train_me')
           .reduce((sum, item) => sum + (item.quantity || 1), 0);
 
-        // Team mode rule: Platform Access quantity must equal Session Minutes quantity
-        if (platformAccessQty > 0 && sessionMinutesQty > 0 && platformAccessQty !== sessionMinutesQty) {
+        // CRITICAL RULE: Platform Access is ALWAYS required - no exceptions
+        if (platformAccessQty === 0) {
           return res.status(400).json({ 
-            message: `Team purchases require Session Minutes quantity (${sessionMinutesQty}) to equal Platform Access quantity (${platformAccessQty})` 
+            message: "Platform Access subscription is required for all team purchases. Please add at least one Platform Access license to your cart." 
           });
         }
 
@@ -3739,7 +3739,7 @@ export function setupBillingRoutes(app: Router) {
             // Use the proper breakdown from cart calculation
             const subtotal = parseFloat(metadata.subtotal?.toString() || '0');
             const gstAmount = parseFloat(metadata.gstAmount?.toString() || '0');
-            const gstRate = 0; // No GST for USD
+            const gstRate = 18; // 18% GST for all purchases
             
             return {
               packageSku: pendingOrder.packageSku || 'CART-MULTI-ITEM',
@@ -3763,10 +3763,10 @@ export function setupBillingRoutes(app: Router) {
             let gstAmount: number;
             let gstRate: number;
             
-            // For USD (Razorpay), no GST
-            gstRate = 0;
-            baseAmount = totalAmount;
-            gstAmount = 0;
+            // 18% GST for all purchases
+            gstRate = 18;
+            baseAmount = totalAmount / 1.18;
+            gstAmount = totalAmount - baseAmount;
             
             return {
               packageSku: pendingOrder.packageSku || 'PENDING-ORDER',
@@ -3854,7 +3854,7 @@ export function setupBillingRoutes(app: Router) {
           discount: parseFloat(discount.toFixed(2)), // CRITICAL FIX: Include discount
           subtotalAfterDiscount: parseFloat((subtotal - discount).toFixed(2)), // CRITICAL FIX: Show discounted subtotal
           gst: parseFloat(totalGst.toFixed(2)),
-          gstRate: 0, // No GST for USD
+          gstRate: 18, // 18% GST for all purchases
           total: parseFloat(grandTotal.toFixed(2)),
           currency: currency,
           amountInWords: convertAmountToWords(grandTotal, currency),

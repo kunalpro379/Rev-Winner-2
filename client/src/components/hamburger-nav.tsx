@@ -29,6 +29,47 @@ interface AuthResponse {
   subscription?: any;
 }
 
+// Component to check if user has organization before showing License Manager
+function LicenseManagerNavButton({ currentPath, navigateTo }: { currentPath: string; navigateTo: (path: string) => void }) {
+  const { data: orgData } = useQuery<{ hasOrganization: boolean }>({
+    queryKey: ['/api/enterprise/has-organization'],
+    queryFn: async () => {
+      const token = localStorage.getItem('accessToken');
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const response = await fetch('/api/enterprise/has-organization', {
+        credentials: 'include',
+        headers
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to check organization: ${response.status}`);
+      }
+      return response.json();
+    },
+    retry: false,
+    staleTime: 60000, // Cache for 1 minute
+  });
+
+  // Only show if user has an organization
+  if (!orgData?.hasOrganization) {
+    return null;
+  }
+
+  return (
+    <Button
+      variant={currentPath === '/license-manager' ? 'default' : 'ghost'}
+      className="w-full justify-start"
+      onClick={() => navigateTo('/license-manager')}
+      data-testid="nav-license-manager"
+    >
+      <Building2 className="mr-2 h-4 w-4" />
+      License Manager
+    </Button>
+  );
+}
+
 export function HamburgerNav({ currentPath = "/" }: HamburgerNavProps) {
   const [, setLocation] = useLocation();
   const [open, setOpen] = useState(false);
@@ -254,17 +295,9 @@ export function HamburgerNav({ currentPath = "/" }: HamburgerNavProps) {
                         Packages
                       </Button>
                       
-                      {/* License Manager Menu Item */}
+                      {/* License Manager Menu Item - Only show if user has organization */}
                       {(authData?.user?.role === 'license_manager' || authData?.user?.role === 'admin') && (
-                        <Button
-                          variant={currentPath === '/license-manager' ? 'default' : 'ghost'}
-                          className="w-full justify-start"
-                          onClick={() => navigateTo('/license-manager')}
-                          data-testid="nav-license-manager"
-                        >
-                          <Building2 className="mr-2 h-4 w-4" />
-                          License Manager
-                        </Button>
+                        <LicenseManagerNavButton currentPath={currentPath} navigateTo={navigateTo} />
                       )}
                       
                       <Separator className="my-2" />

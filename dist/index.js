@@ -188,6 +188,7 @@ __export(schema_exports, {
   insertSubscriptionPlanSchema: () => insertSubscriptionPlanSchema,
   insertSubscriptionSchema: () => insertSubscriptionSchema,
   insertSupportTicketSchema: () => insertSupportTicketSchema,
+  insertSystemConfigSchema: () => insertSystemConfigSchema,
   insertSystemMetricSchema: () => insertSystemMetricSchema,
   insertTeamsMeetingSchema: () => insertTeamsMeetingSchema,
   insertTermsAndConditionsSchema: () => insertTermsAndConditionsSchema,
@@ -246,6 +247,7 @@ __export(schema_exports, {
   subscriptions: () => subscriptions,
   superUserOverrides: () => superUserOverrides,
   supportTickets: () => supportTickets,
+  systemConfig: () => systemConfig,
   systemMetrics: () => systemMetrics,
   teamsMeetings: () => teamsMeetings,
   termsAndConditions: () => termsAndConditions,
@@ -260,10 +262,10 @@ __export(schema_exports, {
   verifyOtpSchema: () => verifyOtpSchema
 });
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb, boolean, integer, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, boolean, integer, bigint, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-var sessions, users, conversations, audioSources, messages, teamsMeetings, insertUserSchema, insertConversationSchema, insertMessageSchema, insertTeamsMeetingSchema, insertAudioSourceSchema, AUDIO_SOURCE_TYPES, productReference, USER_ROLES, authUsers, superUserOverrides, otps, passwordResetTokens, refreshTokens, addons, subscriptionPlans, subscriptionPlansHistory, addonsHistory, subscriptions, payments, promoCodes, auditLogs, sessionUsage, sessionMinutesPurchases, AI_PROVIDERS, aiTokenUsage, organizations, organizationMemberships, licensePackages, licenseAssignments, billingAdjustments, enterprisePromoCodes, enterprisePromoCodeUsages, insertAuthUserSchema, registerUserSchema, loginSchema, verifyOtpSchema, insertOtpSchema, insertPasswordResetTokenSchema, requestPasswordResetSchema, resetPasswordSchema, insertAITokenUsageSchema, insertAddonSchema, insertSubscriptionPlanSchema, insertSubscriptionPlanHistorySchema, insertAddonHistorySchema, CHANGE_TYPES, REASON_CODES, REASON_CODE_LABELS, insertSubscriptionSchema, insertPaymentSchema, insertPromoCodeSchema, insertSessionUsageSchema, insertSessionMinutesPurchaseSchema, leads, insertLeadSchema, domainExpertise, trainingDocuments, insertDomainExpertiseSchema, updateDomainExpertiseSchema, insertTrainingDocumentSchema, knowledgeCategories, knowledgeEntries, insertKnowledgeEntrySchema, systemMetrics, announcements, supportTickets, insertSystemMetricSchema, insertAnnouncementSchema, insertSupportTicketSchema, refunds, timeExtensions, insertRefundSchema, insertTimeExtensionSchema, insertOrganizationSchema, insertOrganizationMembershipSchema, insertLicensePackageSchema, insertLicenseAssignmentSchema, insertBillingAdjustmentSchema, insertEnterprisePromoCodeSchema, insertEnterprisePromoCodeUsageSchema, purchaseEnterpriseLicenseSchema, addSeatsSchema, assignLicenseSchema, reassignLicenseSchema, gatewayProviders, gatewayTransactions, gatewayWebhooks, addonPurchases, sessionMinutesUsage, daiUsageLogs, enterpriseUserAssignments, activationInvites, adminActionsLog, userEntitlements, insertGatewayProviderSchema, insertGatewayTransactionSchema, insertAddonPurchaseSchema, insertSessionMinutesUsageSchema, insertDaiUsageLogSchema, insertEnterpriseUserAssignmentSchema, insertActivationInviteSchema, insertAdminActionLogSchema, insertUserEntitlementSchema, pendingOrders, insertPendingOrderSchema, purchaseSessionMinutesSchema, purchasePlatformAccessSchema, purchaseTrainMeSchema, purchaseDaiSchema, cartItems, insertCartItemSchema, cartCheckoutSchema, caseStudies, insertCaseStudySchema, products, insertProductSchema, implementationPlaybooks, insertImplementationPlaybookSchema, promptTemplates, insertPromptTemplateSchema, conversationIntents, insertConversationIntentSchema, buyerStages, insertBuyerStageSchema, conversationMemories, insertConversationMemorySchema, userProfiles, insertUserProfileSchema, callRecordings, insertCallRecordingSchema, callMeetingMinutes, insertCallMeetingMinutesSchema, discoveryInsightsSchema, closingPitchSchema, productAnalysisSchema, salesScriptSchema, productResponseItemSchema, multiProductResponseSchema, trafficLogs, insertTrafficLogSchema, adminUpdateOrganizationSchema, adminAddSeatsSchema, adminAssignLicenseSchema, adminRevokeLicenseSchema, adminExtendSubscriptionSchema, licenseRenewalSchema, conversationMinutesBackup, insertConversationMinutesBackupSchema, SALES_INTENT_TYPES, salesIntelligenceKnowledge, salesIntelligenceSuggestions, salesIntelligenceLearningLogs, salesIntelligenceExports, insertSalesIntelligenceKnowledgeSchema, insertSalesIntelligenceSuggestionSchema, insertSalesIntelligenceLearningLogSchema, insertSalesIntelligenceExportSchema, marketingAccess, marketingUserSettings, marketingGeneratedContent, insertMarketingAccessSchema, insertMarketingUserSettingsSchema, insertMarketingGeneratedContentSchema, apiKeys, apiKeyUsageLogs, insertApiKeySchema, insertApiKeyUsageLogSchema, termsAndConditions, insertTermsAndConditionsSchema, userFeedback;
+var sessions, users, conversations, audioSources, messages, teamsMeetings, insertUserSchema, insertConversationSchema, insertMessageSchema, insertTeamsMeetingSchema, insertAudioSourceSchema, AUDIO_SOURCE_TYPES, productReference, USER_ROLES, authUsers, superUserOverrides, otps, passwordResetTokens, refreshTokens, addons, subscriptionPlans, subscriptionPlansHistory, addonsHistory, subscriptions, payments, promoCodes, auditLogs, sessionUsage, sessionMinutesPurchases, AI_PROVIDERS, aiTokenUsage, organizations, organizationMemberships, licensePackages, licenseAssignments, billingAdjustments, enterprisePromoCodes, enterprisePromoCodeUsages, insertAuthUserSchema, registerUserSchema, loginSchema, verifyOtpSchema, insertOtpSchema, insertPasswordResetTokenSchema, requestPasswordResetSchema, resetPasswordSchema, insertAITokenUsageSchema, insertAddonSchema, insertSubscriptionPlanSchema, insertSubscriptionPlanHistorySchema, insertAddonHistorySchema, CHANGE_TYPES, REASON_CODES, REASON_CODE_LABELS, insertSubscriptionSchema, insertPaymentSchema, insertPromoCodeSchema, insertSessionUsageSchema, insertSessionMinutesPurchaseSchema, leads, insertLeadSchema, domainExpertise, trainingDocuments, insertDomainExpertiseSchema, updateDomainExpertiseSchema, insertTrainingDocumentSchema, knowledgeCategories, knowledgeEntries, insertKnowledgeEntrySchema, systemMetrics, announcements, supportTickets, insertSystemMetricSchema, insertAnnouncementSchema, insertSupportTicketSchema, refunds, timeExtensions, insertRefundSchema, insertTimeExtensionSchema, insertOrganizationSchema, insertOrganizationMembershipSchema, insertLicensePackageSchema, insertLicenseAssignmentSchema, insertBillingAdjustmentSchema, insertEnterprisePromoCodeSchema, insertEnterprisePromoCodeUsageSchema, purchaseEnterpriseLicenseSchema, addSeatsSchema, assignLicenseSchema, reassignLicenseSchema, gatewayProviders, gatewayTransactions, gatewayWebhooks, addonPurchases, sessionMinutesUsage, daiUsageLogs, enterpriseUserAssignments, activationInvites, adminActionsLog, userEntitlements, insertGatewayProviderSchema, insertGatewayTransactionSchema, insertAddonPurchaseSchema, insertSessionMinutesUsageSchema, insertDaiUsageLogSchema, insertEnterpriseUserAssignmentSchema, insertActivationInviteSchema, insertAdminActionLogSchema, insertUserEntitlementSchema, pendingOrders, insertPendingOrderSchema, purchaseSessionMinutesSchema, purchasePlatformAccessSchema, purchaseTrainMeSchema, purchaseDaiSchema, cartItems, insertCartItemSchema, cartCheckoutSchema, caseStudies, insertCaseStudySchema, products, insertProductSchema, implementationPlaybooks, insertImplementationPlaybookSchema, promptTemplates, insertPromptTemplateSchema, conversationIntents, insertConversationIntentSchema, buyerStages, insertBuyerStageSchema, conversationMemories, insertConversationMemorySchema, userProfiles, insertUserProfileSchema, callRecordings, insertCallRecordingSchema, callMeetingMinutes, insertCallMeetingMinutesSchema, discoveryInsightsSchema, closingPitchSchema, productAnalysisSchema, salesScriptSchema, productResponseItemSchema, multiProductResponseSchema, trafficLogs, insertTrafficLogSchema, adminUpdateOrganizationSchema, adminAddSeatsSchema, adminAssignLicenseSchema, adminRevokeLicenseSchema, adminExtendSubscriptionSchema, licenseRenewalSchema, conversationMinutesBackup, insertConversationMinutesBackupSchema, SALES_INTENT_TYPES, salesIntelligenceKnowledge, salesIntelligenceSuggestions, salesIntelligenceLearningLogs, salesIntelligenceExports, insertSalesIntelligenceKnowledgeSchema, insertSalesIntelligenceSuggestionSchema, insertSalesIntelligenceLearningLogSchema, insertSalesIntelligenceExportSchema, marketingAccess, marketingUserSettings, marketingGeneratedContent, insertMarketingAccessSchema, insertMarketingUserSettingsSchema, insertMarketingGeneratedContentSchema, apiKeys, apiKeyUsageLogs, insertApiKeySchema, insertApiKeyUsageLogSchema, termsAndConditions, insertTermsAndConditionsSchema, userFeedback, systemConfig, insertSystemConfigSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -800,7 +802,13 @@ var init_schema = __esm({
       durationSeconds: varchar("duration_seconds", { length: 20 }),
       // Duration in seconds (stored as string for precision)
       status: varchar("status", { length: 20 }).notNull().default("active"),
-      // 'active' or 'ended'
+      // 'active', 'paused', or 'ended'
+      lastResumeTime: timestamp("last_resume_time"),
+      // When session was last resumed (for calculating running time)
+      accumulatedDurationMs: bigint("accumulated_duration_ms", { mode: "number" }).notNull().default(0),
+      // Total accumulated time in ms
+      isPaused: boolean("is_paused").notNull().default(false),
+      // Whether session is currently paused
       createdAt: timestamp("created_at").defaultNow()
     });
     sessionMinutesPurchases = pgTable("session_minutes_purchases", {
@@ -2519,6 +2527,25 @@ var init_schema = __esm({
       createdAt: timestamp("created_at").defaultNow(),
       updatedAt: timestamp("updated_at").defaultNow()
     });
+    systemConfig = pgTable("system_config", {
+      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+      key: varchar("key", { length: 255 }).notNull().unique(),
+      value: text("value"),
+      section: varchar("section", { length: 50 }).notNull(),
+      // email, payment, ai, system, security
+      description: text("description"),
+      updatedBy: varchar("updated_by").references(() => authUsers.id, { onDelete: "set null" }),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    }, (table) => [
+      index("idx_system_config_section").on(table.section),
+      index("idx_system_config_key").on(table.key)
+    ]);
+    insertSystemConfigSchema = createInsertSchema(systemConfig).omit({
+      id: true,
+      createdAt: true,
+      updatedAt: true
+    });
   }
 });
 
@@ -2758,8 +2785,10 @@ var init_storage_auth = __esm({
       }
       // Subscription operations
       async createSubscription(data) {
+        const planId = data.planType === "free_trial" || data.planId === "free_trial" ? null : data.planId;
         const [subscription] = await db.insert(subscriptions).values({
           ...data,
+          planId,
           planType: data.planType || "free_trial",
           sessionsUsed: data.sessionsUsed || "0",
           // For paid subscriptions, DO NOT set default limits (leave them null for unlimited)
@@ -4389,6 +4418,21 @@ var init_storage_auth = __esm({
         ));
         return membership || null;
       }
+      /** If user has active license assignment but no org membership, create membership from assignment's org. Fixes assigned users who never got membership. */
+      async ensureOrganizationMembershipFromAssignment(userId) {
+        const assignment = await this.getUserActiveLicenseAssignment(userId);
+        if (!assignment) return null;
+        const pkg = await this.getLicensePackageById(assignment.licensePackageId);
+        if (!pkg?.organizationId) return null;
+        const existing = await this.getUserMembership(userId);
+        if (existing) return existing;
+        return this.createOrganizationMembership({
+          organizationId: pkg.organizationId,
+          userId,
+          role: "member",
+          status: "active"
+        });
+      }
       async updateMembershipStatus(id, status) {
         const [membership] = await db.update(organizationMemberships).set({
           status,
@@ -4811,7 +4855,23 @@ var init_storage_auth = __esm({
           createdAt: organization.createdAt ? new Date(organization.createdAt).toISOString() : (/* @__PURE__ */ new Date()).toISOString(),
           updatedAt: organization.updatedAt ? new Date(organization.updatedAt).toISOString() : (/* @__PURE__ */ new Date()).toISOString()
         };
-        const addonsDTO = [];
+        const orgAddons = await this.getOrganizationAddons(organizationId);
+        const addonDisplayName = (type, slug) => type === "session_minutes" ? "Session Minutes" : type === "train_me" ? "Train Me" : type === "dai" ? "DAI" : type === "platform_access" ? "Platform Access" : slug;
+        const addonsDTO = orgAddons.map((a) => ({
+          id: a.id,
+          displayName: a.displayName && a.displayName !== a.slug ? a.displayName : addonDisplayName(a.type, a.slug),
+          status: a.status,
+          startDate: a.startDate,
+          endDate: a.endDate ?? a.renewalDate ?? null,
+          details: {
+            type: a.type,
+            totalUnits: a.totalUnits,
+            usedUnits: a.usedUnits,
+            totalPrice: a.totalPrice,
+            currency: a.currency,
+            description: a.type === "session_minutes" ? `${a.totalUnits} minutes (${a.usedUnits} used)` : a.type === "train_me" ? "Train Me add-on" : a.type === "dai" ? "DAI tokens" : a.slug
+          }
+        }));
         return {
           organization: organizationDTO,
           activePackage: activePackage ? {
@@ -5324,6 +5384,9 @@ var init_storage = __esm({
           userId: insertUsage.userId,
           sessionId: insertUsage.sessionId,
           startTime: insertUsage.startTime,
+          lastResumeTime: insertUsage.lastResumeTime || insertUsage.startTime,
+          accumulatedDurationMs: insertUsage.accumulatedDurationMs || 0,
+          isPaused: insertUsage.isPaused || false,
           endTime: insertUsage.endTime || null,
           durationSeconds: insertUsage.durationSeconds || null,
           status: insertUsage.status || "active"
@@ -5336,10 +5399,10 @@ var init_storage = __esm({
         if (memoryUsage) return memoryUsage;
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { sessionUsage: sessionUsageTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22 } = await import("drizzle-orm");
+        const { eq: eq27, and: and22 } = await import("drizzle-orm");
         const [usage] = await db2.select().from(sessionUsageTable).where(and22(
-          eq26(sessionUsageTable.userId, userId),
-          eq26(sessionUsageTable.sessionId, sessionId)
+          eq27(sessionUsageTable.userId, userId),
+          eq27(sessionUsageTable.sessionId, sessionId)
         )).limit(1);
         if (usage) {
           this.sessionUsage.set(`${userId}_${sessionId}`, usage);
@@ -5349,10 +5412,10 @@ var init_storage = __esm({
       async updateSessionUsage(sessionId, userId, updates) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { sessionUsage: sessionUsageTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22 } = await import("drizzle-orm");
+        const { eq: eq27, and: and22 } = await import("drizzle-orm");
         const [updated] = await db2.update(sessionUsageTable).set(updates).where(and22(
-          eq26(sessionUsageTable.userId, userId),
-          eq26(sessionUsageTable.sessionId, sessionId)
+          eq27(sessionUsageTable.userId, userId),
+          eq27(sessionUsageTable.sessionId, sessionId)
         )).returning();
         if (updated) {
           const key = `${userId}_${sessionId}`;
@@ -5363,8 +5426,8 @@ var init_storage = __esm({
       async getUserSessionUsage(userId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { sessionUsage: sessionUsageTable } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, desc: desc15 } = await import("drizzle-orm");
-        const allUsage = await db2.select().from(sessionUsageTable).where(eq26(sessionUsageTable.userId, userId)).orderBy(desc15(sessionUsageTable.startTime));
+        const { eq: eq27, desc: desc15 } = await import("drizzle-orm");
+        const allUsage = await db2.select().from(sessionUsageTable).where(eq27(sessionUsageTable.userId, userId)).orderBy(desc15(sessionUsageTable.startTime));
         return allUsage;
       }
       async createLead(insertLead) {
@@ -5384,10 +5447,10 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { domainExpertise: domainExpertise2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22 } = await import("drizzle-orm");
           const domains = await db2.select().from(domainExpertise2).where(and22(
-            eq26(domainExpertise2.userId, userId),
-            eq26(domainExpertise2.isActive, true)
+            eq27(domainExpertise2.userId, userId),
+            eq27(domainExpertise2.isActive, true)
           ));
           return domains;
         } catch (error) {
@@ -5398,41 +5461,41 @@ var init_storage = __esm({
       async getDomainExpertise(id, userId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { domainExpertise: domainExpertise2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22 } = await import("drizzle-orm");
+        const { eq: eq27, and: and22 } = await import("drizzle-orm");
         const [domain] = await db2.select().from(domainExpertise2).where(and22(
-          eq26(domainExpertise2.id, id),
-          eq26(domainExpertise2.userId, userId)
+          eq27(domainExpertise2.id, id),
+          eq27(domainExpertise2.userId, userId)
         ));
         return domain;
       }
       async getDomainExpertiseByName(name, userId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { domainExpertise: domainExpertise2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22, ilike: ilike3 } = await import("drizzle-orm");
+        const { eq: eq27, and: and22, ilike: ilike3 } = await import("drizzle-orm");
         const [domain] = await db2.select().from(domainExpertise2).where(and22(
           ilike3(domainExpertise2.name, name),
-          eq26(domainExpertise2.userId, userId),
-          eq26(domainExpertise2.isActive, true)
+          eq27(domainExpertise2.userId, userId),
+          eq27(domainExpertise2.isActive, true)
         ));
         return domain;
       }
       async updateDomainExpertise(id, userId, updates) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { domainExpertise: domainExpertise2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22 } = await import("drizzle-orm");
+        const { eq: eq27, and: and22 } = await import("drizzle-orm");
         const [updated] = await db2.update(domainExpertise2).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(and22(
-          eq26(domainExpertise2.id, id),
-          eq26(domainExpertise2.userId, userId)
+          eq27(domainExpertise2.id, id),
+          eq27(domainExpertise2.userId, userId)
         )).returning();
         return updated;
       }
       async deleteDomainExpertise(id, userId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { domainExpertise: domainExpertise2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22 } = await import("drizzle-orm");
+        const { eq: eq27, and: and22 } = await import("drizzle-orm");
         await db2.update(domainExpertise2).set({ isActive: false }).where(and22(
-          eq26(domainExpertise2.id, id),
-          eq26(domainExpertise2.userId, userId)
+          eq27(domainExpertise2.id, id),
+          eq27(domainExpertise2.userId, userId)
         ));
       }
       // Train Me feature - Training Documents management
@@ -5445,68 +5508,68 @@ var init_storage = __esm({
       async getTrainingDocumentsByDomain(domainId, userId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { trainingDocuments: trainingDocuments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22 } = await import("drizzle-orm");
+        const { eq: eq27, and: and22 } = await import("drizzle-orm");
         const documents = await db2.select().from(trainingDocuments2).where(and22(
-          eq26(trainingDocuments2.domainExpertiseId, domainId),
-          eq26(trainingDocuments2.userId, userId)
+          eq27(trainingDocuments2.domainExpertiseId, domainId),
+          eq27(trainingDocuments2.userId, userId)
         ));
         return documents;
       }
       async getAllUserTrainingDocuments(userId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { trainingDocuments: trainingDocuments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26 } = await import("drizzle-orm");
-        const documents = await db2.select().from(trainingDocuments2).where(eq26(trainingDocuments2.userId, userId));
+        const { eq: eq27 } = await import("drizzle-orm");
+        const documents = await db2.select().from(trainingDocuments2).where(eq27(trainingDocuments2.userId, userId));
         return documents;
       }
       async countUserTrainingDocuments(userId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { trainingDocuments: trainingDocuments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, count } = await import("drizzle-orm");
-        const result = await db2.select({ count: count() }).from(trainingDocuments2).where(eq26(trainingDocuments2.userId, userId));
+        const { eq: eq27, count } = await import("drizzle-orm");
+        const result = await db2.select({ count: count() }).from(trainingDocuments2).where(eq27(trainingDocuments2.userId, userId));
         const countValue = result[0]?.count;
         return countValue ? Number(countValue) : 0;
       }
       async getTrainingDocument(id, userId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { trainingDocuments: trainingDocuments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22 } = await import("drizzle-orm");
+        const { eq: eq27, and: and22 } = await import("drizzle-orm");
         const [document] = await db2.select().from(trainingDocuments2).where(and22(
-          eq26(trainingDocuments2.id, id),
-          eq26(trainingDocuments2.userId, userId)
+          eq27(trainingDocuments2.id, id),
+          eq27(trainingDocuments2.userId, userId)
         ));
         return document;
       }
       async updateTrainingDocument(id, userId, updates) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { trainingDocuments: trainingDocuments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22 } = await import("drizzle-orm");
+        const { eq: eq27, and: and22 } = await import("drizzle-orm");
         const [updated] = await db2.update(trainingDocuments2).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(and22(
-          eq26(trainingDocuments2.id, id),
-          eq26(trainingDocuments2.userId, userId)
+          eq27(trainingDocuments2.id, id),
+          eq27(trainingDocuments2.userId, userId)
         )).returning();
         return updated;
       }
       async deleteTrainingDocument(id, userId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { trainingDocuments: trainingDocuments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22 } = await import("drizzle-orm");
+        const { eq: eq27, and: and22 } = await import("drizzle-orm");
         await db2.delete(trainingDocuments2).where(and22(
-          eq26(trainingDocuments2.id, id),
-          eq26(trainingDocuments2.userId, userId)
+          eq27(trainingDocuments2.id, id),
+          eq27(trainingDocuments2.userId, userId)
         ));
       }
       async searchTrainingDocuments(userId, query, domainId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { trainingDocuments: trainingDocuments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22, ilike: ilike3, or: or8 } = await import("drizzle-orm");
-        const conditions = [eq26(trainingDocuments2.userId, userId)];
+        const { eq: eq27, and: and22, ilike: ilike3, or: or9 } = await import("drizzle-orm");
+        const conditions = [eq27(trainingDocuments2.userId, userId)];
         if (domainId) {
-          conditions.push(eq26(trainingDocuments2.domainExpertiseId, domainId));
+          conditions.push(eq27(trainingDocuments2.domainExpertiseId, domainId));
         }
         const searchPattern = `%${query}%`;
         conditions.push(
-          or8(
+          or9(
             ilike3(trainingDocuments2.fileName, searchPattern),
             ilike3(trainingDocuments2.content, searchPattern),
             ilike3(trainingDocuments2.summary, searchPattern)
@@ -5525,75 +5588,75 @@ var init_storage = __esm({
       async getKnowledgeEntriesByDomain(domainId, userId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22 } = await import("drizzle-orm");
+        const { eq: eq27, and: and22 } = await import("drizzle-orm");
         const entries = await db2.select().from(knowledgeEntries2).where(and22(
-          eq26(knowledgeEntries2.domainExpertiseId, domainId),
-          eq26(knowledgeEntries2.userId, userId)
+          eq27(knowledgeEntries2.domainExpertiseId, domainId),
+          eq27(knowledgeEntries2.userId, userId)
         ));
         return entries;
       }
       async getAllUserKnowledgeEntries(userId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26 } = await import("drizzle-orm");
-        const entries = await db2.select().from(knowledgeEntries2).where(eq26(knowledgeEntries2.userId, userId));
+        const { eq: eq27 } = await import("drizzle-orm");
+        const entries = await db2.select().from(knowledgeEntries2).where(eq27(knowledgeEntries2.userId, userId));
         return entries;
       }
       async getKnowledgeEntry(id, userId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22 } = await import("drizzle-orm");
+        const { eq: eq27, and: and22 } = await import("drizzle-orm");
         const [entry] = await db2.select().from(knowledgeEntries2).where(and22(
-          eq26(knowledgeEntries2.id, id),
-          eq26(knowledgeEntries2.userId, userId)
+          eq27(knowledgeEntries2.id, id),
+          eq27(knowledgeEntries2.userId, userId)
         ));
         return entry;
       }
       async updateKnowledgeEntry(id, userId, updates) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22 } = await import("drizzle-orm");
+        const { eq: eq27, and: and22 } = await import("drizzle-orm");
         const [updated] = await db2.update(knowledgeEntries2).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(and22(
-          eq26(knowledgeEntries2.id, id),
-          eq26(knowledgeEntries2.userId, userId)
+          eq27(knowledgeEntries2.id, id),
+          eq27(knowledgeEntries2.userId, userId)
         )).returning();
         return updated;
       }
       async updateKnowledgeEntryEmbedding(id, embedding) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26 } = await import("drizzle-orm");
-        await db2.update(knowledgeEntries2).set({ embedding, updatedAt: /* @__PURE__ */ new Date() }).where(eq26(knowledgeEntries2.id, id));
+        const { eq: eq27 } = await import("drizzle-orm");
+        await db2.update(knowledgeEntries2).set({ embedding, updatedAt: /* @__PURE__ */ new Date() }).where(eq27(knowledgeEntries2.id, id));
       }
       async deleteKnowledgeEntry(id, userId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22 } = await import("drizzle-orm");
+        const { eq: eq27, and: and22 } = await import("drizzle-orm");
         await db2.delete(knowledgeEntries2).where(and22(
-          eq26(knowledgeEntries2.id, id),
-          eq26(knowledgeEntries2.userId, userId)
+          eq27(knowledgeEntries2.id, id),
+          eq27(knowledgeEntries2.userId, userId)
         ));
       }
       async deleteKnowledgeEntriesByDomain(domainId, userId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22 } = await import("drizzle-orm");
+        const { eq: eq27, and: and22 } = await import("drizzle-orm");
         await db2.delete(knowledgeEntries2).where(and22(
-          eq26(knowledgeEntries2.domainExpertiseId, domainId),
-          eq26(knowledgeEntries2.userId, userId)
+          eq27(knowledgeEntries2.domainExpertiseId, domainId),
+          eq27(knowledgeEntries2.userId, userId)
         ));
       }
       async searchKnowledgeEntries(userId, query, category) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22, ilike: ilike3, or: or8 } = await import("drizzle-orm");
-        const conditions = [eq26(knowledgeEntries2.userId, userId)];
+        const { eq: eq27, and: and22, ilike: ilike3, or: or9 } = await import("drizzle-orm");
+        const conditions = [eq27(knowledgeEntries2.userId, userId)];
         if (category) {
-          conditions.push(eq26(knowledgeEntries2.category, category));
+          conditions.push(eq27(knowledgeEntries2.category, category));
         }
         const searchPattern = `%${query}%`;
         conditions.push(
-          or8(
+          or9(
             ilike3(knowledgeEntries2.title, searchPattern),
             ilike3(knowledgeEntries2.content, searchPattern)
           )
@@ -5616,24 +5679,24 @@ var init_storage = __esm({
       async updateSubscriptionPlan(id, updates) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { subscriptionPlans: subscriptionPlans3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26 } = await import("drizzle-orm");
-        const [updated] = await db2.update(subscriptionPlans3).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq26(subscriptionPlans3.id, id)).returning();
+        const { eq: eq27 } = await import("drizzle-orm");
+        const [updated] = await db2.update(subscriptionPlans3).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq27(subscriptionPlans3.id, id)).returning();
         return updated;
       }
       async deleteSubscriptionPlan(id) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { subscriptionPlans: subscriptionPlans3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26 } = await import("drizzle-orm");
-        const result = await db2.delete(subscriptionPlans3).where(eq26(subscriptionPlans3.id, id)).returning();
+        const { eq: eq27 } = await import("drizzle-orm");
+        const result = await db2.delete(subscriptionPlans3).where(eq27(subscriptionPlans3.id, id)).returning();
         return result.length > 0;
       }
       async planHasActiveSubscriptions(planId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { subscriptions: subscriptions2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26, and: and22 } = await import("drizzle-orm");
+        const { eq: eq27, and: and22 } = await import("drizzle-orm");
         const activeSubscriptions = await db2.select().from(subscriptions2).where(and22(
-          eq26(subscriptions2.planId, planId),
-          eq26(subscriptions2.status, "active")
+          eq27(subscriptions2.planId, planId),
+          eq27(subscriptions2.status, "active")
         )).limit(1);
         return activeSubscriptions.length > 0;
       }
@@ -5652,22 +5715,22 @@ var init_storage = __esm({
       async updateAddon(id, updates) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { addons: addons2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26 } = await import("drizzle-orm");
-        const [updated] = await db2.update(addons2).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq26(addons2.id, id)).returning();
+        const { eq: eq27 } = await import("drizzle-orm");
+        const [updated] = await db2.update(addons2).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq27(addons2.id, id)).returning();
         return updated;
       }
       async deleteAddon(id) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { addons: addons2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { eq: eq26 } = await import("drizzle-orm");
-        const result = await db2.delete(addons2).where(eq26(addons2.id, id)).returning();
+        const { eq: eq27 } = await import("drizzle-orm");
+        const result = await db2.delete(addons2).where(eq27(addons2.id, id)).returning();
         return result.length > 0;
       }
       async addonIsReferencedByPlans(addonId) {
         const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
         const { subscriptionPlans: subscriptionPlans3 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-        const { sql: sql15 } = await import("drizzle-orm");
-        const referencingPlans = await db2.select().from(subscriptionPlans3).where(sql15`${subscriptionPlans3.requiredAddons}::text LIKE ${"%" + addonId + "%"}`).limit(1);
+        const { sql: sql16 } = await import("drizzle-orm");
+        const referencingPlans = await db2.select().from(subscriptionPlans3).where(sql16`${subscriptionPlans3.requiredAddons}::text LIKE ${"%" + addonId + "%"}`).limit(1);
         return referencingPlans.length > 0;
       }
       async createConversationMemory(memory) {
@@ -5855,10 +5918,10 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { domainExpertise: domainExpertise2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22 } = await import("drizzle-orm");
           const domains = await db2.select().from(domainExpertise2).where(and22(
-            eq26(domainExpertise2.userId, userId),
-            eq26(domainExpertise2.isActive, true)
+            eq27(domainExpertise2.userId, userId),
+            eq27(domainExpertise2.isActive, true)
           ));
           return domains;
         } catch (error) {
@@ -5870,11 +5933,11 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { domainExpertise: domainExpertise2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22 } = await import("drizzle-orm");
           const [domain] = await db2.select().from(domainExpertise2).where(and22(
-            eq26(domainExpertise2.id, id),
-            eq26(domainExpertise2.userId, userId),
-            eq26(domainExpertise2.isActive, true)
+            eq27(domainExpertise2.id, id),
+            eq27(domainExpertise2.userId, userId),
+            eq27(domainExpertise2.isActive, true)
           ));
           return domain;
         } catch (error) {
@@ -5886,11 +5949,11 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { domainExpertise: domainExpertise2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22 } = await import("drizzle-orm");
           const [domain] = await db2.select().from(domainExpertise2).where(and22(
-            eq26(domainExpertise2.name, name),
-            eq26(domainExpertise2.userId, userId),
-            eq26(domainExpertise2.isActive, true)
+            eq27(domainExpertise2.name, name),
+            eq27(domainExpertise2.userId, userId),
+            eq27(domainExpertise2.isActive, true)
           ));
           return domain;
         } catch (error) {
@@ -5902,10 +5965,10 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { domainExpertise: domainExpertise2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22 } = await import("drizzle-orm");
           const [updated] = await db2.update(domainExpertise2).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(and22(
-            eq26(domainExpertise2.id, id),
-            eq26(domainExpertise2.userId, userId)
+            eq27(domainExpertise2.id, id),
+            eq27(domainExpertise2.userId, userId)
           )).returning();
           return updated;
         } catch (error) {
@@ -5917,10 +5980,10 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { domainExpertise: domainExpertise2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22 } = await import("drizzle-orm");
           await db2.update(domainExpertise2).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(and22(
-            eq26(domainExpertise2.id, id),
-            eq26(domainExpertise2.userId, userId)
+            eq27(domainExpertise2.id, id),
+            eq27(domainExpertise2.userId, userId)
           ));
         } catch (error) {
           console.error("Error deleting domain expertise:", error);
@@ -5943,10 +6006,10 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { trainingDocuments: trainingDocuments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22 } = await import("drizzle-orm");
           const docs = await db2.select().from(trainingDocuments2).where(and22(
-            eq26(trainingDocuments2.domainExpertiseId, domainId),
-            eq26(trainingDocuments2.userId, userId)
+            eq27(trainingDocuments2.domainExpertiseId, domainId),
+            eq27(trainingDocuments2.userId, userId)
           ));
           return docs;
         } catch (error) {
@@ -5958,8 +6021,8 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { trainingDocuments: trainingDocuments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26 } = await import("drizzle-orm");
-          const docs = await db2.select().from(trainingDocuments2).where(eq26(trainingDocuments2.userId, userId));
+          const { eq: eq27 } = await import("drizzle-orm");
+          const docs = await db2.select().from(trainingDocuments2).where(eq27(trainingDocuments2.userId, userId));
           return docs;
         } catch (error) {
           console.error("Error fetching all user training documents:", error);
@@ -5970,8 +6033,8 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { trainingDocuments: trainingDocuments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, count } = await import("drizzle-orm");
-          const result = await db2.select({ count: count() }).from(trainingDocuments2).where(eq26(trainingDocuments2.userId, userId));
+          const { eq: eq27, count } = await import("drizzle-orm");
+          const result = await db2.select({ count: count() }).from(trainingDocuments2).where(eq27(trainingDocuments2.userId, userId));
           return result[0]?.count || 0;
         } catch (error) {
           console.error("Error counting user training documents:", error);
@@ -5982,10 +6045,10 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { trainingDocuments: trainingDocuments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22 } = await import("drizzle-orm");
           const [doc] = await db2.select().from(trainingDocuments2).where(and22(
-            eq26(trainingDocuments2.id, id),
-            eq26(trainingDocuments2.userId, userId)
+            eq27(trainingDocuments2.id, id),
+            eq27(trainingDocuments2.userId, userId)
           ));
           return doc;
         } catch (error) {
@@ -5997,10 +6060,10 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { trainingDocuments: trainingDocuments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22 } = await import("drizzle-orm");
           const [updated] = await db2.update(trainingDocuments2).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(and22(
-            eq26(trainingDocuments2.id, id),
-            eq26(trainingDocuments2.userId, userId)
+            eq27(trainingDocuments2.id, id),
+            eq27(trainingDocuments2.userId, userId)
           )).returning();
           return updated;
         } catch (error) {
@@ -6012,10 +6075,10 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { trainingDocuments: trainingDocuments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22 } = await import("drizzle-orm");
           await db2.delete(trainingDocuments2).where(and22(
-            eq26(trainingDocuments2.id, id),
-            eq26(trainingDocuments2.userId, userId)
+            eq27(trainingDocuments2.id, id),
+            eq27(trainingDocuments2.userId, userId)
           ));
         } catch (error) {
           console.error("Error deleting training document:", error);
@@ -6026,14 +6089,14 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { trainingDocuments: trainingDocuments2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22, ilike: ilike3, or: or8 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22, ilike: ilike3, or: or9 } = await import("drizzle-orm");
           const searchPattern = `%${query}%`;
-          const conditions = [eq26(trainingDocuments2.userId, userId)];
+          const conditions = [eq27(trainingDocuments2.userId, userId)];
           if (domainId) {
-            conditions.push(eq26(trainingDocuments2.domainExpertiseId, domainId));
+            conditions.push(eq27(trainingDocuments2.domainExpertiseId, domainId));
           }
           conditions.push(
-            or8(
+            or9(
               ilike3(trainingDocuments2.title, searchPattern),
               ilike3(trainingDocuments2.content, searchPattern)
             )
@@ -6061,10 +6124,10 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22 } = await import("drizzle-orm");
           const entries = await db2.select().from(knowledgeEntries2).where(and22(
-            eq26(knowledgeEntries2.domainExpertiseId, domainId),
-            eq26(knowledgeEntries2.userId, userId)
+            eq27(knowledgeEntries2.domainExpertiseId, domainId),
+            eq27(knowledgeEntries2.userId, userId)
           ));
           return entries;
         } catch (error) {
@@ -6076,8 +6139,8 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26 } = await import("drizzle-orm");
-          const entries = await db2.select().from(knowledgeEntries2).where(eq26(knowledgeEntries2.userId, userId));
+          const { eq: eq27 } = await import("drizzle-orm");
+          const entries = await db2.select().from(knowledgeEntries2).where(eq27(knowledgeEntries2.userId, userId));
           return entries;
         } catch (error) {
           console.error("Error fetching all user knowledge entries:", error);
@@ -6088,10 +6151,10 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22 } = await import("drizzle-orm");
           const [entry] = await db2.select().from(knowledgeEntries2).where(and22(
-            eq26(knowledgeEntries2.id, id),
-            eq26(knowledgeEntries2.userId, userId)
+            eq27(knowledgeEntries2.id, id),
+            eq27(knowledgeEntries2.userId, userId)
           ));
           return entry;
         } catch (error) {
@@ -6103,10 +6166,10 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22 } = await import("drizzle-orm");
           const [updated] = await db2.update(knowledgeEntries2).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(and22(
-            eq26(knowledgeEntries2.id, id),
-            eq26(knowledgeEntries2.userId, userId)
+            eq27(knowledgeEntries2.id, id),
+            eq27(knowledgeEntries2.userId, userId)
           )).returning();
           return updated;
         } catch (error) {
@@ -6118,8 +6181,8 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26 } = await import("drizzle-orm");
-          await db2.update(knowledgeEntries2).set({ embedding, updatedAt: /* @__PURE__ */ new Date() }).where(eq26(knowledgeEntries2.id, id));
+          const { eq: eq27 } = await import("drizzle-orm");
+          await db2.update(knowledgeEntries2).set({ embedding, updatedAt: /* @__PURE__ */ new Date() }).where(eq27(knowledgeEntries2.id, id));
         } catch (error) {
           console.error("Error updating knowledge entry embedding:", error);
           throw error;
@@ -6129,10 +6192,10 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22 } = await import("drizzle-orm");
           await db2.delete(knowledgeEntries2).where(and22(
-            eq26(knowledgeEntries2.id, id),
-            eq26(knowledgeEntries2.userId, userId)
+            eq27(knowledgeEntries2.id, id),
+            eq27(knowledgeEntries2.userId, userId)
           ));
         } catch (error) {
           console.error("Error deleting knowledge entry:", error);
@@ -6143,10 +6206,10 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22 } = await import("drizzle-orm");
           await db2.delete(knowledgeEntries2).where(and22(
-            eq26(knowledgeEntries2.domainExpertiseId, domainId),
-            eq26(knowledgeEntries2.userId, userId)
+            eq27(knowledgeEntries2.domainExpertiseId, domainId),
+            eq27(knowledgeEntries2.userId, userId)
           ));
         } catch (error) {
           console.error("Error deleting knowledge entries by domain:", error);
@@ -6157,14 +6220,14 @@ var init_storage = __esm({
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22, ilike: ilike3, or: or8 } = await import("drizzle-orm");
+          const { eq: eq27, and: and22, ilike: ilike3, or: or9 } = await import("drizzle-orm");
           const searchPattern = `%${query}%`;
-          const conditions = [eq26(knowledgeEntries2.userId, userId)];
+          const conditions = [eq27(knowledgeEntries2.userId, userId)];
           if (category) {
-            conditions.push(eq26(knowledgeEntries2.category, category));
+            conditions.push(eq27(knowledgeEntries2.category, category));
           }
           conditions.push(
-            or8(
+            or9(
               ilike3(knowledgeEntries2.title, searchPattern),
               ilike3(knowledgeEntries2.content, searchPattern)
             )
@@ -10144,7 +10207,7 @@ var init_knowledge_service = __esm({
           // Other meaningful terms
         ].slice(0, 20);
         const industries = industryIndicators.filter((word) => text2.includes(word));
-        console.log(` Extracted keywords from transcript:`, {
+        console.log(`\u{1F50D} Extracted keywords from transcript:`, {
           problemKeywords: problemKeywords.slice(0, 10),
           productKeywords: productKeywords.slice(0, 15),
           industries
@@ -10416,105 +10479,33 @@ ${generalContext}`;
         const useGenericKnowledge = isUniversal || !hasTrainingContext;
         const caseStudiesText = useGenericKnowledge ? this.formatCaseStudies(knowledge.relevantCaseStudies) : "";
         const productsText = useGenericKnowledge ? this.formatProducts(knowledge.relevantProducts) : "";
-        return `${isUniversal ? buildUniversalRVSystemPrompt() + "\n\n" : ""}You are Rev Winner Real-Time Sales Intelligence Engine. Top 1% sales strategist and ${effectiveDomain} domain expert coaching reps during LIVE calls.
-
-CORE MISSION: Analyze live conversation, generate next best response/guidance/question/rebuttal/positioning/close recommendation with HIGH ACCURACY and SPEED. Continuously build forward - never repeat previous responses.
+        return `${isUniversal ? buildUniversalRVSystemPrompt() + "\n\n" : ""}You are Rev Winner, a real-time sales coach for LIVE calls. Domain: ${effectiveDomain}.
 
 ${isUniversal ? dynamicDomainSection + "\n\n" : ""}${domainName && !isUniversal ? `DOMAIN: ${domainName}
-` : ""}
-${cappedTraining && !isUniversal ? `TRAINING MATERIALS (ONLY source of truth - use EXCLUSIVELY):
+` : ""}${cappedTraining && !isUniversal ? `TRAINING DATA (use EXCLUSIVELY as source of truth, exact pricing only):
 ${cappedTraining}
-RULES: Only use products/solutions from training. Use exact pricing if available. Never fabricate data.
 ` : ""}${!hasTrainingContext && domainName && !isUniversal ? `No training docs for "${domainName}". Use universal knowledge.
 ` : ""}${useGenericKnowledge ? `KNOWLEDGE:
 ${productsText}
 ${caseStudiesText}` : ""}
 
-=== PHASE 1: REAL-TIME INTENT DETECTION (Execute BEFORE generating response) ===
-Detect what customer is doing RIGHT NOW:
-- ASKING A QUESTION \u2192 Answer directly first, then guide
-- OBJECTING \u2192 Activate objection engine
-- COMPARING COMPETITOR \u2192 Activate competitive positioning
-- SIGNALING DISINTEREST ("we're fine", "not interested", "not a priority") \u2192 Activate re-alignment engine
-- WALKING AWAY ("too expensive", "we'll think about it", "send proposal", "maybe next quarter") \u2192 Activate walking-away recovery
-- NEGOTIATING PRICE \u2192 Activate negotiation intelligence
-- DEFLECTING \u2192 Surface hidden concern
-- ESCALATING TO PROCUREMENT \u2192 Shift to ROI/business case language
-- ASKING TECHNICAL CLARIFICATION \u2192 Precise technical response
-- DELAYING ("no budget right now", "next quarter") \u2192 Urgency reframe with risk of inaction
+DETECT customer intent: question | objection | competitor comparison | disinterest | walking away | price negotiation | deflection | technical query | procurement escalation | delay.
 
-=== PHASE 2: OBJECTION CLASSIFICATION ===
-When objection detected, classify into: Financial | Technical | Security/Compliance | Operational complexity | Switching cost | Political/Stakeholder | Timing | Competitive | Procurement negotiation | Hidden
-No generic answers. Each category gets specialized handling.
+RESPONSE RULES:
+- Objection: empathy (1 sentence) \u2192 clarify real concern \u2192 reframe to business impact \u2192 risk of inaction \u2192 value anchor \u2192 micro-commitment
+- Walking away ("too expensive", "we'll think about it", "send proposal"): slow down \u2192 impact question \u2192 surface risk \u2192 re-anchor value \u2192 offer pilot
+- Price negotiation: trade don't discount (commitment/volume/speed) \u2192 ROI anchor \u2192 never arbitrary concession
+- Technical: precise answer, no marketing fluff
+- Disinterest: short analogy (insurance/warning light/margin leak) \u2192 risk of inaction
 
-=== PHASE 3: HIGH-QUALITY RESPONSE FRAME ===
-Every rebuttal MUST follow this structure:
-1. Tactical empathy - Short acknowledgment (1 sentence max)
-2. Precision clarification - One sharp question to understand real concern
-3. Strategic reframe - Shift lens to business impact
-4. Risk amplification - What they lose if they ignore/delay
-5. Value anchor - Tie directly to their stated outcome
-6. Micro commitment - Controlled next step (not aggressive close)
-NO fluff. NO motivational tone. NO lectures. Seller-ready language ONLY.
+Auto-select framework: SPIN/MEDDIC for mid-market, MEDDPICC/Challenger for enterprise, AIDA/PAS for SMB. Never announce framework.
 
-=== PHASE 4: ANALOGY-DRIVEN PERSUASION ===
-When disinterest or walking away detected, use SHORT powerful analogies:
-- Insurance analogy (protecting before the breach)
-- Engine warning light (ignoring early signals)
-- Air traffic control (visibility prevents collisions)
-- Cyber breach window (cost of delayed response)
-- Margin leak (small inefficiencies compounding)
-- Medical diagnosis (early detection vs emergency)
-Rules: Must connect to THEIR concern. Must highlight risk of inaction. Executive-appropriate tone. Never dramatic.
+Track: buyer persona, stage (opening\u2192discovery\u2192qualification\u2192positioning\u2192objection\u2192decision\u2192closing), BANT qualification, emotional signals, deal risk.
 
-=== PHASE 5: WALKING AWAY RECOVERY ===
-Triggers: "we are fine", "not interested", "too expensive", "we'll think", "send proposal", "already using X", "no budget", "maybe next quarter"
-Response model: 1) Slow down tone 2) Ask impact-based question 3) Surface hidden risk 4) Re-anchor value 5) Offer low-risk pilot/proof
-Do NOT push close aggressively. Re-engage through curiosity and risk awareness.
+OUTPUT: Exact seller-ready words (30-50 words per tip). Use "we/our" for product, "you/your" for customer. Never invent facts. Never guess pricing.
 
-=== PHASE 6: NEGOTIATION INTELLIGENCE ===
-When pricing pressure detected:
-1. Detect context - Real budget issue or leverage tactic?
-2. Trade, never discount - Offer: longer commitment, volume expansion, case study participation, faster decision, multi-module adoption
-3. Conditional framing - "If we structure X, we can explore Y"
-4. ROI anchor - Shift from price-per-unit to risk-per-outcome
-5. Margin guardrails - NEVER suggest arbitrary concession or raw discount
-
-=== PHASE 7: TECHNICAL OBJECTION HANDLING ===
-When technical concern detected: 1) Clarify their environment 2) Identify integration constraint 3) Explain compatibility precisely 4) Compare to industry best practice 5) Offer proof/validation
-No marketing fluff. Only precise technical language.
-
-CONTEXT AWARENESS ENGINE - Track from conversation:
-- Prospect: industry, company size, tech maturity, buyer persona (technical/executive/business owner/MSP/enterprise)
-- Stage: opening\u2192discovery\u2192pain identification\u2192qualification\u2192positioning\u2192objection handling\u2192decision\u2192closing
-- Qualification: Budget, Authority, Need, Timeline
-- Emotional signals: confidence, resistance, curiosity, trust, urgency
-- Tech environment: infrastructure, cloud, security, apps, compliance, current vendors
-
-FRAMEWORK SWITCHING ENGINE - Auto-select best framework (NEVER announce switch):
-Small/B2C: AIDA, PAS, FAB, Story Selling, Problem-Solution-Close
-Mid-market: SPIN, MEDDIC, Consultative, Solution Selling
-Enterprise: MEDDPICC, Challenger, Command of the Message, Value Selling
-Also: Sandler, BANT, GPCT, Gap Selling, Customer Centric Selling
-Switch seamlessly when context changes. Continue conversation flow naturally.
-
-SHIFT GEARS OUTPUT TYPES: next best question, risk identification, missing qualification alert, deal risk alert, objection handling, positioning recommendation, close readiness signal, trust building suggestion, walking-away recovery, negotiation guidance, re-alignment
-
-REAL-TIME ADAPTATION: After every turn detect changes in buyer intent, deal risk, competitive presence, budget confirmation, decision authority, urgency, trust level. Adapt immediately.
-
-RESPONSE QUALITY:
-- Fast, concise, contextual, seller-practical
-- High authority tone, professional, executive-ready
-- Avoid: over-explanation, academic language, generic reassurance, motivational filler
-
-ACCURACY PROTECTION:
-- Never invent facts. Never assume decision authority unless confirmed. Never skip qualification steps.
-- For pricing: EXACT values from training docs only. Never guess.
-- No fake company names. No hallucinated products. Stay in ${effectiveDomain} domain only.
-- Give exact words reps can say verbatim. Use "we/our" for product, "you/your" for customer.
-
-JSON response with LRM reasoning + exactly 3 tips:
-{"lrm_reasoning":{"stage":"opening|discovery|pain_identification|qualification|positioning|objection_handling|decision|closing","buyer_intent":"1 sentence","our_goal":"1 sentence","strategy":"1 sentence","framework":"auto-detected framework name","deal_risk":"low|medium|high","emotional_signal":"dominant signal","detected_intent":"question|objection|disinterest|walking_away|negotiation|deflection|technical_clarification|procurement_escalation|delay|normal"},"tips":[{"type":"next_step|objection|rebuttal|technical|psychological|closure|competitive|discovery|qualification|trust_building|risk_alert|walking_away_recovery|negotiation|re_alignment","title":"10 words max","action":"Exact words to say (30-50 words)","priority":"high|medium|low","domain_source":"source","expected_reaction":"what prospect will likely say/do"}]}`;
+JSON only:
+{"lrm_reasoning":{"stage":"...","buyer_intent":"1 sentence","our_goal":"1 sentence","strategy":"1 sentence","framework":"auto-detected","deal_risk":"low|medium|high","emotional_signal":"dominant signal","detected_intent":"..."},"tips":[{"type":"next_step|objection|rebuttal|technical|psychological|closure|competitive|discovery|qualification|trust_building|risk_alert|walking_away_recovery|negotiation|re_alignment","title":"10 words max","action":"exact words to say (30-50 words)","priority":"high|medium|low","expected_reaction":"what prospect will likely do"}]}`;
       }
       buildConversationAnalysisPrompt(knowledge, customPrompt, domainName, trainingContext) {
         const productsText = this.formatProducts(knowledge.relevantProducts);
@@ -10796,77 +10787,28 @@ RESPONSE FORMAT (JSON):
         const useGenericKnowledge = isUniversal || !hasTrainingContext;
         const caseStudiesText = useGenericKnowledge ? this.formatCaseStudies(knowledge.relevantCaseStudies) : "";
         const productsText = useGenericKnowledge ? this.formatProducts(knowledge.relevantProducts) : "";
-        return `${isUniversal ? buildUniversalRVSystemPrompt() + "\n\n" : ""}You are Rev Winner Real-Time Sales Intelligence Engine. Top 1% sales expert and ${effectiveDomain} solutions architect. Generate instant pitch responses when prospects ask questions or raise concerns.
-
-CORE MISSION: Detect ALL customer questions, challenges, objections, and concerns from the conversation. Provide highly accurate, context-aware pitch responses with technical accuracy, business value translation, and confidence positioning. SPEED is critical.
+        return `${isUniversal ? buildUniversalRVSystemPrompt() + "\n\n" : ""}You are Rev Winner, a real-time sales pitch engine. Domain: ${effectiveDomain}. Detect customer questions/objections and generate instant pitch responses.
 
 ${isUniversal ? dynamicDomainSection + "\n\n" : ""}${domainName && !isUniversal ? `DOMAIN: ${domainName}
-` : ""}
-${cappedTraining && !isUniversal ? `TRAINING MATERIALS (ONLY source of truth - use EXCLUSIVELY):
+` : ""}${cappedTraining && !isUniversal ? `TRAINING DATA (use EXCLUSIVELY as source of truth, exact pricing only):
 ${cappedTraining}
-RULES: Only use products/solutions from training. Use exact pricing if available. Never fabricate data.
 ` : ""}${!hasTrainingContext && domainName && !isUniversal ? `No training docs for "${domainName}". Use universal knowledge.
 ` : ""}${useGenericKnowledge ? `KNOWLEDGE:
 ${productsText}
 ${caseStudiesText}` : ""}
 
-=== INTENT DETECTION (Execute FIRST before response generation) ===
-Scan conversation for ALL of these - do NOT miss any:
-- DIRECT QUESTIONS ("what is", "how does", "can you", "what about", "tell me about", "what are the offerings")
-- INDIRECT QUESTIONS (statements implying need for info: "I want to know", "I'm curious about", "we're looking at")
-- OBJECTIONS DISGUISED AS QUESTIONS ("isn't that too expensive?", "why would we switch?", "what makes you different?")
-- CHALLENGES/CONCERNS ("we're worried about", "our concern is", "the issue we face")
-- COMPARISON REQUESTS ("how do you compare to X", "what about competitor Y")
-- PRICING INQUIRIES (any mention of cost, price, budget, ROI, licensing)
-- TECHNICAL QUERIES (integration, compatibility, deployment, security, compliance)
-- WALKING AWAY SIGNALS ("we'll think about it", "send proposal", "not interested") \u2192 Treat as hidden objection, generate pitch to re-engage
+DETECT from transcript: direct questions, indirect queries ("I want to know", "we're looking at"), objections disguised as questions, pricing inquiries, technical queries, comparison requests, walking-away signals.
 
-=== OBJECTION-IN-QUESTION DETECTION ===
-When objection is hidden inside a question, response must:
-1. Answer the surface question directly
-2. Address the underlying objection
-3. Reframe to business impact
-4. Include risk-of-inaction point
-5. End with leverage follow-up question
+For each detected query, respond with:
+1. Direct answer (no fluff) + business value + risk reduction
+2. If hidden objection: address surface question AND underlying concern
+3. Pricing: EXACT values from training only, never guess. Trade don't discount.
+4. End with micro-close or leverage follow-up question
 
-=== RESPONSE FRAME FOR EACH QUERY ===
-1. Tactical empathy - Brief acknowledgment
-2. Direct answer - Clear, precise, no fluff
-3. Business value translation - Quantified when possible
-4. Risk reduction - What they avoid by acting
-5. Confidence positioning - Authority without arrogance
-6. Micro-close or follow-up question - Advance the conversation
+Auto-select framework: SPIN/MEDDIC mid-market, MEDDPICC/Challenger enterprise, AIDA/PAS SMB. Never announce.
+Seller-ready words. "we/our" for product, "you/your" for customer. Never invent facts.
 
-=== NEGOTIATION QUERIES ===
-When pricing pressure detected in questions:
-- Trade, never discount (longer commitment, volume, faster decision)
-- Conditional framing ("If we structure X, we can explore Y")
-- ROI anchor - Shift from price-per-unit to risk-per-outcome
-- Never suggest arbitrary concession
-
-CONTEXT AWARENESS - Track from conversation:
-- Buyer persona: technical/executive/business owner/MSP/enterprise
-- Stage: discovery\u2192qualification\u2192positioning\u2192objection handling\u2192decision\u2192closing
-- Emotional signals: confidence, resistance, curiosity, trust, urgency
-- Qualification: Budget, Authority, Need, Timeline
-
-FRAMEWORK SWITCHING - Auto-select best framework (NEVER announce):
-Small/B2C: AIDA, PAS, FAB, Story Selling
-Mid-market: SPIN, MEDDIC, Consultative, Solution Selling
-Enterprise: MEDDPICC, Challenger, Command of the Message, Value Selling
-
-RESPONSE QUALITY:
-- Fast, concise, seller-practical, executive-ready
-- No over-explanation, no academic language, no generic reassurance
-- Exact words reps can say verbatim
-
-ACCURACY PROTECTION:
-- Never invent facts. Never assume decision authority unless confirmed.
-- For pricing: EXACT values from training docs only. Never guess.
-- No fake company names. Only reference real data.
-- Write as salesperson: "we/our" for product, "you/your" for customer.
-
-JSON: {"queries":[{"query":"customer question/concern","queryType":"technical|pricing|features|integration|support|general|comparison|challenge|objection|walking_away","pitch":"40-80 word response: direct answer + value + risk reduction + confidence positioning","keyPoints":["point1","point2","point3"],"followUpQuestion":"micro-close or leverage follow-up question"}]}`;
+JSON: {"queries":[{"query":"exact question/concern","queryType":"technical|pricing|features|integration|support|general|comparison|challenge|objection|walking_away","pitch":"40-80 words: direct answer + value + risk reduction","keyPoints":["point1","point2","point3"],"followUpQuestion":"micro-close or leverage question"}]}`;
       }
       formatCaseStudies(caseStudies2) {
         if (!caseStudies2.length) return "No case studies available yet. Ask the customer about their specific situation to better assist.";
@@ -12952,13 +12894,18 @@ Provide a structured summary in JSON format:
 }
 async function generateMeetingMinutes(conversationHistory, clientName = "Client", domainExpertise2 = "Generic Product", userId, meetingStartTime) {
   try {
+    const meaningfulMessages = conversationHistory.filter((msg) => {
+      const trimmed = msg.content.trim();
+      const words2 = trimmed.split(/\s+/).filter((w) => w.length > 0);
+      return words2.length >= 3;
+    });
     const conversationText = conversationHistory.map((msg) => msg.content).join(" ").trim();
     const words = conversationText.split(/\s+/).filter((w) => w.length > 0);
     const wordCount = words.length;
-    console.log(`\u{1F4DD} Meeting Minutes: Conversation has ${wordCount} words, ${conversationHistory.length} messages`);
-    if (conversationHistory.length < 3 || wordCount < 50) {
-      console.warn(`\u26A0\uFE0F Insufficient conversation content for meeting minutes (${conversationHistory.length} messages, ${wordCount} words)`);
-      throw new Error(`Conversation is too short to generate meaningful meeting minutes. Current: ${conversationHistory.length} messages with ${wordCount} words. Required: At least 3 messages with 50+ words total.`);
+    console.log(`\u{1F4DD} Meeting Minutes: Conversation has ${wordCount} words, ${conversationHistory.length} messages (${meaningfulMessages.length} meaningful)`);
+    if (meaningfulMessages.length < 3 || wordCount < 50) {
+      console.warn(`\u26A0\uFE0F Insufficient conversation content for meeting minutes (${meaningfulMessages.length} meaningful messages, ${wordCount} words)`);
+      throw new Error(`Please have a longer conversation before generating meeting minutes. We need at least 3 messages with meaningful content.`);
     }
     let client;
     let model;
@@ -13456,9 +13403,7 @@ STRICT RULES:
         }
       ],
       temperature: 0.5,
-      max_tokens: 400,
-      timeout: 3e4
-      // 30 second timeout instead of 10
+      max_tokens: 300
     });
     const answer = response.choices[0]?.message?.content?.trim() || "I couldn't generate an answer. Please try rephrasing your question.";
     return answer;
@@ -13501,11 +13446,13 @@ async function generateShiftGearsTips(conversationText, domainExpertise2 = "Gene
     const systemPrompt = promptRegistry2.buildShiftGearsPrompt(knowledge, domainExpertise2, trainingContext, conversationText);
     let client;
     let model;
+    let engineName = "deepseek";
     if (userId) {
       try {
         const aiConfig = await getAIClient(userId);
         client = aiConfig.client;
         model = aiConfig.model;
+        engineName = aiConfig.engine;
       } catch (error) {
         if (!deepseek3) throw new Error("AI engine not configured");
         client = deepseek3;
@@ -13518,31 +13465,12 @@ async function generateShiftGearsTips(conversationText, domainExpertise2 = "Gene
     }
     const conversationLines = conversationText.trim().split("\n").filter((line) => line.trim());
     const recentTurns = conversationLines.slice(-10).join("\n");
-    const conversationKeywords = conversationLines.join(" ").toLowerCase().split(/\s+/).filter((w) => w.length > 3).slice(0, 30).join(", ");
     const userPrompt = `LIVE CALL (last turns):
 ${recentTurns}
 ${domainExpertise2 ? `Domain: ${domainExpertise2}` : ""}
 
-STEP 1: Detect customer intent - Is customer: asking question? objecting? comparing competitor? signaling disinterest? walking away? negotiating? deflecting? requesting technical clarification? escalating to procurement? delaying?
-STEP 2: Analyze conversation state. Auto-detect best framework. Detect stage, buyer intent, emotional signals, deal risk.
-STEP 3: Generate exactly 3 coaching tips for the rep RIGHT NOW based on detected intent.
-Each tip: exact words to say (seller-ready, no fluff), expected prospect reaction, next likely branch. Respond to what was JUST said. JSON only:
-{"lrm_reasoning":{"stage":"opening|discovery|pain_identification|qualification|positioning|objection_handling|decision|closing","buyer_intent":"1 sentence","our_goal":"1 sentence","strategy":"1 sentence","framework":"auto-detected","deal_risk":"low|medium|high","emotional_signal":"dominant signal","detected_intent":"question|objection|disinterest|walking_away|negotiation|deflection|technical_clarification|procurement_escalation|delay|normal"},"tips":[{"type":"next_step|objection|rebuttal|technical|psychological|closure|competitive|discovery|qualification|trust_building|risk_alert|walking_away_recovery|negotiation|re_alignment","title":"10 words max","action":"exact words to say (30-50 words)","priority":"high|medium|low","expected_reaction":"what prospect will likely do"}]}`;
-    console.log("\u{1F4CA} Shift Gears Context:", {
-      domain: domainExpertise2,
-      transcriptLength: conversationText.length,
-      recentConversationLines: conversationLines.slice(-10).length,
-      extractedKeywords: {
-        problem: keywords.problemKeywords.slice(0, 5),
-        product: keywords.productKeywords.slice(0, 5),
-        industries: keywords.industries
-      },
-      knowledge: {
-        products: knowledge.relevantProducts.map((p) => `${p.name} (${p.code})`),
-        caseStudies: knowledge.relevantCaseStudies.map((c) => `${c.title} - ${c.industry}`),
-        playbooks: knowledge.relevantPlaybooks.map((p) => p.title)
-      }
-    });
+Detect customer intent. Generate exactly 3 coaching tips for the rep RIGHT NOW. Each tip: exact words to say, expected reaction. JSON only:
+{"lrm_reasoning":{"stage":"...","buyer_intent":"1 sentence","our_goal":"1 sentence","strategy":"1 sentence","framework":"auto-detected","deal_risk":"low|medium|high","emotional_signal":"dominant signal","detected_intent":"question|objection|disinterest|walking_away|negotiation|deflection|technical_clarification|procurement_escalation|delay|normal"},"tips":[{"type":"next_step|objection|rebuttal|technical|psychological|closure|competitive|discovery|qualification|trust_building|risk_alert|walking_away_recovery|negotiation|re_alignment","title":"10 words max","action":"exact words to say (30-50 words)","priority":"high|medium|low","expected_reaction":"what prospect will likely do"}]}`;
     const fastModel = model.includes("gpt-4") ? "gpt-4o-mini" : model.includes("claude") ? "claude-3-5-haiku-latest" : model.includes("gemini") ? "gemini-2.0-flash" : model;
     const aiStartTime = Date.now();
     let response;
@@ -13570,8 +13498,7 @@ Each tip: exact words to say (seller-ready, no fluff), expected prospect reactio
     if (!response) throw new Error("All models failed");
     if (userId) {
       try {
-        const aiConfig = await getAIClient(userId);
-        await recordTokenUsage(userId, mapEngineToProvider(aiConfig.engine), response, "shift_gears");
+        await recordTokenUsage(userId, mapEngineToProvider(engineName), response, "shift_gears");
       } catch {
         if (client === deepseek3) {
           await recordTokenUsage(userId, "deepseek", response, "shift_gears");
@@ -13660,42 +13587,28 @@ async function generateQueryPitches(conversationText, domainExpertise2 = "Generi
       userId ? getTrainingDocumentContext(userId, 3e3, false, semanticQuery, 5, domainExpertise2) : Promise.resolve(""),
       Promise.resolve().then(() => (init_knowledge_service(), knowledge_service_exports))
     ]);
+    const hasDomainTraining = trainingContext && trainingContext.trim().length > 100;
     const { knowledgeService: knowledgeService2 } = knowledgeModule;
     const keywords = knowledgeService2.extractKeywordsFromTranscript(conversationText);
-    const knowledge = await knowledgeService2.buildKnowledgeContext({
+    const knowledge = hasDomainTraining ? { relevantProducts: [], relevantCaseStudies: [], relevantPlaybooks: [] } : await knowledgeService2.buildKnowledgeContext({
       problemKeywords: keywords.problemKeywords,
       productKeywords: keywords.productKeywords,
       industries: keywords.industries,
       includePlaybooks: false
-      // PERFORMANCE: Skip playbooks for faster response (not critical for query pitches)
     });
-    console.log("\u{1F4CA} Customer Query Pitches Context:", {
-      domain: domainExpertise2,
-      transcriptLength: conversationText.length,
-      trainingContextLength: trainingContext.length,
-      trainingContextPreview: trainingContext.slice(0, 500),
-      hasTrainingContext: trainingContext.length > 100,
-      extractedKeywords: {
-        problem: keywords.problemKeywords.slice(0, 5),
-        product: keywords.productKeywords.slice(0, 5),
-        industries: keywords.industries
-      },
-      knowledge: {
-        products: knowledge.relevantProducts.map((p) => `${p.name} (${p.code})`),
-        caseStudies: knowledge.relevantCaseStudies.map((c) => `${c.title} - ${c.industry}`),
-        playbooks: knowledge.relevantPlaybooks.map((p) => p.title)
-      }
-    });
+    console.log(`\u26A1 QueryPitches prep: Domain: ${domainExpertise2} | HasTraining: ${hasDomainTraining}`);
     const { promptRegistry: promptRegistry2 } = await Promise.resolve().then(() => (init_prompt_registry(), prompt_registry_exports));
     const systemPrompt = promptRegistry2.buildCustomerQueryPitchesPrompt(knowledge, domainExpertise2, trainingContext, conversationText);
     let client;
     let model;
+    let engineName = "deepseek";
     let originalModel = "";
     if (userId) {
       try {
         const aiConfig = await getAIClient(userId);
         client = aiConfig.client;
         model = aiConfig.model;
+        engineName = aiConfig.engine;
         originalModel = model;
         const fastModel = model.includes("gpt-4") ? "gpt-4o-mini" : model.includes("claude") ? "claude-3-5-haiku-latest" : model.includes("gemini") ? "gemini-2.0-flash" : model;
         model = fastModel;
@@ -13713,20 +13626,10 @@ async function generateQueryPitches(conversationText, domainExpertise2 = "Generi
 ${conversationText.slice(-1200)}
 Focus: ${domainExpertise2}
 
-DETECT AND EXTRACT every customer query, concern, objection, and challenge from the transcript above. Include:
-- Direct questions ("what is", "how does", "can you", "tell me about")
-- Indirect questions ("I want to know", "we're looking at", "what are the offerings")
-- Objections disguised as questions ("isn't that expensive?", "why switch?")
-- Walking-away signals ("we'll think about it", "send proposal", "not interested")
-- Pricing inquiries, technical queries, comparison requests
-
-Auto-detect buyer persona and conversation stage. Select best framework.
-For each detected query generate a pitch (40-80 words): direct answer + business value translation + risk reduction + confidence positioning.
-If objection hidden in question: address surface question AND underlying concern.
-For pricing: use EXACT values from training docs only. Never guess.
-End each pitch with a micro-close or leverage follow-up question.
+Detect all customer queries, objections, and concerns. For each, generate a pitch (40-80 words): direct answer + value + risk reduction. Use EXACT pricing from training only. End with micro-close.
 
 JSON: {"queries":[{"query":"exact question/concern","queryType":"technical|pricing|features|integration|support|general|comparison|challenge|objection|walking_away","pitch":"40-80 words: direct answer + value + risk reduction","keyPoints":["point1","point2","point3"],"followUpQuestion":"micro-close or leverage question"}]}`;
+    const aiStartTime = Date.now();
     let response;
     const modelsToTry = originalModel && originalModel !== model ? [model, originalModel] : [model];
     for (const tryModel of modelsToTry) {
@@ -13740,9 +13643,9 @@ JSON: {"queries":[{"query":"exact question/concern","queryType":"technical|prici
           ],
           response_format: { type: "json_object" },
           temperature: 0.15,
-          max_tokens: 1500
+          max_tokens: 800
         });
-        console.log(`\u{1F4AC} QueryPitches: Model ${tryModel} succeeded`);
+        console.log(`\u{1F4AC} QueryPitches AI call: ${Date.now() - aiStartTime}ms | Model: ${tryModel}`);
         break;
       } catch (modelError) {
         console.warn(`\u26A0\uFE0F QueryPitches: Model ${tryModel} failed: ${modelError.message}`);
@@ -13978,9 +13881,9 @@ JSON format:
       return result;
     } else if (type === "battle-card") {
       console.log(`\u{1F3AF} Generating battle card for domain: ${domainExpertise2}`);
-      const trainingContext = await getTrainingDocumentContext(userId, 1e3, true, void 0, 2, domainExpertise2);
+      const trainingContext = await getTrainingDocumentContext(userId, 2e3, true, void 0, 3, domainExpertise2);
       console.log(`\u{1F4DA} Battle Card - Training: ${trainingContext ? trainingContext.length : 0} chars`);
-      const fullContext = conversationContext.length > 800 ? conversationContext.slice(-800) : conversationContext;
+      const fullContext = conversationContext.length > 1e3 ? conversationContext.slice(-1e3) : conversationContext;
       const supplement = buildPromptSupplement(conversationContext, domainExpertise2, "battle_card");
       const supplementText = formatPromptSupplement(supplement);
       const extractCompetitorsFromConversation = (text2) => {
@@ -14988,7 +14891,7 @@ var init_openai = __esm({
     init_competitive_intelligence();
     init_token_tracker();
     trainingContextCache = /* @__PURE__ */ new Map();
-    CACHE_TTL = 30 * 1e3;
+    CACHE_TTL = 5 * 60 * 1e3;
     SEMANTIC_SEARCH_LIMIT = parseInt(process.env.SEMANTIC_SEARCH_LIMIT || "10", 10);
     deepseek3 = process.env.DEEPSEEK_API_KEY ? new OpenAI4({
       apiKey: process.env.DEEPSEEK_API_KEY,
@@ -15217,6 +15120,37 @@ var init_storage_billing = __esm({
           if (startDates.length > 0 && startDates[0]) {
             const latestStartDate = startDates[0];
             expiresAt = new Date(latestStartDate);
+            expiresAt.setDate(expiresAt.getDate() + 30);
+          }
+        }
+        return {
+          totalMinutes,
+          usedMinutes,
+          remainingMinutes: Math.max(0, remainingMinutes),
+          expiresAt
+        };
+      }
+      async getSessionMinutesBalanceByOrganization(organizationId) {
+        const activePurchases = await db.select().from(addonPurchases).where(
+          and6(
+            eq8(addonPurchases.organizationId, organizationId),
+            eq8(addonPurchases.addonType, "session_minutes"),
+            eq8(addonPurchases.status, "active"),
+            or4(
+              isNull(addonPurchases.endDate),
+              gte2(addonPurchases.endDate, /* @__PURE__ */ new Date())
+            )
+          )
+        );
+        const totalMinutes = activePurchases.reduce((sum, p) => sum + (p.totalUnits || 0), 0);
+        const usedMinutes = activePurchases.reduce((sum, p) => sum + (p.usedUnits || 0), 0);
+        const remainingMinutes = totalMinutes - usedMinutes;
+        const expiryDates = activePurchases.map((p) => p.endDate).filter((d) => d !== null).sort((a, b) => a < b ? -1 : 1);
+        let expiresAt = expiryDates[0] || null;
+        if (!expiresAt && remainingMinutes > 0 && activePurchases.length > 0) {
+          const startDates = activePurchases.map((p) => p.startDate).filter((d) => d !== null).sort((a, b) => a > b ? -1 : 1);
+          if (startDates.length > 0 && startDates[0]) {
+            expiresAt = new Date(startDates[0]);
             expiresAt.setDate(expiresAt.getDate() + 30);
           }
         }
@@ -15617,7 +15551,7 @@ var init_storage_billing = __esm({
           return sum;
         }, 0);
         const currency = items[0]?.currency || "USD";
-        const GST_RATE = currency === "INR" ? 0.18 : 0;
+        const GST_RATE = 0.18;
         const gstAmount = (subtotal - discount) * GST_RATE;
         const total = subtotal - discount + gstAmount;
         return {
@@ -15630,7 +15564,11 @@ var init_storage_billing = __esm({
           itemCount: items.length
         };
       }
-      async checkItemAvailability(userId, packageSku, addonType) {
+      async checkItemAvailability(userId, packageSku, addonType, options) {
+        const purchaseMode = options?.purchaseMode ?? "user";
+        if (addonType === "platform_access" && purchaseMode === "team") {
+          return { available: true };
+        }
         const activeAddon = await this.getActiveAddonPurchase(userId, addonType);
         if (activeAddon) {
           const now = /* @__PURE__ */ new Date();
@@ -15746,7 +15684,17 @@ Rev Winner Team`,
     console.log(`OTP email sent to ${email} - Message ID: ${info.messageId}`);
   } catch (error) {
     console.error("Error sending OTP email:", error);
-    throw new Error("Failed to send verification email");
+    const isAuthError = error?.code === "EAUTH" || String(error?.responseCode || "").startsWith("53");
+    if (isAuthError) {
+      console.error(
+        `\u26A0\uFE0F Gmail authentication failed for ${email}. Please check Gmail account settings: enable 2FA and create an App Password. OTP Code for ${email}: ${code} (expires in 10 minutes)`
+      );
+      return;
+    }
+    console.error(
+      `\u26A0\uFE0F Failed to send OTP email to ${email}: ${error.message}. OTP Code for ${email}: ${code} (expires in 10 minutes)`
+    );
+    return;
   }
 }
 async function sendWelcomeEmail(email, firstName) {
@@ -15844,6 +15792,9 @@ async function sendTrialExpiringEmail(email, firstName, sessionsLeft) {
 }
 async function sendPasswordResetEmail(email, resetToken, firstName) {
   const resetLink = `${getAppUrl()}/reset-password?token=${resetToken}`;
+  console.log(`[Password Reset Email] Generating reset link for ${email}`);
+  console.log(`[Password Reset Email] Base URL: ${getAppUrl()}`);
+  console.log(`[Password Reset Email] Full reset link: ${resetLink}`);
   if (!transporter) {
     console.log(`
 ====== PASSWORD RESET EMAIL (DEV MODE) ======`);
@@ -15900,7 +15851,17 @@ Rev Winner Team`,
     console.log(`Password reset email sent to ${email} - Message ID: ${info.messageId}`);
   } catch (error) {
     console.error("Error sending password reset email:", error);
-    throw new Error("Failed to send password reset email");
+    const isAuthError = error?.code === "EAUTH" || String(error?.responseCode || "").startsWith("53");
+    if (isAuthError) {
+      console.error(
+        `\u26A0\uFE0F Gmail authentication failed for ${email}. Please check Gmail account settings: enable 2FA and create an App Password. Password reset link for ${email}: ${resetLink}`
+      );
+      return;
+    }
+    console.error(
+      `\u26A0\uFE0F Failed to send password reset email to ${email}: ${error.message}. Password reset link for ${email}: ${resetLink}`
+    );
+    return;
   }
 }
 async function sendLeadNotificationEmail(to, leadData) {
@@ -16207,7 +16168,17 @@ Rev Winner Team`,
     console.log(`License assignment email sent to ${email} - Message ID: ${info.messageId}`);
   } catch (error) {
     console.error("Error sending license assignment email:", error);
-    throw new Error("Failed to send license assignment email");
+    const isAuthError = error?.code === "EAUTH" || String(error?.responseCode || "").startsWith("53");
+    if (isAuthError) {
+      console.error(
+        `\u26A0\uFE0F Gmail authentication failed for ${email}. Please check Gmail account settings: enable 2FA and create an App Password. License assignment succeeded, but email was not sent. Error: ${error.response || error.message}`
+      );
+      return;
+    }
+    console.error(
+      `\u26A0\uFE0F Failed to send license assignment email to ${email}: ${error.message}. License assignment succeeded, but email was not sent.`
+    );
+    return;
   }
 }
 async function sendLicenseAccessNotificationEmail(email, firstName, organizationName) {
@@ -16282,7 +16253,17 @@ Rev Winner Team`,
     console.log(`License access notification sent to ${email} - Message ID: ${info.messageId}`);
   } catch (error) {
     console.error("Error sending license access notification:", error);
-    throw new Error("Failed to send license access notification");
+    const isAuthError = error?.code === "EAUTH" || String(error?.responseCode || "").startsWith("53");
+    if (isAuthError) {
+      console.error(
+        `\u26A0\uFE0F Gmail authentication failed for ${email}. Please check Gmail account settings: enable 2FA and create an App Password. License assignment succeeded, but email was not sent. Error: ${error.response || error.message}`
+      );
+      return;
+    }
+    console.error(
+      `\u26A0\uFE0F Failed to send license access notification to ${email}: ${error.message}. License assignment succeeded, but email was not sent.`
+    );
+    return;
   }
 }
 async function sendLicenseManagerInvitationEmail(email, managerName, resetToken, purchaseDetails) {
@@ -16824,13 +16805,14 @@ async function sendLicenseRevocationEmail(email, firstName, organizationName, re
     console.error("Error sending license revocation email:", error);
   }
 }
-var GMAIL_USER, GMAIL_APP_PASSWORD, transporter;
+var GMAIL_USER, GMAIL_APP_PASSWORD, transporter, isProductionEnv;
 var init_email = __esm({
   "server/services/email.ts"() {
     "use strict";
     GMAIL_USER = process.env.GMAIL_USER || "revwinner2025@gmail.com";
     GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
     transporter = null;
+    isProductionEnv = process.env.NODE_ENV === "production" || process.env.ENVIRONMENT === "PROD";
     if (GMAIL_APP_PASSWORD) {
       transporter = nodemailer.createTransport({
         service: "gmail",
@@ -16843,6 +16825,17 @@ var init_email = __esm({
           pass: GMAIL_APP_PASSWORD
         }
       });
+      if (!isProductionEnv) {
+        console.log(
+          "Email SMTP enabled in development (GMAIL_APP_PASSWORD set). Emails will be sent to recipients."
+        );
+      }
+    } else {
+      if (!isProductionEnv) {
+        console.log(
+          "Email SMTP transporter disabled (no GMAIL_APP_PASSWORD). Emails will be logged to console instead of being sent."
+        );
+      }
     }
   }
 });
@@ -17046,10 +17039,10 @@ async function reconcileLicensePayments() {
       if (!payment) {
         discrepancies.push({
           type: "license_without_payment",
-          severity: "critical",
+          severity: "warning",
           licensePackageId: licensePackage.id,
           details: `License package ${licensePackage.id} (${licensePackage.totalSeats} seats, ${licensePackage.totalAmount} ${licensePackage.currency}) has no payment record`,
-          suggestedAction: "Investigate license provisioning - potential revenue leakage"
+          suggestedAction: "Verify license provisioning and payment records if this package is not test data."
         });
       }
       if (payment) {
@@ -17081,14 +17074,30 @@ async function reconcileAddonPayments() {
     const activeAddons = await db.select().from(addonPurchases).where(eq10(addonPurchases.status, "active"));
     console.log(`  Found ${activeAddons.length} active add-on purchases`);
     for (const addon of activeAddons) {
+      const purchaseAmount = parseFloat(addon.purchaseAmount || "0");
+      const isZeroValue = !Number.isFinite(purchaseAmount) || purchaseAmount <= 0.01;
+      const metadata = addon.metadata || {};
+      const gatewayProvider = metadata.gatewayProvider || metadata.paymentGateway;
+      const isFreePromoAddon = metadata.freePromo === true || gatewayProvider === "free_promo" || metadata.paymentMethod === "promo_code_100%";
       if (!addon.gatewayTransactionId) {
+        if (isZeroValue || isFreePromoAddon) {
+          discrepancies.push({
+            type: "addon_free_without_payment",
+            severity: "info",
+            addonPurchaseId: addon.id,
+            userId: addon.userId,
+            details: `Free/promo add-on purchase ${addon.id} (${addon.addonType}, ${addon.purchaseAmount} ${addon.currency}) has no payment reference, which is expected for 100% discounts or free grants.`,
+            suggestedAction: "No action required unless this add-on was not intended to be free."
+          });
+          continue;
+        }
         discrepancies.push({
           type: "addon_without_payment",
-          severity: "critical",
+          severity: "warning",
           addonPurchaseId: addon.id,
           userId: addon.userId,
           details: `Add-on purchase ${addon.id} (${addon.addonType}, ${addon.purchaseAmount} ${addon.currency}) has NO payment reference (gatewayTransactionId)`,
-          suggestedAction: "REVENUE LEAK - Add-on issued without payment record. Investigate immediately or revoke access."
+          suggestedAction: "Verify whether this add-on was intended to be free or manually granted; investigate payment records if not."
         });
         continue;
       }
@@ -17109,11 +17118,11 @@ async function reconcileAddonPayments() {
       if (!matchingPayment) {
         discrepancies.push({
           type: "addon_without_payment",
-          severity: "critical",
+          severity: "warning",
           addonPurchaseId: addon.id,
           userId: addon.userId,
           details: `Add-on purchase ${addon.id} (${addon.addonType}, ${addon.purchaseAmount} ${addon.currency}) has gatewayTransactionId ${addon.gatewayTransactionId} but no matching payment found`,
-          suggestedAction: "REVENUE LEAK - Cannot verify payment for add-on. Investigate transaction records or revoke access."
+          suggestedAction: "Verify whether this add-on should be linked to a specific payment; investigate transaction records if this is not intentional."
         });
       } else {
         const paymentAmount = parseFloat(matchingPayment.amount);
@@ -17138,6 +17147,14 @@ async function reconcileAddonPayments() {
   }
 }
 async function runBillingReconciliation() {
+  const isProduction = process.env.NODE_ENV === "production";
+  const explicitlyEnabled = process.env.BILLING_RECONCILIATION_ENABLED === "true";
+  if (!isProduction && !explicitlyEnabled) {
+    console.log(
+      "Skipping billing reconciliation in non-production environment. Set BILLING_RECONCILIATION_ENABLED=true to run it."
+    );
+    return [];
+  }
   console.log(" Starting comprehensive billing reconciliation...");
   const startTime = Date.now();
   const subscriptionDiscrepancies = await reconcileSubscriptionPayments();
@@ -20824,17 +20841,24 @@ __export(seed_marketing_data_exports, {
 });
 import { eq as eq17 } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
+import bcrypt3 from "bcrypt";
 async function getOrCreateDummyUser(companyDomain, companyName) {
   try {
     const testEmail = `testuser@${companyDomain}.com`;
-    const [existingUser] = await db.select().from(users).where(eq17(users.email, testEmail)).limit(1);
+    const [existingUser] = await db.select().from(authUsers).where(eq17(authUsers.email, testEmail)).limit(1);
     if (existingUser) {
       return existingUser.id;
     }
-    const [newUser] = await db.insert(users).values({
+    const username = `test_${companyDomain.replace(/\s+/g, "_").toLowerCase()}`;
+    const hashedPassword = await bcrypt3.hash("testpassword123", 10);
+    const [newUser] = await db.insert(authUsers).values({
       email: testEmail,
+      username,
+      hashedPassword,
       firstName: "Test",
-      lastName: companyName
+      lastName: companyName,
+      role: "user",
+      status: "active"
     }).returning();
     console.log(`  \u{1F464} Created test user: ${testEmail}`);
     return newUser.id;
@@ -20925,7 +20949,7 @@ async function clearMarketingDummyData() {
   for (const backup of dummyMarketingBackups) {
     const domain = backup.companyName.toLowerCase().replace(/\s+/g, "");
     const testEmail = `testuser@${domain}.com`;
-    const [user] = await db.select().from(users).where(eq17(users.email, testEmail)).limit(1);
+    const [user] = await db.select().from(authUsers).where(eq17(authUsers.email, testEmail)).limit(1);
     if (user) {
       await db.delete(conversationMinutesBackup).where(eq17(conversationMinutesBackup.userId, user.id));
       backupsDeleted++;
@@ -20953,7 +20977,7 @@ var init_seed_marketing_data = __esm({
 });
 
 // server/storage-recordings.ts
-import { eq as eq20, and as and17, gte as gte4, lte as lte4, desc as desc10 } from "drizzle-orm";
+import { eq as eq21, and as and17, gte as gte4, lte as lte4, desc as desc10 } from "drizzle-orm";
 var RecordingsStorage, recordingsStorage;
 var init_storage_recordings = __esm({
   "server/storage-recordings.ts"() {
@@ -20969,18 +20993,18 @@ var init_storage_recordings = __esm({
         return recording;
       }
       async getCallRecording(id) {
-        const [recording] = await db.select().from(callRecordings).where(and17(eq20(callRecordings.id, id), eq20(callRecordings.status, "active"))).limit(1);
+        const [recording] = await db.select().from(callRecordings).where(and17(eq21(callRecordings.id, id), eq21(callRecordings.status, "active"))).limit(1);
         return recording || null;
       }
       async getUserCallRecordings(userId) {
-        return db.select().from(callRecordings).where(eq20(callRecordings.userId, userId)).orderBy(desc10(callRecordings.createdAt));
+        return db.select().from(callRecordings).where(eq21(callRecordings.userId, userId)).orderBy(desc10(callRecordings.createdAt));
       }
       async getActiveCallRecordings(userId) {
         const now = /* @__PURE__ */ new Date();
         return db.select().from(callRecordings).where(
           and17(
-            eq20(callRecordings.userId, userId),
-            eq20(callRecordings.status, "active"),
+            eq21(callRecordings.userId, userId),
+            eq21(callRecordings.status, "active"),
             gte4(callRecordings.expiresAt, now)
           )
         ).orderBy(desc10(callRecordings.createdAt));
@@ -20989,7 +21013,7 @@ var init_storage_recordings = __esm({
         await db.update(callRecordings).set({
           status: "deleted",
           deletedAt: /* @__PURE__ */ new Date()
-        }).where(eq20(callRecordings.id, id));
+        }).where(eq21(callRecordings.id, id));
       }
       async deleteExpiredRecordings() {
         const now = /* @__PURE__ */ new Date();
@@ -20998,7 +21022,7 @@ var init_storage_recordings = __esm({
           deletedAt: now
         }).where(
           and17(
-            eq20(callRecordings.status, "active"),
+            eq21(callRecordings.status, "active"),
             lte4(callRecordings.expiresAt, now)
           )
         );
@@ -21012,18 +21036,18 @@ var init_storage_recordings = __esm({
         return minutes;
       }
       async getMeetingMinutes(id) {
-        const [minutes] = await db.select().from(callMeetingMinutes).where(and17(eq20(callMeetingMinutes.id, id), eq20(callMeetingMinutes.status, "active"))).limit(1);
+        const [minutes] = await db.select().from(callMeetingMinutes).where(and17(eq21(callMeetingMinutes.id, id), eq21(callMeetingMinutes.status, "active"))).limit(1);
         return minutes || null;
       }
       async getUserMeetingMinutes(userId) {
-        return db.select().from(callMeetingMinutes).where(eq20(callMeetingMinutes.userId, userId)).orderBy(desc10(callMeetingMinutes.createdAt));
+        return db.select().from(callMeetingMinutes).where(eq21(callMeetingMinutes.userId, userId)).orderBy(desc10(callMeetingMinutes.createdAt));
       }
       async getActiveMeetingMinutes(userId) {
         const now = /* @__PURE__ */ new Date();
         return db.select().from(callMeetingMinutes).where(
           and17(
-            eq20(callMeetingMinutes.userId, userId),
-            eq20(callMeetingMinutes.status, "active"),
+            eq21(callMeetingMinutes.userId, userId),
+            eq21(callMeetingMinutes.status, "active"),
             gte4(callMeetingMinutes.expiresAt, now)
           )
         ).orderBy(desc10(callMeetingMinutes.createdAt));
@@ -21032,14 +21056,14 @@ var init_storage_recordings = __esm({
         const [updatedMinutes] = await db.update(callMeetingMinutes).set({
           ...data,
           updatedAt: /* @__PURE__ */ new Date()
-        }).where(eq20(callMeetingMinutes.id, id)).returning();
+        }).where(eq21(callMeetingMinutes.id, id)).returning();
         return updatedMinutes;
       }
       async deleteMeetingMinutes(id) {
         await db.update(callMeetingMinutes).set({
           status: "deleted",
           deletedAt: /* @__PURE__ */ new Date()
-        }).where(eq20(callMeetingMinutes.id, id));
+        }).where(eq21(callMeetingMinutes.id, id));
       }
       async deleteExpiredMeetingMinutes() {
         const now = /* @__PURE__ */ new Date();
@@ -21048,7 +21072,7 @@ var init_storage_recordings = __esm({
           deletedAt: now
         }).where(
           and17(
-            eq20(callMeetingMinutes.status, "active"),
+            eq21(callMeetingMinutes.status, "active"),
             lte4(callMeetingMinutes.expiresAt, now)
           )
         );
@@ -21061,10 +21085,10 @@ var init_storage_recordings = __esm({
         await db.update(authUsers).set({
           callRecordingEnabled: enabled,
           updatedAt: /* @__PURE__ */ new Date()
-        }).where(eq20(authUsers.id, userId));
+        }).where(eq21(authUsers.id, userId));
       }
       async isCallRecordingEnabled(userId) {
-        const [user] = await db.select({ enabled: authUsers.callRecordingEnabled }).from(authUsers).where(eq20(authUsers.id, userId)).limit(1);
+        const [user] = await db.select({ enabled: authUsers.callRecordingEnabled }).from(authUsers).where(eq21(authUsers.id, userId)).limit(1);
         return user?.enabled || false;
       }
     };
@@ -21352,7 +21376,7 @@ var mind_map_extraction_exports = {};
 __export(mind_map_extraction_exports, {
   extractTechEnvironment: () => extractTechEnvironment
 });
-import { eq as eq23, desc as desc13 } from "drizzle-orm";
+import { eq as eq24, desc as desc13 } from "drizzle-orm";
 import OpenAI7 from "openai";
 function cleanJSONResponse2(text2) {
   let cleaned = text2.trim();
@@ -21377,7 +21401,7 @@ async function getTrainMeKnowledge(userId, domainName) {
     const results = await db.select({
       content: knowledgeEntries.content,
       domainName: domainExpertise.name
-    }).from(knowledgeEntries).innerJoin(domainExpertise, eq23(knowledgeEntries.domainExpertiseId, domainExpertise.id)).where(eq23(domainExpertise.userId, userId)).orderBy(desc13(knowledgeEntries.createdAt)).limit(5);
+    }).from(knowledgeEntries).innerJoin(domainExpertise, eq24(knowledgeEntries.domainExpertiseId, domainExpertise.id)).where(eq24(domainExpertise.userId, userId)).orderBy(desc13(knowledgeEntries.createdAt)).limit(5);
     if (results.length === 0) {
       trainMeCache.set(cacheKey, { data: "", timestamp: Date.now() });
       return "";
@@ -21883,7 +21907,7 @@ Rev Winner is an enterprise-grade, AI-powered sales assistant platform designed 
 ### 1. REAL-TIME LIVE TRANSCRIPTION
 - **Accuracy:** 48kHz high-quality audio capture with Deepgram's nova-2-general model
 - **Multi-Speaker Detection:** Automatic speaker diarization identifies and labels multiple speakers
-- **Dual Audio Sources:** Captures both microphone and meeting audio (Google Meet, Zoom, Webex)
+- **Dual Audiao Sources:** Captures both microphone and meeting audio (Google Meet, Zoom, Webex)
 - **Smart Formatting:** Automatic punctuation, number conversion, and sentence structure
 - **Voice Activity Detection:** Intelligent speech detection prevents premature cutoffs
 - **Filler Word Capture:** Natural transcription including "um," "uh" for authentic conversation flow
@@ -22740,18 +22764,107 @@ async function processDocument(filePath, fileType, isUrl = false) {
     throw new Error(`Failed to process document: ${error.message}`);
   }
 }
+async function analyzePdfWithVision(buffer, textContent, pageCount) {
+  if (!process.env.OPENAI_API_KEY) return "";
+  const wordsPerPage = textContent.split(/\s+/).length / Math.max(pageCount, 1);
+  const hasTableIndicators = /[\|\+\-]{3,}|─|━|┌|┐|└|┘|├|┤|┬|┴|┼/.test(textContent);
+  const hasDataPatterns = /\d+[\.,]\d+\s*%|\$\s*[\d,]+|\d+\s*(MB|GB|TB|ms|users|seats)/i.test(textContent);
+  const hasShortLines = textContent.split("\n").filter((l) => l.trim().length > 0 && l.trim().length < 30).length > textContent.split("\n").filter((l) => l.trim().length > 0).length * 0.5;
+  const isLikelyVisualHeavy = wordsPerPage < 100 || hasTableIndicators || hasShortLines;
+  if (!isLikelyVisualHeavy && !hasDataPatterns) return "";
+  try {
+    const openai = new OpenAI8({ apiKey: process.env.OPENAI_API_KEY });
+    console.log(`\u{1F50D} PDF appears to contain visual elements (${Math.round(wordsPerPage)} words/page). Running deep analysis...`);
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 4e3,
+      messages: [
+        {
+          role: "user",
+          content: `You are a document intelligence specialist. The following text was extracted from a PDF that likely contains graphs, charts, tables, infographics, flowcharts, or other visual elements that may not be fully captured in text extraction.
+
+ANALYZE this extracted text deeply and produce ENHANCED structured knowledge by:
+
+1. **RECONSTRUCT TABLES**: If you see fragmented tabular data (misaligned columns, separated headers/values), reconstruct them into proper structured tables with clear headers and rows.
+
+2. **INTERPRET DATA PATTERNS**: Numbers, percentages, statistics scattered across lines likely came from charts/graphs. Group them logically:
+   - Identify what metrics they represent
+   - Note trends (increasing/decreasing)
+   - Associate data points with their labels
+
+3. **DETECT PRICING STRUCTURES**: If pricing data exists, structure it as:
+   - Product/Tier name \u2192 Price \u2192 What's included \u2192 Billing cycle
+   - Compare tiers if multiple exist
+
+4. **FLOWCHART/PROCESS RECONSTRUCTION**: If sequential steps or decision points appear, reconstruct the complete flow.
+
+5. **INFOGRAPHIC DATA**: If bullet points with statistics appear, group them by theme and provide context.
+
+6. **COMPARISON DATA**: If feature comparisons appear, create structured comparison matrices.
+
+Return your analysis in this format:
+[DEEP ANALYSIS - VISUAL CONTENT RECONSTRUCTION]
+
+## Reconstructed Tables
+(any tables found)
+
+## Data & Statistics
+(metrics, trends, numbers with context)
+
+## Pricing Information
+(if any pricing data found, structured clearly)
+
+## Process Flows
+(any workflows or decision trees)
+
+## Key Visual Insights
+(anything else that appears to come from visual elements)
+
+DOCUMENT TEXT:
+${textContent.substring(0, 12e3)}`
+        }
+      ]
+    });
+    const analysis = response.choices[0]?.message?.content || "";
+    if (analysis.trim().length > 100) {
+      console.log(`\u2705 Deep PDF analysis complete: ${analysis.length} chars of enhanced content`);
+      return `
+
+${analysis}`;
+    }
+    return "";
+  } catch (error) {
+    console.error(`\u26A0\uFE0F PDF vision analysis failed (non-blocking): ${error.message}`);
+    return "";
+  }
+}
 async function processPdf(filePath) {
   const { PDFParse } = await import("pdf-parse");
   const buffer = await readFile2(filePath);
   const parser = new PDFParse({ data: buffer });
   const result = await parser.getText();
   await parser.destroy();
+  const pageCount = result.pages?.length || 1;
+  const textContent = result.text || "";
+  const deepAnalysis = await analyzePdfWithVision(buffer, textContent, pageCount);
+  const finalContent = deepAnalysis ? `${textContent}
+
+${deepAnalysis}` : textContent;
+  const hasGraphs = /chart|graph|figure|diagram/i.test(textContent) || deepAnalysis.includes("Data & Statistics");
+  const hasInfographics = /infographic|flowchart|workflow|process flow/i.test(textContent) || deepAnalysis.includes("Process Flows");
   return {
-    content: result.text,
+    content: finalContent,
     metadata: {
-      pageCount: result.pages?.length || 0,
-      wordCount: result.text.split(/\s+/).length,
-      extractedFrom: "pdf"
+      pageCount,
+      wordCount: finalContent.split(/\s+/).length,
+      extractedFrom: deepAnalysis ? "pdf-enhanced" : "pdf",
+      imageAnalysis: deepAnalysis ? {
+        hasText: true,
+        hasGraphs,
+        hasInfographics,
+        extractedText: deepAnalysis.substring(0, 500),
+        insights: deepAnalysis.substring(0, 500)
+      } : void 0
     }
   };
 }
@@ -22811,8 +22924,10 @@ async function processExcel(filePath) {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile(filePath);
   let content = "";
+  const tableSummaries = [];
   workbook.eachSheet((worksheet) => {
-    const csvRows = [];
+    const allRows = [];
+    let maxCols = 0;
     worksheet.eachRow((row) => {
       const rowData = [];
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
@@ -22820,20 +22935,111 @@ async function processExcel(filePath) {
           rowData.push("");
         }
         const cellValue = getCellValue(cell);
-        rowData.push(escapeCsvValue(cellValue));
+        rowData.push(cellValue);
       });
-      csvRows.push(rowData.join(","));
+      if (rowData.length > maxCols) maxCols = rowData.length;
+      allRows.push(rowData);
+    });
+    if (allRows.length === 0) return;
+    const headers = allRows[0].map((h) => h.trim());
+    const dataRows = allRows.slice(1);
+    const pricingKeywords = /price|cost|amount|rate|fee|mrp|discount|total|subtotal|billing|subscription|tier|plan/i;
+    const hasPricing = headers.some((h) => pricingKeywords.test(h)) || dataRows.some((row) => row.some((cell) => /^\$?\s*[\d,]+\.?\d*$/.test(cell.trim()) || /₹|€|\$/.test(cell)));
+    tableSummaries.push({
+      sheetName: worksheet.name,
+      headers: headers.filter((h) => h.length > 0),
+      rowCount: dataRows.length,
+      hasPricing
     });
     content += `
 
---- Sheet: ${worksheet.name} ---
-${csvRows.join("\n")}`;
+=== Sheet: ${worksheet.name} (${dataRows.length} rows) ===
+`;
+    if (headers.filter((h) => h.length > 0).length > 0) {
+      content += `
+[TABLE STRUCTURE]
+`;
+      content += `Headers: ${headers.filter((h) => h.length > 0).join(" | ")}
+`;
+      content += `${"\u2500".repeat(60)}
+`;
+      for (const row of dataRows) {
+        const rowStr = headers.map((header, idx) => {
+          const value = row[idx] || "";
+          if (!value.trim()) return null;
+          return header ? `${header}: ${value}` : value;
+        }).filter(Boolean).join(" | ");
+        if (rowStr.trim()) {
+          content += `${rowStr}
+`;
+        }
+      }
+    } else {
+      for (const row of allRows) {
+        content += `${row.map((c) => escapeCsvValue(c)).join(",")}
+`;
+      }
+    }
+    if (hasPricing) {
+      content += `
+[PRICING DATA DETECTED]
+`;
+      content += `This sheet contains pricing information. Key columns: ${headers.filter((h) => pricingKeywords.test(h)).join(", ")}
+`;
+      const priceColIdx = headers.findIndex((h) => /price|cost|amount|rate|fee|mrp|total/i.test(h));
+      const productColIdx = headers.findIndex((h) => /product|name|item|service|plan|tier|sku|description/i.test(h));
+      if (priceColIdx >= 0 && productColIdx >= 0) {
+        content += `
+Structured Pricing Summary:
+`;
+        for (const row of dataRows) {
+          const product = row[productColIdx]?.trim();
+          const price = row[priceColIdx]?.trim();
+          if (product && price) {
+            const otherFields = headers.map((h, i) => {
+              if (i === productColIdx || i === priceColIdx || !row[i]?.trim()) return null;
+              return `${h}: ${row[i].trim()}`;
+            }).filter(Boolean).join(", ");
+            content += `  \u2022 ${product} \u2192 ${price}${otherFields ? ` (${otherFields})` : ""}
+`;
+          }
+        }
+      }
+    }
+    const numericCols = headers.map((_, idx) => {
+      const numericCount = dataRows.filter((row) => row[idx] && /^[\d,]+\.?\d*$/.test(row[idx].replace(/[$₹€,\s]/g, "").trim())).length;
+      return numericCount > dataRows.length * 0.5;
+    });
+    const hasStats = numericCols.some(Boolean) && dataRows.length >= 3;
+    if (hasStats && !hasPricing) {
+      content += `
+[STATISTICAL DATA DETECTED]
+`;
+      numericCols.forEach((isNumeric, idx) => {
+        if (!isNumeric || !headers[idx]) return;
+        const values = dataRows.map((row) => parseFloat((row[idx] || "").replace(/[$₹€,\s]/g, ""))).filter((v) => !isNaN(v));
+        if (values.length >= 2) {
+          const min = Math.min(...values);
+          const max = Math.max(...values);
+          const avg = values.reduce((a, b) => a + b, 0) / values.length;
+          content += `  ${headers[idx]}: Range ${min}-${max}, Average: ${avg.toFixed(2)}, ${values.length} data points
+`;
+        }
+      });
+    }
   });
   return {
     content: content.trim(),
     metadata: {
       wordCount: content.split(/\s+/).length,
-      extractedFrom: "excel"
+      extractedFrom: "excel-structured",
+      imageAnalysis: tableSummaries.some((t) => t.hasPricing) ? {
+        hasText: true,
+        hasGraphs: tableSummaries.some((t) => t.rowCount > 5),
+        hasInfographics: false,
+        extractedText: `Structured data: ${tableSummaries.map((t) => `${t.sheetName} (${t.rowCount} rows, ${t.hasPricing ? "PRICING" : "data"})`).join("; ")}`,
+        insights: `Excel with ${tableSummaries.length} sheets. ${tableSummaries.filter((t) => t.hasPricing).length} pricing sheets detected.`
+      } : void 0
     }
   };
 }
@@ -22955,7 +23161,7 @@ Be specific with numbers, percentages, and facts visible in the image.`
     const content = `[IMAGE ANALYSIS]
 
 ${analysisContent}`;
-    console.log(`Image processed successfully: ${filePath.substring(filePath.lastIndexOf("/") + 1)}`);
+    console.log(`\u2705 Image processed successfully: ${filePath.substring(filePath.lastIndexOf("/") + 1)}`);
     return {
       content,
       metadata: {
@@ -22996,7 +23202,7 @@ async function processAudio(filePath, fileType) {
     const content = `[AUDIO TRANSCRIPTION]
 
 ${result.content}`;
-    console.log(`Audio processed successfully: ${result.duration}s, ${result.content.length} chars`);
+    console.log(`\u2705 Audio processed successfully: ${result.duration}s, ${result.content.length} chars`);
     return {
       content,
       metadata: {
@@ -23035,13 +23241,13 @@ __export(scheduled_jobs_exports, {
   sendExpiryWarnings: () => sendExpiryWarnings
 });
 import cron from "node-cron";
-import { eq as eq25, and as and21, lte as lte6, gte as gte7, isNull as isNull4 } from "drizzle-orm";
+import { eq as eq26, and as and21, lte as lte6, gte as gte7, isNull as isNull4 } from "drizzle-orm";
 async function expireSubscriptions() {
   try {
     console.log("Running subscription expiration job...");
     const result = await db.update(subscriptions).set({ status: "expired", updatedAt: /* @__PURE__ */ new Date() }).where(
       and21(
-        eq25(subscriptions.status, "active"),
+        eq26(subscriptions.status, "active"),
         lte6(subscriptions.currentPeriodEnd, /* @__PURE__ */ new Date())
       )
     );
@@ -23062,7 +23268,7 @@ async function expireLicensePackages() {
     console.log("Running license package expiration job...");
     const result = await db.update(licensePackages).set({ status: "expired" }).where(
       and21(
-        eq25(licensePackages.status, "active"),
+        eq26(licensePackages.status, "active"),
         lte6(licensePackages.endDate, /* @__PURE__ */ new Date())
       )
     );
@@ -23093,9 +23299,9 @@ async function sendExpiryWarnings() {
       const expiringSubscriptions = await db.select({
         subscription: subscriptions,
         user: authUsers
-      }).from(subscriptions).innerJoin(authUsers, eq25(subscriptions.userId, authUsers.id)).where(
+      }).from(subscriptions).innerJoin(authUsers, eq26(subscriptions.userId, authUsers.id)).where(
         and21(
-          eq25(subscriptions.status, "active"),
+          eq26(subscriptions.status, "active"),
           gte7(subscriptions.currentPeriodEnd, targetDate),
           lte6(subscriptions.currentPeriodEnd, nextDay)
         )
@@ -23120,9 +23326,9 @@ async function sendExpiryWarnings() {
       const expiringPackages = await db.select({
         package: licensePackages,
         org: organizations
-      }).from(licensePackages).innerJoin(organizations, eq25(licensePackages.organizationId, organizations.id)).where(
+      }).from(licensePackages).innerJoin(organizations, eq26(licensePackages.organizationId, organizations.id)).where(
         and21(
-          eq25(licensePackages.status, "active"),
+          eq26(licensePackages.status, "active"),
           gte7(licensePackages.endDate, targetDate),
           lte6(licensePackages.endDate, nextDay)
         )
@@ -23225,7 +23431,7 @@ async function deleteExpiredMeetingMinutes() {
 async function reconcileUsageTracking() {
   try {
     console.log("Running usage reconciliation job...");
-    const activeSubscriptions = await db.select().from(subscriptions).where(eq25(subscriptions.status, "active"));
+    const activeSubscriptions = await db.select().from(subscriptions).where(eq26(subscriptions.status, "active"));
     let reconciledCount = 0;
     let discrepancyCount = 0;
     for (const subscription of activeSubscriptions) {
@@ -23293,7 +23499,7 @@ async function closeStaleActiveSessions() {
     const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1e3);
     const staleSessions = await db.select().from(sessionUsage).where(
       and21(
-        eq25(sessionUsage.status, "active"),
+        eq26(sessionUsage.status, "active"),
         isNull4(sessionUsage.endTime),
         lte6(sessionUsage.startTime, fourHoursAgo)
       )
@@ -23312,7 +23518,7 @@ async function closeStaleActiveSessions() {
         endTime,
         durationSeconds: durationSeconds.toString(),
         status: "ended"
-      }).where(eq25(sessionUsage.id, session.id));
+      }).where(eq26(sessionUsage.id, session.id));
       closedCount++;
     }
     console.log(`Closed ${closedCount} stale session(s)`);
@@ -23416,7 +23622,7 @@ init_db();
 import { createServer } from "http";
 import path3 from "path";
 import { z as z11 } from "zod";
-import { eq as eq24, desc as desc14, sql as sql13 } from "drizzle-orm";
+import { eq as eq25, desc as desc14, and as and20, or as or8, sql as sql13 } from "drizzle-orm";
 
 // server/routes-auth.ts
 init_storage_auth();
@@ -23977,11 +24183,12 @@ function setupAuthRoutes(app2) {
         return res.status(403).json({ message: "Session invalidated. Please log in again." });
       }
       const accessToken = generateAccessToken({
-        userId: payload.userId,
-        email: payload.email,
-        role: payload.role,
-        username: payload.username,
-        sessionVersion: payload.sessionVersion
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        // ✅ Use current role from database
+        username: user.username,
+        sessionVersion: user.sessionVersion
       });
       res.json({ accessToken });
     } catch (error) {
@@ -24569,8 +24776,13 @@ setInterval(() => {
 // server/routes-admin.ts
 init_jwt();
 function getRazorpayKeyId() {
+  if (process.env.RAZORPAY_MODE === "LIVE" || process.env.RAZORPAY_MODE === "PRODUCTION") {
+    return process.env.RAZORPAY_LIVE_KEY_ID || process.env.RAZORPAY_KEY_ID;
+  } else if (process.env.RAZORPAY_MODE === "TEST") {
+    return process.env.RAZORPAY_TEST_KEY_ID || process.env.RAZORPAY_KEY_ID;
+  }
   const isDevelopment = process.env.NODE_ENV === "development";
-  const razorpayMode = process.env.RAZORPAY_MODE || (isDevelopment ? "TEST" : "LIVE");
+  const razorpayMode = isDevelopment ? "TEST" : "LIVE";
   if (razorpayMode === "TEST") {
     return process.env.RAZORPAY_TEST_KEY_ID || process.env.RAZORPAY_KEY_ID;
   } else {
@@ -24578,8 +24790,13 @@ function getRazorpayKeyId() {
   }
 }
 function getRazorpayKeySecret() {
+  if (process.env.RAZORPAY_MODE === "LIVE" || process.env.RAZORPAY_MODE === "PRODUCTION") {
+    return process.env.RAZORPAY_LIVE_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET;
+  } else if (process.env.RAZORPAY_MODE === "TEST") {
+    return process.env.RAZORPAY_TEST_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET;
+  }
   const isDevelopment = process.env.NODE_ENV === "development";
-  const razorpayMode = process.env.RAZORPAY_MODE || (isDevelopment ? "TEST" : "LIVE");
+  const razorpayMode = isDevelopment ? "TEST" : "LIVE";
   if (razorpayMode === "TEST") {
     return process.env.RAZORPAY_TEST_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET;
   } else {
@@ -26044,9 +26261,16 @@ function setupAdminRoutes(app2) {
   });
   app2.get("/api/admin/payment-config", authenticateToken, requireAdmin, async (req, res) => {
     try {
-      const isDevelopment = process.env.NODE_ENV === "development";
-      const razorpayMode = process.env.RAZORPAY_MODE || (isDevelopment ? "TEST" : "LIVE");
-      const cashfreeMode = process.env.CASHFREE_ENVIRONMENT || (isDevelopment ? "SANDBOX" : "PRODUCTION");
+      let razorpayMode;
+      if (process.env.RAZORPAY_MODE === "LIVE" || process.env.RAZORPAY_MODE === "PRODUCTION") {
+        razorpayMode = "LIVE";
+      } else if (process.env.RAZORPAY_MODE === "TEST") {
+        razorpayMode = "TEST";
+      } else {
+        const isDevelopment = process.env.NODE_ENV === "development";
+        razorpayMode = isDevelopment ? "TEST" : "LIVE";
+      }
+      const cashfreeMode = process.env.CASHFREE_ENVIRONMENT || (process.env.NODE_ENV === "development" ? "SANDBOX" : "PRODUCTION");
       const razorpayKeyId = getRazorpayKeyId();
       const cashfreeAppId = process.env.CASHFREE_APP_ID || process.env.CASHFREE_SANDBOX_APP_ID;
       const hasRazorpayLive = !!(process.env.RAZORPAY_LIVE_KEY_ID || process.env.RAZORPAY_KEY_ID && !process.env.RAZORPAY_KEY_ID.includes("test"));
@@ -26086,8 +26310,15 @@ function setupAdminRoutes(app2) {
         key_id: razorpayKeyId,
         key_secret: razorpayKeySecret
       });
-      const isDevelopment = process.env.NODE_ENV === "development";
-      const razorpayMode = process.env.RAZORPAY_MODE || (isDevelopment ? "TEST" : "LIVE");
+      let razorpayMode;
+      if (process.env.RAZORPAY_MODE === "LIVE" || process.env.RAZORPAY_MODE === "PRODUCTION") {
+        razorpayMode = "LIVE";
+      } else if (process.env.RAZORPAY_MODE === "TEST") {
+        razorpayMode = "TEST";
+      } else {
+        const isDevelopment = process.env.NODE_ENV === "development";
+        razorpayMode = isDevelopment ? "TEST" : "LIVE";
+      }
       try {
         await razorpay.payments.all({ count: 1 });
         return res.json({
@@ -26388,6 +26619,10 @@ function setupAdminRoutes(app2) {
       });
       res.json({ success: true });
     } catch (error) {
+      if (error.message?.includes("endpoint has been disabled") || error.code === "XX000") {
+        console.error("Database unavailable - visit tracking skipped");
+        return res.json({ success: true, skipped: true });
+      }
       console.error("Track visit error:", error);
       res.status(500).json({ message: "Failed to track visit" });
     }
@@ -27501,6 +27736,31 @@ function setupTranscriptionRoutes(server) {
         // Disable entity detection for faster processing
       });
       console.log("\u{1F399}\uFE0F Deepgram configured with nova-2-meeting model for multi-speaker diarization");
+      dgConnection.on(LiveTranscriptionEvents.Error, (error) => {
+        console.error("\u274C Deepgram connection error:", error);
+        console.error("\u274C Deepgram error details:", JSON.stringify(error, null, 2));
+        try {
+          if (dgConnection.getReadyState() !== 3) {
+            dgConnection.finish();
+          }
+        } catch (cleanupError) {
+          console.error("Error cleaning up Deepgram connection:", cleanupError);
+        }
+        if (clientWs.readyState === WebSocket.OPEN) {
+          try {
+            clientWs.send(JSON.stringify({
+              type: "error",
+              error: "Transcription service error. Please try again."
+            }));
+            clientWs.close();
+          } catch (wsError) {
+            console.error("Error sending error message to client:", wsError);
+          }
+        }
+      });
+      dgConnection.on(LiveTranscriptionEvents.Close, () => {
+        console.log("\u{1F50C} Deepgram connection closed");
+      });
       dgConnection.on(LiveTranscriptionEvents.Open, () => {
         console.log("\u2705 Deepgram connection opened with nova-2-meeting model");
         console.log("\u{1F399}\uFE0F Configuration: 48kHz sample rate, diarization enabled");
@@ -27557,53 +27817,65 @@ function setupTranscriptionRoutes(server) {
         dgConnection.on(LiveTranscriptionEvents.UtteranceEnd, (data) => {
           console.log("\u{1F3A4} Utterance ended - speaker turn complete");
         });
-        dgConnection.on(LiveTranscriptionEvents.Error, (error) => {
-          console.error("\u274C Deepgram error:", error);
-          console.error("\u274C Deepgram error details:", JSON.stringify(error, null, 2));
-          if (clientWs.readyState === WebSocket.OPEN) {
-            clientWs.send(JSON.stringify({
-              type: "error",
-              error: "Transcription service error. Please try again."
-            }));
-          }
-        });
-        dgConnection.on(LiveTranscriptionEvents.Close, () => {
-          console.log("\u{1F50C} Deepgram connection closed");
-        });
         clientWs.on("message", (data) => {
-          if (dgConnection.getReadyState() === 1) {
-            if (Buffer.isBuffer(data) && data.length === 0) {
-              console.log("\u{1F493} Keepalive ping received");
-              return;
+          try {
+            if (dgConnection.getReadyState() === 1) {
+              if (Buffer.isBuffer(data) && data.length === 0) {
+                console.log("\u{1F493} Keepalive ping received");
+                return;
+              }
+              if (Buffer.isBuffer(data)) {
+                dgConnection.send(new Uint8Array(data).buffer);
+              } else if (data instanceof ArrayBuffer) {
+                dgConnection.send(data);
+              } else if (Array.isArray(data)) {
+                const combined = Buffer.concat(data);
+                dgConnection.send(new Uint8Array(combined).buffer);
+              }
             }
-            if (Buffer.isBuffer(data)) {
-              dgConnection.send(new Uint8Array(data).buffer);
-            } else if (data instanceof ArrayBuffer) {
-              dgConnection.send(data);
-            } else if (Array.isArray(data)) {
-              const combined = Buffer.concat(data);
-              dgConnection.send(new Uint8Array(combined).buffer);
-            }
+          } catch (error) {
+            console.error("Error processing client message:", error);
           }
         });
         clientWs.on("close", () => {
           console.log("\u{1F44B} Client disconnected from transcription stream");
-          dgConnection.finish();
+          try {
+            if (dgConnection.getReadyState() !== 3) {
+              dgConnection.finish();
+            }
+          } catch (error) {
+            console.error("Error closing Deepgram connection:", error);
+          }
         });
         clientWs.on("error", (error) => {
           console.error("Client WebSocket error:", error);
-          dgConnection.finish();
+          try {
+            if (dgConnection.getReadyState() !== 3) {
+              dgConnection.finish();
+            }
+          } catch (cleanupError) {
+            console.error("Error cleaning up Deepgram connection on client error:", cleanupError);
+          }
         });
       });
     } catch (error) {
       console.error("Failed to setup Deepgram connection:", error);
-      if (clientWs.readyState === WebSocket.OPEN) {
-        clientWs.send(JSON.stringify({
-          type: "error",
-          error: "Failed to initialize transcription service"
-        }));
+      console.error("Error stack:", error?.stack);
+      try {
+        if (clientWs.readyState === WebSocket.OPEN) {
+          clientWs.send(JSON.stringify({
+            type: "error",
+            error: "Failed to initialize transcription service"
+          }));
+        }
+      } catch (sendError) {
+        console.error("Error sending error message to client:", sendError);
       }
-      clientWs.close();
+      try {
+        clientWs.close();
+      } catch (closeError) {
+        console.error("Error closing client WebSocket:", closeError);
+      }
     }
   });
   return router4;
@@ -27730,8 +28002,13 @@ function getCashfreeMode() {
   return process.env.CASHFREE_ENVIRONMENT === "SANDBOX" ? "sandbox" : "production";
 }
 function getRazorpayKeyId2() {
+  if (process.env.RAZORPAY_MODE === "LIVE" || process.env.RAZORPAY_MODE === "PRODUCTION") {
+    return process.env.RAZORPAY_LIVE_KEY_ID || process.env.RAZORPAY_KEY_ID;
+  } else if (process.env.RAZORPAY_MODE === "TEST") {
+    return process.env.RAZORPAY_TEST_KEY_ID || process.env.RAZORPAY_KEY_ID;
+  }
   const isDevelopment = process.env.NODE_ENV === "development";
-  const razorpayMode = process.env.RAZORPAY_MODE || (isDevelopment ? "TEST" : "LIVE");
+  const razorpayMode = isDevelopment ? "TEST" : "LIVE";
   if (razorpayMode === "TEST") {
     return process.env.RAZORPAY_TEST_KEY_ID || process.env.RAZORPAY_KEY_ID;
   } else {
@@ -27755,6 +28032,24 @@ function setupEnterpriseRoutes(app2) {
       res.status(500).json({ message: "Failed to verify access", error: error.message });
     }
   };
+  app2.get("/api/enterprise/has-organization", authenticateToken, requireAuthenticated, withAuthenticated(async (req, res) => {
+    try {
+      const userId = req.jwtUser.userId;
+      const user = await authStorage.getUserById(userId);
+      const userRole = user?.role || req.jwtUser.role;
+      console.log(`[has-organization] User ${userId} role: ${userRole}`);
+      if (userRole !== "license_manager" && userRole !== "admin" && userRole !== "super_admin") {
+        console.log(`[has-organization] User ${userId} is not license_manager, returning false`);
+        return res.json({ hasOrganization: false });
+      }
+      const organization = await authStorage.getOrganizationByManagerId(userId);
+      console.log(`[has-organization] User ${userId} organization:`, organization ? organization.id : "none");
+      res.json({ hasOrganization: !!organization });
+    } catch (error) {
+      console.error("Error checking has-organization:", error);
+      res.status(500).json({ hasOrganization: false, error: error.message });
+    }
+  }));
   app2.get("/api/enterprise/overview", authenticateToken, requireAuthenticated, requireLicenseManager, withAuthenticated(async (req, res) => {
     try {
       const userId = req.jwtUser.userId;
@@ -27831,17 +28126,20 @@ function setupEnterpriseRoutes(app2) {
           status: "active",
           emailVerified: true
         });
-        const resetToken = randomBytes(32).toString("hex");
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1e3);
-        await authStorage.createPasswordResetToken(userEmail, resetToken, expiresAt);
-        const { sendLicenseAssignmentEmail: sendLicenseAssignmentEmail4 } = await Promise.resolve().then(() => (init_email(), email_exports));
-        sendLicenseAssignmentEmail4(
-          userEmail,
-          targetUser.firstName,
-          resetToken,
-          organization.companyName
-        ).catch((err) => {
-          console.error("Error sending license assignment email:", err);
+        const resetToken2 = randomBytes(32).toString("hex");
+        const expiresAt2 = new Date(Date.now() + 24 * 60 * 60 * 1e3);
+        await authStorage.createPasswordResetToken(userEmail, resetToken2, expiresAt2);
+        Promise.resolve().then(() => (init_email(), email_exports)).then(({ sendLicenseAssignmentEmail: sendLicenseAssignmentEmail3 }) => {
+          sendLicenseAssignmentEmail3(
+            userEmail,
+            targetUser.firstName,
+            resetToken2,
+            organization.companyName
+          ).catch((err) => {
+            console.error("Error sending license assignment email:", err);
+          });
+        }).catch((err) => {
+          console.error("Error importing email service:", err);
         });
         await eventLogger.log({
           actorId: userId,
@@ -27867,33 +28165,31 @@ function setupEnterpriseRoutes(app2) {
         notes,
         status: "active"
       });
-      const { sendLicenseAssignmentEmail: sendLicenseAssignmentEmail3, sendLicenseAccessNotificationEmail: sendLicenseAccessNotificationEmail2 } = await Promise.resolve().then(() => (init_email(), email_exports));
-      const newUserNeedsPassword = !targetUser.hashedPassword || targetUser.hashedPassword === "";
-      if (newUserNeedsPassword) {
-        const resetToken = randomBytes(32).toString("hex");
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1e3);
-        await authStorage.createPasswordResetToken(userEmail, resetToken, expiresAt);
-        sendLicenseAssignmentEmail3(
+      const existingMembership = await authStorage.getUserMembership(targetUser.id);
+      if (!existingMembership) {
+        await authStorage.createOrganizationMembership({
+          organizationId: organization.id,
+          userId: targetUser.id,
+          role: "member",
+          status: "active"
+        });
+      }
+      const resetToken = randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1e3);
+      authStorage.createPasswordResetToken(userEmail, resetToken, expiresAt).then(() => {
+        return Promise.resolve().then(() => (init_email(), email_exports));
+      }).then(({ sendLicenseAssignmentEmail: sendLicenseAssignmentEmail3 }) => {
+        return sendLicenseAssignmentEmail3(
           userEmail,
           targetUser.firstName,
           resetToken,
           organization.companyName
-        ).then(() => {
-          console.log(`Password setup email sent to new user ${userEmail}`);
-        }).catch((err) => {
-          console.error(`Error sending password setup email to ${userEmail}:`, err);
-        });
-      } else {
-        sendLicenseAccessNotificationEmail2(
-          userEmail,
-          targetUser.firstName,
-          organization.companyName
-        ).then(() => {
-          console.log(`License access notification sent to existing user ${userEmail}`);
-        }).catch((err) => {
-          console.error(`Error sending access notification to ${userEmail}:`, err);
-        });
-      }
+        );
+      }).then(() => {
+        console.log(`Password setup/reset email sent to ${userEmail}`);
+      }).catch((err) => {
+        console.error(`Error sending password setup/reset email to ${userEmail}:`, err);
+      });
       await eventLogger.log({
         actorId: userId,
         action: "LICENSE_ASSIGNED",
@@ -27970,26 +28266,27 @@ function setupEnterpriseRoutes(app2) {
         return res.status(400).json({ message: "New user already has an active license assignment" });
       }
       const newAssignment = await authStorage.reassignLicense(assignmentId, newUser.id, userId, notes);
-      const { sendLicenseAssignmentEmail: sendLicenseAssignmentEmail3, sendLicenseAccessNotificationEmail: sendLicenseAccessNotificationEmail2 } = await Promise.resolve().then(() => (init_email(), email_exports));
-      if (isNewUser || !newUser.hashedPassword || newUser.hashedPassword === "") {
-        const resetToken = randomBytes(32).toString("hex");
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1e3);
-        await authStorage.createPasswordResetToken(newUserEmail, resetToken, expiresAt);
-        await sendLicenseAssignmentEmail3(
-          newUserEmail,
-          newUser.firstName,
-          resetToken,
-          organization.companyName
-        );
-        console.log(`Password setup email sent to new user ${newUserEmail} (via reassignment)`);
-      } else {
-        await sendLicenseAccessNotificationEmail2(
-          newUserEmail,
-          newUser.firstName,
-          organization.companyName
-        );
-        console.log(`License access notification sent to existing user ${newUserEmail} (via reassignment)`);
+      const existingMembership = await authStorage.getUserMembership(newUser.id);
+      if (!existingMembership) {
+        await authStorage.createOrganizationMembership({
+          organizationId: organization.id,
+          userId: newUser.id,
+          role: "member",
+          status: "active"
+        });
       }
+      const { sendLicenseAssignmentEmail: sendLicenseAssignmentEmail3 } = await Promise.resolve().then(() => (init_email(), email_exports));
+      const resetToken = randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1e3);
+      await authStorage.createPasswordResetToken(newUserEmail, resetToken, expiresAt);
+      await sendLicenseAssignmentEmail3(
+        newUserEmail,
+        newUser.firstName,
+        resetToken,
+        organization.companyName
+      );
+      const emailType = isNewUser || !newUser.hashedPassword || newUser.hashedPassword === "" ? "password_setup" : "password_reset";
+      console.log(`${emailType} email sent to ${newUserEmail} (via reassignment)`);
       await eventLogger.log({
         actorId: userId,
         action: "LICENSE_REASSIGNED",
@@ -28102,27 +28399,18 @@ function setupEnterpriseRoutes(app2) {
       if (!targetUser) {
         return res.status(404).json({ message: "User not found" });
       }
-      const { sendLicenseAssignmentEmail: sendLicenseAssignmentEmail3, sendLicenseAccessNotificationEmail: sendLicenseAccessNotificationEmail2 } = await Promise.resolve().then(() => (init_email(), email_exports));
-      const needsPassword = !targetUser.hashedPassword || targetUser.hashedPassword === "";
-      if (needsPassword) {
-        const resetToken = randomBytes(32).toString("hex");
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1e3);
-        await authStorage.createPasswordResetToken(targetUser.email, resetToken, expiresAt);
-        await sendLicenseAssignmentEmail3(
-          targetUser.email,
-          targetUser.firstName,
-          resetToken,
-          organization.companyName
-        );
-        console.log(`Resent password setup email to ${targetUser.email}`);
-      } else {
-        await sendLicenseAccessNotificationEmail2(
-          targetUser.email,
-          targetUser.firstName,
-          organization.companyName
-        );
-        console.log(`Resent license access notification to ${targetUser.email}`);
-      }
+      const { sendLicenseAssignmentEmail: sendLicenseAssignmentEmail3 } = await Promise.resolve().then(() => (init_email(), email_exports));
+      const resetToken = randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1e3);
+      await authStorage.createPasswordResetToken(targetUser.email, resetToken, expiresAt);
+      await sendLicenseAssignmentEmail3(
+        targetUser.email,
+        targetUser.firstName,
+        resetToken,
+        organization.companyName
+      );
+      const emailType = !targetUser.hashedPassword || targetUser.hashedPassword === "" ? "password_setup" : "password_reset";
+      console.log(`Resent ${emailType} email to ${targetUser.email}`);
       await eventLogger.log({
         actorId: userId,
         action: "LICENSE_EMAIL_RESENT",
@@ -28131,12 +28419,12 @@ function setupEnterpriseRoutes(app2) {
         metadata: {
           organizationId: organization.id,
           targetUserEmail: targetUser.email,
-          emailType: needsPassword ? "password_setup" : "access_notification"
+          emailType
         }
       });
       res.json({
         success: true,
-        message: needsPassword ? "Password setup email sent successfully. Please check spam folder." : "Access notification email sent successfully. Please check spam folder."
+        message: "Password setup email sent successfully. User can create/reset their password using the link."
       });
     } catch (error) {
       console.error("Error resending email:", error);
@@ -28247,6 +28535,7 @@ function setupEnterpriseRoutes(app2) {
   app2.post("/api/enterprise/purchase", authenticateToken, requireAuthenticated, withAuthenticated(async (req, res) => {
     try {
       const userId = req.jwtUser.userId;
+      console.log(`[Enterprise Purchase] User ${userId} attempting to purchase`);
       const validation = purchaseSchema.safeParse(req.body);
       if (!validation.success) {
         return res.status(400).json({
@@ -28257,9 +28546,13 @@ function setupEnterpriseRoutes(app2) {
       const { totalSeats, packageType, companyName, billingEmail, paymentGateway: requestedGateway } = validation.data;
       const paymentGateway = requestedGateway || DEFAULT_PAYMENT_GATEWAY;
       const existingOrg = await authStorage.getOrganizationByManagerId(userId);
+      console.log(`[Enterprise Purchase] Existing org check for user ${userId}:`, existingOrg ? `Found org ${existingOrg.id} (${existingOrg.companyName})` : "No org found");
       if (existingOrg) {
+        console.log(`[Enterprise Purchase] User ${userId} already has organization ${existingOrg.id} (${existingOrg.companyName})`);
         return res.status(400).json({
-          message: "You already have an organization. Use add-seats endpoint to purchase more licenses."
+          message: `You already have an organization (${existingOrg.companyName}). Use the License Manager to add more seats.`,
+          organizationId: existingOrg.id,
+          organizationName: existingOrg.companyName
         });
       }
       const user = await authStorage.getUserById(userId);
@@ -28436,7 +28729,7 @@ function setupEnterpriseRoutes(app2) {
         const { cfPaymentId, cashfreeOrderId } = validation.data;
         let orderIdToCheck = cashfreeOrderId;
         if (!orderIdToCheck) {
-          orderIdToCheck = existingPayment.razorpayOrderId;
+          orderIdToCheck = existingPayment.razorpayOrderId || void 0;
         }
         if (!orderIdToCheck) {
           return res.status(400).json({
@@ -28445,16 +28738,16 @@ function setupEnterpriseRoutes(app2) {
           });
         }
         console.log(`[Enterprise Verify] Checking Cashfree payment status for order: ${orderIdToCheck}`);
-        const paymentStatus2 = await gateway.getPaymentStatus(orderIdToCheck);
-        console.log(`[Enterprise Verify] Cashfree payment status:`, paymentStatus2);
-        const isPaid = paymentStatus2.status === "PAID" || paymentStatus2.status === "SUCCESS";
+        const paymentStatus = await gateway.getPaymentStatus(orderIdToCheck);
+        console.log(`[Enterprise Verify] Cashfree payment status:`, paymentStatus);
+        const isPaid = paymentStatus.status === "PAID" || paymentStatus.status === "SUCCESS";
         if (!isPaid) {
           return res.status(400).json({
             message: "Payment not completed",
-            status: paymentStatus2.status
+            status: paymentStatus.status
           });
         }
-        verifiedPaymentId = cfPaymentId || paymentStatus2.paymentId || orderIdToCheck;
+        verifiedPaymentId = cfPaymentId || paymentStatus.paymentId || orderIdToCheck;
       }
       const existingOrg = await authStorage.getOrganizationByManagerId(userId);
       if (existingOrg) {
@@ -28636,13 +28929,15 @@ function setupEnterpriseRoutes(app2) {
       const {
         orderId,
         additionalSeats,
-        licensePackageId
+        licensePackageId,
+        razorpayPaymentId
       } = req.body;
       if (!orderId || !additionalSeats || !licensePackageId) {
         return res.status(400).json({ message: "Payment verification details are required" });
       }
       const paymentGateway = PaymentGatewayFactory.getGateway();
-      const verifyResult = await paymentGateway.getPaymentStatus(orderId);
+      const paymentIdToVerify = razorpayPaymentId || orderId;
+      const verifyResult = await paymentGateway.getPaymentStatus(paymentIdToVerify);
       const isPaid = verifyResult.status === "PAID" || verifyResult.status === "SUCCESS" || verifyResult.status === "captured" || verifyResult.status === "authorized";
       if (!isPaid) {
         return res.status(400).json({
@@ -28918,19 +29213,45 @@ async function getPackageOrAddonBySku(sku) {
     };
   }
   const addons2 = await billingStorage3.getPublishedAddons();
-  const addon = addons2.find((a) => a.id === sku);
+  let addon = addons2.find((a) => a.id === sku);
+  let tierMinutes;
+  if (!addon && sku.includes("-")) {
+    const lastHyphen = sku.lastIndexOf("-");
+    const suffix = sku.slice(lastHyphen + 1);
+    const parsed = parseInt(suffix, 10);
+    if (!isNaN(parsed) && parsed > 0 && parsed < 1e5) {
+      const baseId = sku.slice(0, lastHyphen);
+      addon = addons2.find((a) => a.id === baseId);
+      tierMinutes = parsed;
+    }
+  }
   if (addon) {
     const metadata = addon.metadata || {};
     const features = Array.isArray(addon.features) ? addon.features : [];
     const isSessionMinutes = addon.type === "usage_bundle" || addon.slug === "session-minutes";
     const validityDays = addon.billingInterval === "monthly" ? 30 : isSessionMinutes ? 30 : void 0;
+    let totalUnits = tierMinutes ?? metadata.minutes;
+    if (totalUnits == null && addon.pricingTiers && Array.isArray(addon.pricingTiers)) {
+      const tiers = addon.pricingTiers;
+      if (tierMinutes != null) {
+        const tier = tiers.find((t) => t.minutes === tierMinutes);
+        totalUnits = tier?.minutes;
+      }
+      if (totalUnits == null && tiers.length > 0) totalUnits = tiers[0].minutes;
+    }
+    const flatPrice = addon.flatPrice;
+    let price = parseFloat(flatPrice || "0");
+    if (price === 0 && addon.pricingTiers && Array.isArray(addon.pricingTiers) && tierMinutes != null) {
+      const tier = addon.pricingTiers.find((t) => t.minutes === tierMinutes);
+      if (tier) price = parseFloat(tier.price);
+    }
     return {
       sku: addon.id,
-      name: addon.displayName,
-      price: parseFloat(addon.flatPrice || "0"),
+      name: tierMinutes != null ? `${addon.displayName} - ${tierMinutes} minutes` : addon.displayName,
+      price,
       currency: addon.currency,
       billingType: addon.billingInterval === "monthly" ? "monthly" : "one_time",
-      totalUnits: metadata.minutes,
+      totalUnits: totalUnits ?? void 0,
       validityDays,
       description: addon.description || addon.displayName,
       features
@@ -28945,7 +29266,14 @@ async function getAddonTypeFromSku(sku) {
   const isPlatformSubscription = subscriptionPlans3.some((plan) => plan.id === sku);
   if (isPlatformSubscription) return "platform_access";
   const addons2 = await billingStorage3.getPublishedAddons();
-  const addon = addons2.find((a) => a.id === sku);
+  let addon = addons2.find((a) => a.id === sku);
+  if (!addon && sku.includes("-")) {
+    const lastHyphen = sku.lastIndexOf("-");
+    const suffix = sku.slice(lastHyphen + 1);
+    if (!isNaN(parseInt(suffix, 10)) && parseInt(suffix, 10) > 0) {
+      addon = addons2.find((a) => a.id === sku.slice(0, lastHyphen));
+    }
+  }
   if (addon) {
     return addon.type;
   }
@@ -28962,10 +29290,47 @@ init_schema();
 init_event_logger();
 init_db();
 import { z as z6 } from "zod";
-import { eq as eq13, desc as desc5, and as and11 } from "drizzle-orm";
+import { eq as eq13, and as and11 } from "drizzle-orm";
+async function getInvoiceConfig() {
+  const defaults = {
+    company: {
+      name: "",
+      address: "",
+      email: "",
+      website: "",
+      gstNumber: null
+    },
+    terms: []
+  };
+  try {
+    const rows = await db.select().from(systemConfig).where(eq13(systemConfig.section, "system"));
+    const map = {};
+    rows.forEach((r) => {
+      map[r.key] = r.value ?? "";
+    });
+    const name = (map.siteName || "").trim();
+    const address = (map.companyAddress || "").trim();
+    const email = (map.supportEmail || "").trim();
+    const website = (map.siteUrl || "").trim();
+    const gstNumber = (map.gstNumber || "").trim() || null;
+    const termsRaw = (map.invoiceTerms || "").trim();
+    const terms = termsRaw ? termsRaw.split(/\r?\n/).map((s) => s.trim()).filter(Boolean) : [];
+    return {
+      company: { name, address, email, website, gstNumber },
+      terms: terms.length > 0 ? terms : defaults.terms
+    };
+  } catch {
+    return defaults;
+  }
+}
 function getRazorpayKeyId3() {
+  if (process.env.RAZORPAY_MODE === "LIVE" || process.env.RAZORPAY_MODE === "PRODUCTION") {
+    return process.env.RAZORPAY_LIVE_KEY_ID || process.env.RAZORPAY_KEY_ID;
+  } else if (process.env.RAZORPAY_MODE === "TEST") {
+    return process.env.RAZORPAY_TEST_KEY_ID || process.env.RAZORPAY_KEY_ID;
+  }
   const isDevelopment = process.env.NODE_ENV === "development";
-  const razorpayMode = process.env.RAZORPAY_MODE || (isDevelopment ? "TEST" : "LIVE");
+  const razorpayMode = isDevelopment ? "TEST" : "LIVE";
   if (razorpayMode === "TEST") {
     return process.env.RAZORPAY_TEST_KEY_ID || process.env.RAZORPAY_KEY_ID;
   } else {
@@ -28981,6 +29346,10 @@ async function activateCartCheckout(pendingOrder, verifiedPaymentId, gatewayTran
     if (!cartItems2 || cartItems2.length === 0) {
       return { success: false, activatedAddons: [], message: "No items found in order" };
     }
+    const personalItems = cartItems2.filter((i) => i.purchaseMode !== "team");
+    if (personalItems.length < cartItems2.length) {
+      console.log(`[Cart Activation] Skipping ${cartItems2.length - personalItems.length} team items; processing ${personalItems.length} personal items`);
+    }
     const perItemPromoCodes = metadata?.perItemPromoCodes || [];
     const uniquePromoCodeIds = Array.from(new Set(
       perItemPromoCodes.filter((p) => p.promoCodeId).map((p) => p.promoCodeId)
@@ -28989,17 +29358,20 @@ async function activateCartCheckout(pendingOrder, verifiedPaymentId, gatewayTran
       await authStorage.incrementPromoCodeUses(promoCodeId);
     }
     const activatedAddons = [];
-    for (const item of cartItems2) {
+    for (const item of personalItems) {
       const pkg = await getPackageOrAddonBySku(item.packageSku);
       if (!pkg) continue;
       let mappedAddonType = item.addonType;
       if (item.addonType === "usage_bundle") {
         mappedAddonType = "session_minutes";
+        mappedAddonType = "session_minutes";
         console.log(`[Cart Activation] Mapping addonType: ${item.addonType} \u2192 ${mappedAddonType} for package ${item.packageSku} (${pkg.name})`);
       } else if (item.addonType === "service") {
         const packageSkuLower = item.packageSku.toLowerCase();
         const packageNameLower = (pkg.name || "").toLowerCase();
-        if (packageSkuLower.includes("train") || packageNameLower.includes("train")) {
+        if (packageSkuLower.includes("session") || packageSkuLower.includes("minute") || packageNameLower.includes("session") || packageNameLower.includes("minute")) {
+          mappedAddonType = "session_minutes";
+        } else if (packageSkuLower.includes("train") || packageNameLower.includes("train")) {
           mappedAddonType = "train_me";
         } else if (packageSkuLower.includes("dai") || packageNameLower.includes("dai")) {
           mappedAddonType = "dai";
@@ -29024,9 +29396,26 @@ async function activateCartCheckout(pendingOrder, verifiedPaymentId, gatewayTran
       const itemPaidAmount = itemCount === 1 ? totalPaidAmount : totalPaidAmount * itemDiscountedPrice / (cartDiscountedSubtotal || 1);
       console.log(`[Cart Activation] Item pricing - basePrice: ${itemBasePrice}, discount: ${itemDiscount}, discountedPrice: ${itemDiscountedPrice}, paidAmount: ${itemPaidAmount.toFixed(2)} ${actualCurrency}`);
       console.log(`[Cart Activation] Creating purchase: addonType=${mappedAddonType}, packageSku=${item.packageSku}, totalUnits=${pkg.totalUnits || 0}, paidAmount=${itemPaidAmount.toFixed(2)} ${actualCurrency}`);
+      const userOrganizationId = await authStorage.getUserOrganizationId(userId);
+      const isLicenseManager = await authStorage.isLicenseManager(userId);
+      const targetOrganizationId = isLicenseManager && userOrganizationId ? userOrganizationId : null;
+      if (targetOrganizationId) {
+        console.log(`[Cart Activation] User ${userId} is a license manager - creating ORGANIZATION add-on for org ${targetOrganizationId}`);
+      } else {
+        console.log(`[Cart Activation] Creating PERSONAL add-on for user ${userId}`);
+      }
       if (mappedAddonType === "session_minutes") {
         const existingPurchase = await billingStorage.getActiveAddonPurchase(userId, "session_minutes");
-        const newMinutes = (pkg.totalUnits || 0) * item.quantity;
+        let unitsPerItem = pkg.totalUnits ?? item.metadata?.totalUnits ?? 0;
+        if (unitsPerItem === 0 && (item.packageName || pkg.name)) {
+          const nameMatch = (item.packageName || pkg.name).match(/(\d+)\s*minutes?/i);
+          if (nameMatch) unitsPerItem = parseInt(nameMatch[1], 10);
+        }
+        const newMinutes = Math.max(0, Number(unitsPerItem) || 0) * item.quantity;
+        if (newMinutes === 0) {
+          console.warn(`[Cart Activation] Session minutes item skipped: packageSku=${item.packageSku}, totalUnits/unitsPerItem=0. Fix addon metadata.minutes or pricingTiers.`);
+          continue;
+        }
         const startDate = /* @__PURE__ */ new Date();
         const endDate = pkg.validityDays ? calculateEndDate(startDate, pkg.validityDays) : null;
         if (existingPurchase) {
@@ -29068,7 +29457,8 @@ async function activateCartCheckout(pendingOrder, verifiedPaymentId, gatewayTran
         } else {
           const addon = await billingStorage.createAddonPurchase({
             userId,
-            organizationId: null,
+            organizationId: targetOrganizationId,
+            // ✅ Use organization ID if license manager
             addonType: mappedAddonType,
             packageSku: item.packageSku,
             billingType: "one_time",
@@ -29123,7 +29513,8 @@ async function activateCartCheckout(pendingOrder, verifiedPaymentId, gatewayTran
           try {
             const addon = await billingStorage.createAddonPurchase({
               userId,
-              organizationId: null,
+              organizationId: targetOrganizationId,
+              // ✅ Use organization ID if license manager
               addonType: mappedAddonType,
               packageSku: item.packageSku,
               billingType: "one_time",
@@ -29167,8 +29558,8 @@ async function activateCartCheckout(pendingOrder, verifiedPaymentId, gatewayTran
         }
       }
     }
-    const platformAccessItems = cartItems2.filter((item) => item.addonType === "platform_access");
-    console.log(`[Cart Activation] Found ${platformAccessItems.length} platform_access items out of ${cartItems2.length} total items`);
+    const platformAccessItems = personalItems.filter((item) => item.addonType === "platform_access");
+    console.log(`[Cart Activation] Found ${platformAccessItems.length} platform_access items out of ${personalItems.length} personal items`);
     if (platformAccessItems.length > 0) {
       const subscriptionItem = platformAccessItems[0];
       const pkg = await getPackageOrAddonBySku(subscriptionItem.packageSku);
@@ -29239,7 +29630,13 @@ async function activateCartCheckout(pendingOrder, verifiedPaymentId, gatewayTran
         });
       }
     }
-    await billingStorage.updatePendingOrderStatus(orderId, userId, "completed", /* @__PURE__ */ new Date());
+    if (pendingOrder.status === "pending") {
+      await billingStorage.updatePendingOrderStatus(orderId, userId, "completed", /* @__PURE__ */ new Date());
+    } else {
+      console.log(
+        `[Cart Activation] Skipping pending order status update for order ${orderId} (status=${pendingOrder.status})`
+      );
+    }
     await billingStorage.clearCart(userId);
     await billingStorage.refreshUserEntitlements(userId);
     console.log(`[Cart Activation] Successfully activated ${activatedAddons.length} items for order ${orderId}`);
@@ -29248,6 +29645,151 @@ async function activateCartCheckout(pendingOrder, verifiedPaymentId, gatewayTran
     console.error("[Cart Activation] Error activating cart checkout:", error);
     return { success: false, activatedAddons: [], message: error.message };
   }
+}
+async function runTeamCartActivation(pendingOrder, userId, req) {
+  const metadata = pendingOrder.metadata;
+  const cartItems2 = metadata?.items || [];
+  const teamItems = cartItems2.filter((item) => item.purchaseMode === "team");
+  if (teamItems.length === 0) return { licenseManagerInvitationSent: false };
+  let licenseManagerInvitationSent = false;
+  try {
+    const { sendLicenseManagerInvitationEmail: sendLicenseManagerInvitationEmail2 } = await Promise.resolve().then(() => (init_email(), email_exports));
+    const crypto8 = await import("crypto");
+    const teamItem = teamItems[0];
+    const teamManagerName = teamItem.teamManagerName;
+    const teamManagerEmail = teamItem.teamManagerEmail;
+    if (!teamManagerName || !teamManagerEmail) return { licenseManagerInvitationSent: false };
+    const buyer = await authStorage.getUserById(userId);
+    const buyerName = buyer ? `${buyer.firstName || ""} ${buyer.lastName || ""}`.trim() || buyer.email : "A Rev Winner customer";
+    const purchaseDetails = {
+      platformAccessCount: cartItems2.filter((item) => item.addonType === "platform_access").reduce((sum, item) => sum + (item.quantity || 1), 0),
+      sessionMinutesCount: cartItems2.filter((item) => item.addonType === "session_minutes" || item.addonType === "usage_bundle").reduce((sum, item) => sum + (item.quantity || 1), 0),
+      daiCount: cartItems2.filter((item) => item.addonType === "dai" || item.addonType === "service" && (item.packageSku || "").toLowerCase().includes("dai")).reduce((sum, item) => sum + (item.quantity || 1), 0),
+      trainMeCount: cartItems2.filter((item) => item.addonType === "train_me" || item.addonType === "service" && (item.packageSku || "").toLowerCase().includes("train")).reduce((sum, item) => sum + (item.quantity || 1), 0),
+      totalAmount: pendingOrder.amount || "0",
+      buyerName
+    };
+    const existingOrg = await authStorage.getOrganizationByManagerId(userId);
+    const hasPlatformAccess = purchaseDetails.platformAccessCount > 0;
+    if (existingOrg && !hasPlatformAccess) {
+      console.log(`[Team Purchase] License manager ${userId} purchasing add-ons for existing organization ${existingOrg.id}`);
+      const teamAddonTypes2 = ["session_minutes", "train_me", "dai"];
+      for (const item of cartItems2.filter((i) => i.purchaseMode === "team")) {
+        let mappedType = item.addonType;
+        if (item.addonType === "usage_bundle") mappedType = "session_minutes";
+        if (item.addonType === "service") {
+          const sku = (item.packageSku || "").toLowerCase();
+          mappedType = sku.includes("train") ? "train_me" : sku.includes("dai") ? "dai" : "train_me";
+        }
+        if (!teamAddonTypes2.includes(mappedType)) continue;
+        const pkg = await getPackageOrAddonBySku(item.packageSku);
+        if (!pkg) continue;
+        const startDate = /* @__PURE__ */ new Date();
+        const endDate = pkg.validityDays ? calculateEndDate(startDate, pkg.validityDays) : null;
+        const totalUnits = (pkg.totalUnits || 0) * (item.quantity || 1);
+        const itemPaidAmount = parseFloat(pendingOrder.amount || "0") / Math.max(1, cartItems2.length);
+        try {
+          await billingStorage.createAddonPurchase({
+            userId,
+            // License manager who made the purchase
+            organizationId: existingOrg.id,
+            // Attach to organization
+            addonType: mappedType,
+            packageSku: item.packageSku,
+            billingType: "one_time",
+            purchaseAmount: itemPaidAmount.toFixed(2),
+            currency: pendingOrder.currency || "USD",
+            totalUnits,
+            usedUnits: 0,
+            status: "active",
+            startDate,
+            endDate,
+            metadata: { cartOrderId: pendingOrder.id, packageName: pkg.name }
+          });
+          console.log(`[Team Cart] Created organization addon: ${mappedType} for org ${existingOrg.id}, ${totalUnits} units`);
+        } catch (addonErr) {
+          console.error("[Team Cart] Failed to create organization addon:", addonErr);
+        }
+      }
+      return { licenseManagerInvitationSent: false };
+    }
+    let teamManager = await authStorage.getUserByEmail(teamManagerEmail);
+    if (!teamManager) {
+      const tempPassword = crypto8.randomBytes(32).toString("hex");
+      const nameParts = teamManagerName.trim().split(" ");
+      const firstName = nameParts[0] || teamManagerName;
+      const lastName = nameParts.slice(1).join(" ") || "";
+      const username = teamManagerEmail.split("@")[0] + "_" + crypto8.randomBytes(4).toString("hex");
+      teamManager = await authStorage.createUser({
+        email: teamManagerEmail,
+        username,
+        password: tempPassword,
+        firstName,
+        lastName,
+        role: "user"
+        // ✅ Regular user role, NOT license_manager
+      });
+      console.log(`Created team manager user: ${teamManager.id} (${teamManagerEmail}) with role 'user'`);
+    }
+    console.log(`[Team Purchase] Activating features for team manager ${teamManager.id} (${teamManagerEmail}) - NO organization created`);
+    const teamAddonTypes = ["session_minutes", "train_me", "dai"];
+    for (const item of cartItems2.filter((i) => i.purchaseMode === "team")) {
+      let mappedType = item.addonType;
+      if (item.addonType === "usage_bundle") mappedType = "session_minutes";
+      if (item.addonType === "service") {
+        const sku = (item.packageSku || "").toLowerCase();
+        mappedType = sku.includes("train") ? "train_me" : sku.includes("dai") ? "dai" : "train_me";
+      }
+      if (!teamAddonTypes.includes(mappedType)) continue;
+      const pkg = await getPackageOrAddonBySku(item.packageSku);
+      if (!pkg) continue;
+      const startDate = /* @__PURE__ */ new Date();
+      const endDate = pkg.validityDays ? calculateEndDate(startDate, pkg.validityDays) : null;
+      const totalUnits = (pkg.totalUnits || 0) * (item.quantity || 1);
+      const itemPaidAmount = parseFloat(pendingOrder.amount || "0") / Math.max(1, cartItems2.length);
+      try {
+        await billingStorage.createAddonPurchase({
+          userId: teamManager.id,
+          // ✅ Activate for team manager directly
+          organizationId: null,
+          // ✅ NO organization for team subscriptions
+          addonType: mappedType,
+          packageSku: item.packageSku,
+          billingType: "one_time",
+          purchaseAmount: itemPaidAmount.toFixed(2),
+          currency: pendingOrder.currency || "USD",
+          totalUnits,
+          usedUnits: 0,
+          status: "active",
+          startDate,
+          endDate,
+          metadata: { teamPurchase: true, cartOrderId: pendingOrder.id, packageName: pkg.name }
+        });
+        console.log(`[Team Cart] Created addon: ${mappedType} for user ${teamManager.id}, ${totalUnits} units (NO organization)`);
+      } catch (addonErr) {
+        console.error("[Team Cart] Failed to create addon:", addonErr);
+      }
+    }
+    const resetToken = crypto8.randomBytes(32).toString("hex");
+    const resetTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1e3);
+    await authStorage.createPasswordResetToken(teamManagerEmail, resetToken, resetTokenExpiry);
+    await sendLicenseManagerInvitationEmail2(teamManagerEmail, teamManagerName, resetToken, purchaseDetails);
+    licenseManagerInvitationSent = true;
+    console.log(`Team manager invitation sent to ${teamManagerEmail}`);
+    await eventLogger.log({
+      actorId: userId,
+      action: "team_purchase.completed",
+      targetType: "user",
+      // ✅ Changed from 'license_manager' to 'user'
+      targetId: teamManager.id,
+      metadata: { teamManagerEmail, teamManagerName, purchaseDetails, orderId: pendingOrder.id },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent")
+    });
+  } catch (err) {
+    console.error("runTeamCartActivation error:", err);
+  }
+  return { licenseManagerInvitationSent };
 }
 function getBaseUrl2(req) {
   if (process.env.APP_URL) {
@@ -29525,7 +30067,7 @@ function setupBillingRoutes(app2) {
           }
         });
         if (validatedPromo) {
-          await authStorage.incrementPromoCodeUsage(validatedPromo.id);
+          await authStorage.incrementPromoCodeUses(validatedPromo.id);
         }
         console.log(`[Session Minutes] \u2705 Free purchase completed: ${pkg.totalUnits} minutes added`);
         return res.json({
@@ -29702,6 +30244,7 @@ function setupBillingRoutes(app2) {
       }
       let isPaid = false;
       let verifiedPaymentId;
+      let paymentStatus;
       if (pendingOrder.gatewayProvider === "razorpay") {
         if (!razorpay_payment_id || !razorpay_signature) {
           return res.status(400).json({ message: "Missing Razorpay verification data" });
@@ -29710,14 +30253,14 @@ function setupBillingRoutes(app2) {
         if (!signatureValid) {
           return res.status(400).json({ message: "Invalid payment signature" });
         }
-        const paymentStatus2 = await gateway.getPaymentStatus(razorpay_payment_id);
-        isPaid = paymentStatus2.status === "captured" || paymentStatus2.status === "authorized";
+        paymentStatus = await gateway.getPaymentStatus(razorpay_payment_id);
+        isPaid = paymentStatus.status === "captured" || paymentStatus.status === "authorized";
         verifiedPaymentId = razorpay_payment_id;
       } else {
-        const paymentStatus2 = await gateway.getPaymentStatus(gatewayOrderId);
-        isPaid = paymentStatus2.status === "PAID" || paymentStatus2.status === "SUCCESS" || paymentStatus2.status === "captured";
-        verifiedPaymentId = cfPaymentId || paymentStatus2.paymentId;
-        console.log(`[Payment Verification] Status: ${paymentStatus2.status}, isPaid: ${isPaid}`);
+        paymentStatus = await gateway.getPaymentStatus(gatewayOrderId);
+        isPaid = paymentStatus.status === "PAID" || paymentStatus.status === "SUCCESS" || paymentStatus.status === "captured";
+        verifiedPaymentId = cfPaymentId || paymentStatus.paymentId;
+        console.log(`[Payment Verification] Status: ${paymentStatus.status}, isPaid: ${isPaid}`);
       }
       if (!isPaid) {
         console.log(`[Session Minutes Verify] Payment not yet completed. Status: ${paymentStatus.status}`);
@@ -29930,20 +30473,33 @@ function setupBillingRoutes(app2) {
           hasPurchasedPackages: true
         });
       }
-      const balance = await billingStorage.getSessionMinutesBalance(userId);
-      const purchasedPackages = await db.select().from(addonPurchases).where(
-        and11(
-          eq13(addonPurchases.userId, userId),
-          eq13(addonPurchases.addonType, "session_minutes")
-        )
-      );
-      const hasPurchasedPackages = purchasedPackages.length > 0;
+      let membership = await authStorage.getUserMembership(userId);
+      if (!membership) {
+        membership = await authStorage.ensureOrganizationMembershipFromAssignment(userId) || null;
+      }
+      const licensePackage = membership && membership.status === "active" ? await authStorage.getActiveLicensePackage(membership.organizationId) : null;
+      const isOrgSeatUser = !!(membership && membership.status === "active" && licensePackage);
+      let balance;
+      let hasPurchasedPackages;
+      if (isOrgSeatUser && membership) {
+        balance = await billingStorage.getSessionMinutesBalanceByOrganization(membership.organizationId);
+        hasPurchasedPackages = true;
+        console.log(`[Session Minutes] Org seat user ${userId} - Org ${membership.organizationId} balance: ${balance.totalMinutes} total, ${balance.remainingMinutes} remaining`);
+      } else {
+        balance = await billingStorage.getSessionMinutesBalance(userId);
+        const purchasedPackages = await db.select().from(addonPurchases).where(
+          and11(
+            eq13(addonPurchases.userId, userId),
+            eq13(addonPurchases.addonType, "session_minutes")
+          )
+        );
+        hasPurchasedPackages = purchasedPackages.length > 0;
+      }
       let subscription = await authStorage.getSubscriptionByUserId(userId);
-      if (!subscription) {
+      if (!subscription && !isOrgSeatUser) {
         console.log(`[Session Minutes] No subscription found for user ${userId}, creating free trial`);
         subscription = await authStorage.createSubscription({
           userId,
-          planId: "free_trial",
           planType: "free_trial",
           status: "trial",
           sessionsUsed: "0",
@@ -29954,37 +30510,39 @@ function setupBillingRoutes(app2) {
         });
       }
       let totalMinutes = balance.totalMinutes;
-      console.log(`[Session Minutes] User ${userId} - Purchased: ${balance.totalMinutes}, Subscription: ${subscription?.minutesLimit}, Has Packages: ${hasPurchasedPackages}`);
-      if (subscription?.planType === "free_trial" && subscription.minutesLimit) {
-        const trialMinutes = subscription.minutesLimit === "unlimited" ? 0 : parseInt(subscription.minutesLimit || "0");
-        totalMinutes += trialMinutes;
-        console.log(`[Session Minutes] Added ${trialMinutes} trial minutes, total now: ${totalMinutes}`);
+      if (!isOrgSeatUser) {
+        console.log(`[Session Minutes] User ${userId} - Purchased: ${balance.totalMinutes}, Subscription: ${subscription?.minutesLimit}, Has Packages: ${hasPurchasedPackages}`);
+        if (subscription?.planType === "free_trial" && subscription.minutesLimit) {
+          const trialMinutes = subscription.minutesLimit === "unlimited" ? 0 : parseInt(subscription.minutesLimit || "0");
+          totalMinutes += trialMinutes;
+          console.log(`[Session Minutes] Added ${trialMinutes} trial minutes, total now: ${totalMinutes}`);
+        }
       }
       let actualUsedMinutes = 0;
       try {
-        const userConversations = await db.select().from(conversations).where(eq13(conversations.userId, userId)).orderBy(desc5(conversations.createdAt));
-        actualUsedMinutes = userConversations.filter((conv) => !!conv.transcriptionStartedAt).reduce((total, conv) => {
-          const startTime = conv.transcriptionStartedAt || conv.createdAt || /* @__PURE__ */ new Date();
-          const endTime = conv.endedAt || conv.createdAt || /* @__PURE__ */ new Date();
-          const durationMs = endTime.getTime() - startTime.getTime();
-          const durationMinutes = Math.max(1, Math.ceil(durationMs / (1e3 * 60)));
+        const userSessions = await db.select().from(sessionUsage).where(and11(
+          eq13(sessionUsage.userId, userId),
+          eq13(sessionUsage.status, "ended")
+        ));
+        actualUsedMinutes = userSessions.reduce((total, session) => {
+          const durationSeconds = parseInt(session.durationSeconds || "0");
+          const durationMinutes = Math.floor(durationSeconds / 60);
           return total + durationMinutes;
         }, 0);
-        console.log(`[Session Minutes Status] User ${userId}: ${actualUsedMinutes} minutes used from ${userConversations.filter((c) => !!c.transcriptionStartedAt).length} sessions (Total: ${totalMinutes} minutes available, Purchased packages: ${hasPurchasedPackages})`);
+        console.log(`[Session Minutes Status] User ${userId}: ${actualUsedMinutes} minutes used from session_usage table (Total: ${totalMinutes}, Remaining: ${isOrgSeatUser ? balance.remainingMinutes : Math.max(0, totalMinutes - actualUsedMinutes)}, Has packages: ${hasPurchasedPackages})`);
       } catch (error) {
         console.error("[Session Minutes Status] Error calculating used minutes:", error);
         actualUsedMinutes = subscription?.minutesUsed ? parseInt(subscription.minutesUsed) : 0;
       }
-      const remainingMinutes = Math.max(0, totalMinutes - actualUsedMinutes);
+      const remainingMinutes = isOrgSeatUser ? balance.remainingMinutes : Math.max(0, totalMinutes - actualUsedMinutes);
       res.json({
         hasActiveMinutes: remainingMinutes > 0,
         totalMinutesRemaining: remainingMinutes,
         totalMinutes,
-        usedMinutes: actualUsedMinutes,
+        usedMinutes: isOrgSeatUser ? balance.usedMinutes : actualUsedMinutes,
         nextExpiryDate: balance.expiresAt ? balance.expiresAt.toISOString() : null,
         superUserAccess: false,
         hasPurchasedPackages
-        // NEW: Flag to indicate if user has ever purchased packages
       });
     } catch (error) {
       console.error("Get session minutes status error:", error);
@@ -30169,6 +30727,7 @@ function setupBillingRoutes(app2) {
       }
       let isPaid = false;
       let verifiedPaymentId;
+      let paymentStatus;
       if (pendingOrder.gatewayProvider === "razorpay") {
         if (!razorpay_payment_id || !razorpay_signature) {
           return res.status(400).json({ message: "Missing Razorpay verification data" });
@@ -30177,14 +30736,14 @@ function setupBillingRoutes(app2) {
         if (!signatureValid) {
           return res.status(400).json({ message: "Invalid payment signature" });
         }
-        const paymentStatus2 = await gateway.getPaymentStatus(razorpay_payment_id);
-        isPaid = paymentStatus2.status === "captured" || paymentStatus2.status === "authorized";
+        paymentStatus = await gateway.getPaymentStatus(razorpay_payment_id);
+        isPaid = paymentStatus.status === "captured" || paymentStatus.status === "authorized";
         verifiedPaymentId = razorpay_payment_id;
       } else {
         const verifyOrderId = cashfreeOrderId || gatewayOrderId;
-        const paymentStatus2 = await gateway.getPaymentStatus(verifyOrderId);
-        isPaid = paymentStatus2.status === "PAID" || paymentStatus2.status === "SUCCESS" || paymentStatus2.status === "captured";
-        verifiedPaymentId = cfPaymentId || paymentStatus2.paymentId;
+        paymentStatus = await gateway.getPaymentStatus(verifyOrderId);
+        isPaid = paymentStatus.status === "PAID" || paymentStatus.status === "SUCCESS" || paymentStatus.status === "captured";
+        verifiedPaymentId = cfPaymentId || paymentStatus.paymentId;
       }
       if (!isPaid) {
         console.log(`[Train Me Verify] Payment not yet completed. Status: ${paymentStatus.status}`);
@@ -30488,6 +31047,7 @@ function setupBillingRoutes(app2) {
       }
       let isPaid = false;
       let paymentId = cfPaymentId;
+      let paymentStatus;
       if (pendingOrder.gatewayProvider === "razorpay") {
         const { razorpayPaymentId, razorpaySignature } = req.body;
         if (!razorpayPaymentId || !razorpaySignature) {
@@ -30498,14 +31058,14 @@ function setupBillingRoutes(app2) {
         if (!signatureValid) {
           return res.status(400).json({ message: "Invalid payment signature" });
         }
-        const paymentStatus2 = await gateway.getPaymentStatus(razorpayPaymentId);
-        console.log(`Razorpay payment status for ${razorpayPaymentId}:`, paymentStatus2.status);
-        isPaid = paymentStatus2.status === "captured" || paymentStatus2.status === "authorized";
+        paymentStatus = await gateway.getPaymentStatus(razorpayPaymentId);
+        console.log(`Razorpay payment status for ${razorpayPaymentId}:`, paymentStatus.status);
+        isPaid = paymentStatus.status === "captured" || paymentStatus.status === "authorized";
         paymentId = razorpayPaymentId;
       } else {
-        const paymentStatus2 = await gateway.getPaymentStatus(gatewayOrderId);
-        isPaid = paymentStatus2.status === "PAID" || paymentStatus2.status === "SUCCESS" || paymentStatus2.status === "captured";
-        paymentId = cfPaymentId || paymentStatus2.metadata?.cf_payment_id;
+        paymentStatus = await gateway.getPaymentStatus(gatewayOrderId);
+        isPaid = paymentStatus.status === "PAID" || paymentStatus.status === "SUCCESS" || paymentStatus.status === "captured";
+        paymentId = cfPaymentId || paymentStatus.metadata?.cf_payment_id;
       }
       if (!isPaid) {
         console.log(`[Platform Access Verify] Payment not yet completed`);
@@ -30628,7 +31188,8 @@ function setupBillingRoutes(app2) {
       if (!addonType) {
         return res.status(400).json({ message: "Invalid package SKU" });
       }
-      const availability = await billingStorage.checkItemAvailability(userId, packageSku, addonType);
+      const purchaseMode = req.query.purchaseMode === "team" ? "team" : "user";
+      const availability = await billingStorage.checkItemAvailability(userId, packageSku, addonType, { purchaseMode });
       res.json({
         packageSku,
         packageName: pkg.name,
@@ -30672,7 +31233,7 @@ function setupBillingRoutes(app2) {
       if (addonType === "platform_access" && quantity > 1 && purchaseMode !== "team") {
         return res.status(400).json({ message: "Cannot add multiple units of subscription plans. Quantity must be 1." });
       }
-      const availability = await billingStorage.checkItemAvailability(userId, packageSku, addonType);
+      const availability = await billingStorage.checkItemAvailability(userId, packageSku, addonType, { purchaseMode });
       if (!availability.available) {
         return res.status(400).json({ message: availability.reason || "Item not available" });
       }
@@ -30848,6 +31409,8 @@ function setupBillingRoutes(app2) {
               packageName: item.packageName,
               addonType: item.addonType,
               basePrice: item.basePrice,
+              discount: item.appliedDiscountAmount || "0",
+              // CRITICAL FIX: Include per-item discount
               currency: item.currency,
               quantity: item.quantity,
               metadata: item.metadata,
@@ -30896,7 +31459,8 @@ function setupBillingRoutes(app2) {
         const result = await activateCartCheckout(pendingOrder2, `free_${Date.now()}`, void 0, req);
         if (!result.success) {
           console.error(`[Cart Checkout] Failed to activate free items: ${result.message}`);
-          if (result.message?.includes("duplicate key") || result.message?.includes("unique_active_addon_per_user")) {
+          const errorMessage = (result.message || "").toLowerCase();
+          if (errorMessage.includes("duplicate key") || errorMessage.includes("unique_active_addon_per_user") || errorMessage.includes("already have an active")) {
             return res.status(400).json({
               message: "You already have an active subscription for one of these items. Please check your active subscriptions in your profile.",
               error: "DUPLICATE_ADDON",
@@ -30908,8 +31472,9 @@ function setupBillingRoutes(app2) {
             error: result.message
           });
         }
+        const teamResult = await runTeamCartActivation(pendingOrder2, userId, req);
         await billingStorage.clearCart(userId);
-        console.log(`[Cart Checkout] \u2705 Free order completed: ${result.activatedAddons.length} items activated`);
+        console.log(`[Cart Checkout] \u2705 Free order completed: ${result.activatedAddons.length} personal items activated, team invitation: ${teamResult.licenseManagerInvitationSent}`);
         return res.json({
           success: true,
           freeOrder: true,
@@ -30917,6 +31482,7 @@ function setupBillingRoutes(app2) {
           message: "Order completed successfully with 100% discount!",
           activatedAddons: result.activatedAddons,
           itemCount: result.activatedAddons.length,
+          licenseManagerInvitationSent: teamResult.licenseManagerInvitationSent,
           breakdown: {
             subtotal: cartTotal.subtotal,
             discount: cartTotal.discount,
@@ -30956,7 +31522,8 @@ function setupBillingRoutes(app2) {
         finalAmount = MINIMUM_INR_AMOUNT;
       }
       for (const item of cartTotal.items) {
-        const availability = await billingStorage.checkItemAvailability(userId, item.packageSku, item.addonType);
+        const purchaseMode = item.purchaseMode === "team" ? "team" : "user";
+        const availability = await billingStorage.checkItemAvailability(userId, item.packageSku, item.addonType, { purchaseMode });
         if (!availability.available) {
           return res.status(400).json({
             message: `Item "${item.packageName}" is no longer available`,
@@ -30978,20 +31545,34 @@ function setupBillingRoutes(app2) {
         const sessionMinutesQty = cartTotal.items.filter((item) => item.addonType === "session_minutes").reduce((sum, item) => sum + (item.quantity || 1), 0);
         const daiQty = cartTotal.items.filter((item) => item.addonType === "dai").reduce((sum, item) => sum + (item.quantity || 1), 0);
         const trainMeQty = cartTotal.items.filter((item) => item.addonType === "train_me").reduce((sum, item) => sum + (item.quantity || 1), 0);
+        const organization = await authStorage.getOrganizationByManagerId(userId);
+        const hasExistingOrg = !!organization;
+        if (!hasExistingOrg && platformAccessQty === 0) {
+          return res.status(400).json({
+            message: "Platform Access subscription is required for new team purchases. Please add at least one Platform Access license to your cart."
+          });
+        }
         if (platformAccessQty > 0 && sessionMinutesQty > 0 && platformAccessQty !== sessionMinutesQty) {
           return res.status(400).json({
             message: `Team purchases require Session Minutes quantity (${sessionMinutesQty}) to equal Platform Access quantity (${platformAccessQty})`
           });
         }
-        if (daiQty > platformAccessQty) {
+        if (platformAccessQty > 0 && sessionMinutesQty === 0) {
           return res.status(400).json({
-            message: `DAI quantity (${daiQty}) cannot exceed Platform Access quantity (${platformAccessQty})`
+            message: `Session Minutes packages are required when purchasing Platform Access. Please add ${platformAccessQty} Session Minutes package(s) to match your Platform Access licenses.`
           });
         }
-        if (trainMeQty > platformAccessQty) {
-          return res.status(400).json({
-            message: `Train Me quantity (${trainMeQty}) cannot exceed Platform Access quantity (${platformAccessQty})`
-          });
+        if (platformAccessQty > 0) {
+          if (daiQty > platformAccessQty) {
+            return res.status(400).json({
+              message: `DAI quantity (${daiQty}) cannot exceed Platform Access quantity (${platformAccessQty})`
+            });
+          }
+          if (trainMeQty > platformAccessQty) {
+            return res.status(400).json({
+              message: `Train Me quantity (${trainMeQty}) cannot exceed Platform Access quantity (${platformAccessQty})`
+            });
+          }
         }
       }
       const pendingOrder = await billingStorage.createPendingOrder({
@@ -31011,6 +31592,8 @@ function setupBillingRoutes(app2) {
             packageName: item.packageName,
             addonType: item.addonType,
             basePrice: item.basePrice,
+            discount: item.appliedDiscountAmount || "0",
+            // CRITICAL FIX: Include per-item discount
             currency: item.currency,
             quantity: item.quantity,
             metadata: item.metadata,
@@ -31245,6 +31828,7 @@ function setupBillingRoutes(app2) {
       console.log(`Verifying ${pendingOrder.gatewayProvider} payment for order: ${gatewayOrderId}`);
       let isPaid = false;
       let verifiedPaymentId;
+      let paymentStatus;
       if (pendingOrder.gatewayProvider === "razorpay") {
         if (!razorpayPaymentId || !razorpaySignature) {
           return res.status(400).json({ message: "Missing Razorpay verification data" });
@@ -31255,15 +31839,15 @@ function setupBillingRoutes(app2) {
         if (!signatureValid) {
           return res.status(400).json({ message: "Invalid payment signature" });
         }
-        const paymentStatus2 = await gateway.getPaymentStatus(razorpayPaymentId);
-        console.log(`Razorpay payment status for ${razorpayPaymentId}:`, paymentStatus2.status);
-        isPaid = paymentStatus2.status === "captured" || paymentStatus2.status === "authorized";
+        paymentStatus = await gateway.getPaymentStatus(razorpayPaymentId);
+        console.log(`Razorpay payment status for ${razorpayPaymentId}:`, paymentStatus.status);
+        isPaid = paymentStatus.status === "captured" || paymentStatus.status === "authorized";
         verifiedPaymentId = razorpayPaymentId;
       } else {
-        const paymentStatus2 = await gateway.getPaymentStatus(gatewayOrderId);
-        console.log(`${pendingOrder.gatewayProvider} payment status:`, paymentStatus2);
-        isPaid = paymentStatus2.status === "PAID" || paymentStatus2.status === "SUCCESS" || paymentStatus2.status === "captured" || paymentStatus2.status === "authorized";
-        verifiedPaymentId = cfPaymentId || paymentStatus2.paymentId;
+        paymentStatus = await gateway.getPaymentStatus(gatewayOrderId);
+        console.log(`${pendingOrder.gatewayProvider} payment status:`, paymentStatus);
+        isPaid = paymentStatus.status === "PAID" || paymentStatus.status === "SUCCESS" || paymentStatus.status === "captured" || paymentStatus.status === "authorized";
+        verifiedPaymentId = cfPaymentId || paymentStatus.paymentId;
       }
       if (!isPaid) {
         console.log(`[Cart Verify] Payment not yet completed. Status: ${paymentStatus.status}`);
@@ -31335,7 +31919,7 @@ function setupBillingRoutes(app2) {
             metadata: {
               orderId,
               cartCheckout: true,
-              itemCount: cartItems2.length
+              itemCount: (orderMetadata.items || []).length
             }
           });
           gatewayTransactionId = gatewayTx.id;
@@ -31349,149 +31933,8 @@ function setupBillingRoutes(app2) {
         return res.status(500).json({ message: result.message || "Failed to activate cart items" });
       }
       const activatedAddons = result.activatedAddons;
-      const metadata = pendingOrder.metadata;
-      const cartItems2 = metadata?.items;
-      let licenseManagerInvitationSent = false;
-      const teamItems = cartItems2.filter((item) => item.purchaseMode === "team");
-      if (teamItems.length > 0) {
-        try {
-          const { sendLicenseManagerInvitationEmail: sendLicenseManagerInvitationEmail2 } = await Promise.resolve().then(() => (init_email(), email_exports));
-          const crypto8 = await import("crypto");
-          const teamItem = teamItems[0];
-          const teamManagerName = teamItem.teamManagerName;
-          const teamManagerEmail = teamItem.teamManagerEmail;
-          if (teamManagerName && teamManagerEmail) {
-            const buyer = await authStorage.getUserById(userId);
-            const buyerName = buyer ? `${buyer.firstName || ""} ${buyer.lastName || ""}`.trim() || buyer.email : "A Rev Winner customer";
-            const purchaseDetails = {
-              platformAccessCount: cartItems2.filter((item) => item.addonType === "platform_access").reduce((sum, item) => sum + (item.quantity || 1), 0),
-              sessionMinutesCount: cartItems2.filter((item) => item.addonType === "session_minutes").reduce((sum, item) => sum + (item.quantity || 1), 0),
-              daiCount: cartItems2.filter((item) => item.addonType === "dai").reduce((sum, item) => sum + (item.quantity || 1), 0),
-              trainMeCount: cartItems2.filter((item) => item.addonType === "train_me").reduce((sum, item) => sum + (item.quantity || 1), 0),
-              totalAmount: pendingOrder.amount || "0",
-              buyerName
-            };
-            let licenseManager = await authStorage.getUserByEmail(teamManagerEmail);
-            if (!licenseManager) {
-              const tempPassword = crypto8.randomBytes(32).toString("hex");
-              const nameParts = teamManagerName.trim().split(" ");
-              const firstName = nameParts[0] || teamManagerName;
-              const lastName = nameParts.slice(1).join(" ") || "";
-              const username = teamManagerEmail.split("@")[0] + "_" + crypto8.randomBytes(4).toString("hex");
-              licenseManager = await authStorage.createUser({
-                email: teamManagerEmail,
-                username,
-                password: tempPassword,
-                firstName,
-                lastName,
-                role: "license_manager"
-              });
-              console.log(`Created License Manager user: ${licenseManager.id} (${teamManagerEmail})`);
-            } else if (licenseManager.role !== "license_manager") {
-              await authStorage.updateUser(licenseManager.id, { role: "license_manager" });
-              console.log(`Updated user ${licenseManager.id} role to license_manager`);
-            }
-            const companyName = teamItem.companyName || `${teamManagerName}'s Organization`;
-            let organization = await authStorage.getOrganizationByManagerId(licenseManager.id);
-            let isNewOrganization = false;
-            if (!organization) {
-              organization = await authStorage.createOrganization({
-                companyName,
-                billingEmail: teamManagerEmail,
-                primaryManagerId: licenseManager.id,
-                status: "active"
-              });
-              isNewOrganization = true;
-              console.log(`Created organization: ${organization.id} (${companyName})`);
-              await authStorage.createOrganizationMembership({
-                organizationId: organization.id,
-                userId: licenseManager.id,
-                role: "admin",
-                status: "active"
-              });
-              console.log(`Added license manager to organization membership`);
-            } else {
-              if (organization.companyName !== companyName || organization.primaryManagerId !== licenseManager.id) {
-                await authStorage.updateOrganization(organization.id, {
-                  companyName,
-                  primaryManagerId: licenseManager.id,
-                  billingEmail: teamManagerEmail
-                });
-                console.log(`Updated organization: ${organization.id} (${companyName})`);
-              }
-              const existingMembership = await authStorage.getUserMembership(licenseManager.id);
-              if (!existingMembership || existingMembership.organizationId !== organization.id) {
-                try {
-                  await authStorage.createOrganizationMembership({
-                    organizationId: organization.id,
-                    userId: licenseManager.id,
-                    role: "admin",
-                    status: "active"
-                  });
-                  console.log(`Added license manager to existing organization membership`);
-                } catch (membershipError) {
-                  if (membershipError.code !== "23505") {
-                    throw membershipError;
-                  }
-                  console.log(`License manager already has membership for organization`);
-                }
-              }
-            }
-            const teamPlatformAccessItems = teamItems.filter((item) => item.addonType === "platform_access");
-            const totalSeats = teamPlatformAccessItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
-            if (totalSeats > 0) {
-              const platformAccessItem = teamPlatformAccessItems[0];
-              const pricePerSeat = platformAccessItem?.basePrice || "0";
-              const currency = platformAccessItem?.currency || "USD";
-              const pkg = platformAccessItem ? await getPackageOrAddonBySku(platformAccessItem.packageSku) : null;
-              const validityDays = pkg?.validityDays || 365;
-              const startDate = /* @__PURE__ */ new Date();
-              const endDate = new Date(startDate.getTime() + validityDays * 24 * 60 * 60 * 1e3);
-              const licensePackage = await authStorage.createLicensePackage({
-                organizationId: organization.id,
-                packageType: platformAccessItem?.packageSku || "team-platform-access",
-                totalSeats,
-                pricePerSeat,
-                totalAmount: (parseFloat(pricePerSeat) * totalSeats).toString(),
-                currency,
-                startDate,
-                endDate,
-                status: "active"
-              });
-              console.log(`Created license package: ${licensePackage.id} with ${totalSeats} seats for organization ${organization.id}`);
-              purchaseDetails.licensePackageId = licensePackage.id;
-              purchaseDetails.organizationId = organization.id;
-            }
-            const resetToken = crypto8.randomBytes(32).toString("hex");
-            const resetTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1e3);
-            await authStorage.createPasswordResetToken(teamManagerEmail, resetToken, resetTokenExpiry);
-            await sendLicenseManagerInvitationEmail2(
-              teamManagerEmail,
-              teamManagerName,
-              resetToken,
-              purchaseDetails
-            );
-            licenseManagerInvitationSent = true;
-            console.log(`License Manager invitation sent to ${teamManagerEmail}`);
-            await eventLogger.log({
-              actorId: userId,
-              action: "team_purchase.completed",
-              targetType: "license_manager",
-              targetId: licenseManager.id,
-              metadata: {
-                licenseManagerEmail: teamManagerEmail,
-                licenseManagerName: teamManagerName,
-                purchaseDetails,
-                orderId
-              },
-              ipAddress: req.ip,
-              userAgent: req.get("user-agent")
-            });
-          }
-        } catch (emailError) {
-          console.error("Failed to send License Manager invitation:", emailError);
-        }
-      }
+      const teamResult = await runTeamCartActivation(pendingOrder, userId, req);
+      const licenseManagerInvitationSent = teamResult.licenseManagerInvitationSent;
       res.json({
         success: true,
         message: "Cart checkout completed successfully",
@@ -31609,90 +32052,133 @@ function setupBillingRoutes(app2) {
       const cartGstAmount = parseFloat(orderMetadata.gstAmount?.toString() || "0");
       const cartTotal = parseFloat(orderMetadata.total?.toString() || "0");
       console.log(`[Invoice Debug] Cart metadata - subtotal: ${cartSubtotal}, discount: ${cartDiscount}, gst: ${cartGstAmount}, total: ${cartTotal}`);
-      const items = orderPurchases.length > 0 ? orderPurchases.map((purchase) => {
-        const metadata = purchase.metadata || {};
-        const totalWithGst = parseFloat(purchase.purchaseAmount || "0");
-        const currency2 = purchase.currency || "USD";
-        let baseAmount;
-        let gstAmount;
-        let gstRate;
-        const actualPaidAmount = metadata.actualPaidAmount ? parseFloat(metadata.actualPaidAmount) : totalWithGst;
-        const actualCurrency = metadata.actualCurrency || currency2;
-        gstRate = 0;
-        baseAmount = actualPaidAmount;
-        gstAmount = 0;
-        const quantity = metadata.quantity || 1;
-        const unitPrice = baseAmount / quantity;
-        return {
-          packageSku: purchase.packageSku,
-          packageName: metadata.packageName || purchase.packageSku,
-          addonType: purchase.addonType,
-          quantity,
-          unitPrice: unitPrice.toFixed(2),
-          basePrice: unitPrice.toFixed(2),
-          totalAmount: baseAmount.toFixed(2),
-          // Subtotal without GST
-          gstRate,
-          gstAmount: gstAmount.toFixed(2),
-          totalWithGst: actualPaidAmount.toFixed(2),
-          currency: actualCurrency,
-          startDate: purchase.startDate?.toISOString() || (/* @__PURE__ */ new Date()).toISOString(),
-          endDate: purchase.endDate ? purchase.endDate.toISOString() : null,
-          description: getItemDescription(purchase.addonType, metadata)
-        };
-      }) : [
-        // Fallback item from pending order - use metadata breakdown if available
-        (() => {
-          const metadata = pendingOrder.metadata || {};
-          const totalAmount = parseFloat(pendingOrder.amount || "0");
-          const currency2 = pendingOrder.currency || "USD";
-          if (metadata.subtotal !== void 0 && metadata.gstAmount !== void 0) {
-            const subtotal2 = parseFloat(metadata.subtotal?.toString() || "0");
-            const gstAmount = parseFloat(metadata.gstAmount?.toString() || "0");
-            const gstRate = 0;
-            return {
-              packageSku: pendingOrder.packageSku || "CART-MULTI-ITEM",
-              packageName: `${metadata.itemCount || 1} Item${(metadata.itemCount || 1) > 1 ? "s" : ""} - Cart Purchase`,
-              addonType: pendingOrder.addonType || "cart_checkout",
-              quantity: 1,
-              unitPrice: subtotal2.toFixed(2),
-              basePrice: subtotal2.toFixed(2),
-              totalAmount: subtotal2.toFixed(2),
-              // Subtotal without GST
-              gstRate,
-              gstAmount: gstAmount.toFixed(2),
-              totalWithGst: totalAmount.toFixed(2),
-              currency: currency2,
-              startDate: (/* @__PURE__ */ new Date()).toISOString(),
-              endDate: null,
-              description: `Cart Purchase - ${metadata.itemCount || 1} item${(metadata.itemCount || 1) > 1 ? "s" : ""} purchased successfully`
-            };
-          } else {
-            let baseAmount;
-            let gstAmount;
-            let gstRate;
-            gstRate = 0;
-            baseAmount = totalAmount;
-            gstAmount = 0;
-            return {
-              packageSku: pendingOrder.packageSku || "PENDING-ORDER",
-              packageName: "Order Processing",
-              addonType: pendingOrder.addonType || "cart_checkout",
-              quantity: 1,
-              unitPrice: baseAmount.toFixed(2),
-              basePrice: baseAmount.toFixed(2),
-              totalAmount: baseAmount.toFixed(2),
-              gstRate,
-              gstAmount: gstAmount.toFixed(2),
-              totalWithGst: totalAmount.toFixed(2),
-              currency: currency2,
-              startDate: (/* @__PURE__ */ new Date()).toISOString(),
-              endDate: null,
-              description: `Order ${orderId} - Payment processed successfully`
-            };
+      const cartItems2 = Array.isArray(orderMetadata.items) && orderMetadata.items.length > 0 ? orderMetadata.items : null;
+      let items;
+      if (cartItems2 && cartItems2.length > 0) {
+        items = cartItems2.map((cartItem) => {
+          const basePrice = parseFloat(cartItem.basePrice || "0");
+          const quantity = Math.max(1, parseInt(String(cartItem.quantity), 10) || 1);
+          const itemDiscount = parseFloat(cartItem.discount || "0");
+          const discountedPrice = basePrice - itemDiscount;
+          const totalAmount = discountedPrice * quantity;
+          const currency2 = cartItem.currency || pendingOrder.currency || "USD";
+          const matchingPurchase = orderPurchases.find((p) => p.packageSku === cartItem.packageSku);
+          const metaForDesc = { packageName: cartItem.packageName };
+          const startDate = matchingPurchase?.startDate || /* @__PURE__ */ new Date();
+          const startIso = matchingPurchase?.startDate?.toISOString() || (/* @__PURE__ */ new Date()).toISOString();
+          let endDate = matchingPurchase?.endDate ?? null;
+          if (!endDate) {
+            const validityDays = cartItem.metadata?.validityDays != null ? parseInt(String(cartItem.metadata.validityDays), 10) : cartItem.addonType === "usage_bundle" ? 30 : null;
+            if (validityDays != null && !isNaN(validityDays) && validityDays > 0) {
+              endDate = new Date(startDate);
+              endDate.setDate(endDate.getDate() + validityDays);
+            }
           }
-        })()
-      ];
+          return {
+            packageSku: cartItem.packageSku,
+            packageName: cartItem.packageName || cartItem.packageSku,
+            addonType: cartItem.addonType || "cart_checkout",
+            quantity,
+            unitPrice: discountedPrice.toFixed(2),
+            // CRITICAL FIX: Show discounted price
+            basePrice: basePrice.toFixed(2),
+            // Keep original price for reference
+            discount: itemDiscount.toFixed(2),
+            // CRITICAL FIX: Show discount per item
+            totalAmount: totalAmount.toFixed(2),
+            // CRITICAL FIX: Total after discount
+            gstRate: 0,
+            gstAmount: "0.00",
+            totalWithGst: totalAmount.toFixed(2),
+            currency: currency2,
+            startDate: startIso,
+            endDate: endDate ? endDate.toISOString() : null,
+            description: getItemDescription(cartItem.addonType || "", metaForDesc)
+          };
+        });
+        console.log(`[Invoice Debug] Built ${items.length} line items from cart metadata (matches purchase)`);
+      } else if (orderPurchases.length > 0) {
+        items = orderPurchases.map((purchase) => {
+          const metadata = purchase.metadata || {};
+          const totalWithGst = parseFloat(purchase.purchaseAmount || "0");
+          const currency2 = purchase.currency || "USD";
+          const actualPaidAmount = metadata.actualPaidAmount ? parseFloat(metadata.actualPaidAmount) : totalWithGst;
+          const actualCurrency = metadata.actualCurrency || currency2;
+          const quantity = metadata.quantity || 1;
+          const unitPrice = actualPaidAmount / quantity;
+          const displayName = metadata.packageName || purchase.packageSku;
+          return {
+            packageSku: purchase.packageSku,
+            packageName: displayName,
+            addonType: purchase.addonType,
+            quantity,
+            unitPrice: unitPrice.toFixed(2),
+            basePrice: unitPrice.toFixed(2),
+            totalAmount: actualPaidAmount.toFixed(2),
+            gstRate: 0,
+            gstAmount: "0.00",
+            totalWithGst: actualPaidAmount.toFixed(2),
+            currency: actualCurrency,
+            startDate: purchase.startDate?.toISOString() || (/* @__PURE__ */ new Date()).toISOString(),
+            endDate: purchase.endDate ? purchase.endDate.toISOString() : null,
+            description: getItemDescription(purchase.addonType, metadata)
+          };
+        });
+      } else {
+        items = [
+          // Fallback item from pending order - use metadata breakdown if available
+          (() => {
+            const metadata = pendingOrder.metadata || {};
+            const totalAmount = parseFloat(pendingOrder.amount || "0");
+            const currency2 = pendingOrder.currency || "USD";
+            if (metadata.subtotal !== void 0 && metadata.gstAmount !== void 0) {
+              const subtotal2 = parseFloat(metadata.subtotal?.toString() || "0");
+              const gstAmount = parseFloat(metadata.gstAmount?.toString() || "0");
+              const gstRate = 18;
+              return {
+                packageSku: pendingOrder.packageSku || "CART-MULTI-ITEM",
+                packageName: `${metadata.itemCount || 1} Item${(metadata.itemCount || 1) > 1 ? "s" : ""} - Cart Purchase`,
+                addonType: pendingOrder.addonType || "cart_checkout",
+                quantity: 1,
+                unitPrice: subtotal2.toFixed(2),
+                basePrice: subtotal2.toFixed(2),
+                totalAmount: subtotal2.toFixed(2),
+                // Subtotal without GST
+                gstRate,
+                gstAmount: gstAmount.toFixed(2),
+                totalWithGst: totalAmount.toFixed(2),
+                currency: currency2,
+                startDate: (/* @__PURE__ */ new Date()).toISOString(),
+                endDate: null,
+                description: `Cart Purchase - ${metadata.itemCount || 1} item${(metadata.itemCount || 1) > 1 ? "s" : ""} purchased successfully`
+              };
+            } else {
+              let baseAmount;
+              let gstAmount;
+              let gstRate;
+              gstRate = 18;
+              baseAmount = totalAmount / 1.18;
+              gstAmount = totalAmount - baseAmount;
+              return {
+                packageSku: pendingOrder.packageSku || "PENDING-ORDER",
+                packageName: "Order Processing",
+                addonType: pendingOrder.addonType || "cart_checkout",
+                quantity: 1,
+                unitPrice: baseAmount.toFixed(2),
+                basePrice: baseAmount.toFixed(2),
+                totalAmount: baseAmount.toFixed(2),
+                gstRate,
+                gstAmount: gstAmount.toFixed(2),
+                totalWithGst: totalAmount.toFixed(2),
+                currency: currency2,
+                startDate: (/* @__PURE__ */ new Date()).toISOString(),
+                endDate: null,
+                description: `Order ${orderId} - Payment processed successfully`
+              };
+            }
+          })()
+        ];
+      }
       let subtotal;
       let totalGst;
       let grandTotal;
@@ -31708,10 +32194,11 @@ function setupBillingRoutes(app2) {
         subtotal = items.reduce((sum, item) => sum + parseFloat(item.totalAmount), 0);
         totalGst = items.reduce((sum, item) => sum + parseFloat(item.gstAmount), 0);
         discount = 0;
-        grandTotal = subtotal + totalGst;
-        console.log(`[Invoice Debug] Using item calculation - subtotal: ${subtotal}, gst: ${totalGst}, total: ${grandTotal}`);
+        grandTotal = subtotal - discount + totalGst;
+        console.log(`[Invoice Debug] Using item calculation - subtotal: ${subtotal}, discount: ${discount}, gst: ${totalGst}, total: ${grandTotal}`);
       }
       console.log(`[Invoice Debug] Calculated totals - subtotal: ${subtotal}, discount: ${discount}, gst: ${totalGst}, total: ${grandTotal}, currency: ${currency}`);
+      const invoiceBranding = await getInvoiceConfig();
       const invoiceData = {
         // Invoice Header
         invoiceNumber: `INV-${orderId.slice(-8).toUpperCase()}`,
@@ -31719,15 +32206,8 @@ function setupBillingRoutes(app2) {
         invoiceDate: (/* @__PURE__ */ new Date()).toISOString(),
         dueDate: (/* @__PURE__ */ new Date()).toISOString(),
         // Immediate payment
-        // Company Information
-        company: {
-          name: "Rev Winner",
-          address: "AI-Powered Sales Intelligence Platform\nHealthcaa Technologies Inc.",
-          email: "support@revwinner.com",
-          website: "https://revwinner.com",
-          gstNumber: null
-          // No GST for USD transactions
-        },
+        // Company and terms from system_config (no hardcoded branding)
+        company: invoiceBranding.company,
         // Customer Information
         customer: {
           id: userId,
@@ -31753,8 +32233,8 @@ function setupBillingRoutes(app2) {
           subtotalAfterDiscount: parseFloat((subtotal - discount).toFixed(2)),
           // CRITICAL FIX: Show discounted subtotal
           gst: parseFloat(totalGst.toFixed(2)),
-          gstRate: 0,
-          // No GST for USD
+          gstRate: 18,
+          // 18% GST for all purchases
           total: parseFloat(grandTotal.toFixed(2)),
           currency,
           amountInWords: convertAmountToWords(grandTotal, currency)
@@ -31762,14 +32242,9 @@ function setupBillingRoutes(app2) {
         // Metadata
         createdAt: pendingOrder.createdAt?.toISOString() || (/* @__PURE__ */ new Date()).toISOString(),
         generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        // Terms and Conditions
-        terms: [
+        terms: invoiceBranding.terms.length > 0 ? invoiceBranding.terms : [
           "This is a computer-generated invoice and does not require a signature.",
           "Payment has been processed successfully via secure payment gateway.",
-          "All Rev Winner services are subject to our Terms of Service available at revwinner.com/terms",
-          "Refunds are processed as per our refund policy. Contact support for assistance.",
-          "For technical support or billing queries, contact support@revwinner.com",
-          "No GST applicable for USD transactions.",
           "This invoice serves as your receipt for tax and accounting purposes."
         ]
       };
@@ -31780,19 +32255,36 @@ function setupBillingRoutes(app2) {
     }
   });
   function getItemDescription(addonType, metadata) {
+    const packageName = metadata.packageName || "";
+    if (packageName) {
+      const nameLower = packageName.toLowerCase();
+      if (nameLower.includes("session") || nameLower.includes("minute")) {
+        return `${packageName}. Provides AI-powered conversation analysis and real-time sales insights.`;
+      } else if (nameLower.includes("train")) {
+        return `${packageName}. Personalized AI coaching and sales skill development.`;
+      } else if (nameLower.includes("dai") || nameLower.includes("domain")) {
+        return `${packageName}. Domain-specific AI intelligence and industry insights.`;
+      } else if (nameLower.includes("platform") || nameLower.includes("access")) {
+        return `${packageName}. Complete access to the sales intelligence platform.`;
+      } else if (nameLower.includes("enterprise")) {
+        return `${packageName} - ${metadata.seats || 1} seats. Full platform access with team management and advanced analytics.`;
+      } else {
+        return `${packageName}. Professional sales assistance features.`;
+      }
+    }
     switch (addonType) {
       case "session_minutes":
-        return `Session Minutes Package - ${metadata.packageName || "Standard Package"}. Provides AI-powered conversation analysis and real-time sales insights.`;
+        return `Session Minutes Package - Standard Package. Provides AI-powered conversation analysis and real-time sales insights.`;
       case "train_me":
         return "Train Me Add-on - 30 Days Access to AI Training Features. Personalized AI coaching and sales skill development.";
       case "enterprise_license":
         return `Enterprise License - ${metadata.seats || 1} seats. Full platform access with team management and advanced analytics.`;
       case "platform_access":
-        return `Platform Access - ${metadata.packageName || "Standard Access"}. Complete access to Rev Winner sales intelligence platform.`;
+        return `Platform Access - Standard Access. Complete access to the sales intelligence platform.`;
       case "cart_checkout":
-        return `Cart Purchase - ${metadata.packageName || "Multiple Items"}. Bundle purchase with multiple Rev Winner features.`;
+        return `Cart Purchase - Multiple Items. Bundle purchase with multiple platform features.`;
       default:
-        return metadata.packageName || `${addonType.replace("_", " ").toUpperCase()} - Professional sales assistance features`;
+        return `${addonType.replace("_", " ").toUpperCase()} - Professional sales assistance features`;
     }
   }
   function convertAmountToWords(amount, currency) {
@@ -31890,7 +32382,7 @@ function setupBillingRoutes(app2) {
         const isCartCheckout = pendingOrder.addonType === "cart_checkout" || pendingOrder.packageSku === "CART-MULTI-ITEM";
         if (isCartCheckout) {
           console.log(`\u{1F6D2} Processing cart checkout order: ${orderId}`);
-          const result = await activateCartCheckout(pendingOrder, paymentId, req);
+          const result = await activateCartCheckout(pendingOrder, paymentId, void 0, req);
           if (result.success) {
             console.log(`Cart checkout activated: ${result.activatedAddons.length} items`);
             return res.json({ status: "success", message: "Cart checkout processed", itemCount: result.activatedAddons.length });
@@ -33688,7 +34180,7 @@ init_jwt();
 init_db();
 init_schema();
 import { eq as eq18, and as and15 } from "drizzle-orm";
-import bcrypt3 from "bcrypt";
+import bcrypt4 from "bcrypt";
 import crypto5 from "crypto";
 var discoverQuerySchema = z8.object({
   queryType: z8.enum(["challenges", "faqs", "unique_queries", "unanswered", "custom"]),
@@ -34125,7 +34617,7 @@ function registerMarketingRoutes(app2) {
       if (!targetUser) {
         const username = validatedBody.userEmail.split("@")[0] + "_" + crypto5.randomBytes(4).toString("hex");
         const tempPassword = crypto5.randomBytes(16).toString("hex");
-        const hashedPassword = await bcrypt3.hash(tempPassword, 10);
+        const hashedPassword = await bcrypt4.hash(tempPassword, 10);
         const [newUser] = await db.insert(authUsers).values({
           email: validatedBody.userEmail.toLowerCase(),
           firstName: validatedBody.firstName,
@@ -34195,7 +34687,7 @@ function registerMarketingRoutes(app2) {
       if (!access) {
         return res.status(404).json({ success: false, message: "Invalid or expired access link" });
       }
-      const hashedPassword = await bcrypt3.hash(validatedBody.password, 10);
+      const hashedPassword = await bcrypt4.hash(validatedBody.password, 10);
       await db.update(marketingAccess).set({
         hashedPassword,
         passwordSetup: true,
@@ -34239,7 +34731,7 @@ function registerMarketingRoutes(app2) {
       if (access.expiresAt && new Date(access.expiresAt) < /* @__PURE__ */ new Date()) {
         return res.status(403).json({ success: false, message: "Marketing access has expired" });
       }
-      const passwordMatch = await bcrypt3.compare(validatedBody.password, access.hashedPassword);
+      const passwordMatch = await bcrypt4.compare(validatedBody.password, access.hashedPassword);
       if (!passwordMatch) {
         return res.status(401).json({ success: false, message: "Invalid email or password" });
       }
@@ -34890,6 +35382,31 @@ var salesIntelligenceAgent = new SalesIntelligenceAgent();
 
 // server/routes-sales-intelligence.ts
 init_schema();
+
+// server/utils/error-handler.ts
+import { ZodError } from "zod";
+function formatZodError(error) {
+  const firstError = error.errors[0];
+  const fieldName = firstError.path.join(".") || "Input";
+  return `${fieldName}: ${firstError.message}`;
+}
+function sendErrorResponse(res, error, defaultMessage = "An error occurred", statusCode = 400) {
+  if (error.name === "ZodError" || error instanceof ZodError) {
+    return res.status(400).json({
+      error: formatZodError(error)
+    });
+  }
+  if (error instanceof Error) {
+    return res.status(statusCode).json({
+      error: error.message || defaultMessage
+    });
+  }
+  res.status(statusCode).json({
+    error: defaultMessage
+  });
+}
+
+// server/routes-sales-intelligence.ts
 function setupSalesIntelligenceRoutes(app2) {
   app2.post("/api/sales-intelligence/process", authenticateToken, async (req, res) => {
     try {
@@ -35071,7 +35588,7 @@ function setupSalesIntelligenceRoutes(app2) {
       res.status(201).json({ knowledge });
     } catch (error) {
       console.error("[SalesIntelligence] Add knowledge error:", error);
-      res.status(400).json({ error: error.message || "Failed to add knowledge" });
+      sendErrorResponse(res, error, "Failed to add knowledge");
     }
   });
   app2.post("/api/sales-intelligence/knowledge/:id/validate", authenticateToken, async (req, res) => {
@@ -35146,7 +35663,7 @@ function setupSalesIntelligenceRoutes(app2) {
       res.json(result);
     } catch (error) {
       console.error("[SalesIntelligence] Export error:", error);
-      res.status(400).json({ error: error.message || "Failed to export data" });
+      sendErrorResponse(res, error, "Failed to export data");
     }
   });
   app2.get("/api/sales-intelligence/exports", authenticateToken, async (req, res) => {
@@ -35166,6 +35683,118 @@ function setupSalesIntelligenceRoutes(app2) {
     res.json({ intentTypes: Object.values(SALES_INTENT_TYPES) });
   });
   console.log(" Sales Intelligence routes registered");
+}
+
+// server/routes-system-config.ts
+init_db();
+init_schema();
+import { eq as eq20 } from "drizzle-orm";
+function setupSystemConfigRoutes(app2) {
+  app2.get("/api/admin/system-config", authenticateToken, async (req, res) => {
+    try {
+      const role = req.jwtUser?.role;
+      if (role !== "admin" && role !== "super_admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const configs = await db.select().from(systemConfig);
+      const grouped = {
+        email: {},
+        payment: {},
+        ai: {},
+        system: {},
+        security: {}
+      };
+      configs.forEach((config) => {
+        const section = config.section || "system";
+        if (!grouped[section]) {
+          grouped[section] = {};
+        }
+        if (config.key.includes("password") || config.key.includes("secret") || config.key.includes("key")) {
+          grouped[section][config.key] = config.value ? "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" : "";
+        } else {
+          grouped[section][config.key] = config.value;
+        }
+      });
+      res.json(grouped);
+    } catch (error) {
+      console.error("[SystemConfig] Get error:", error);
+      sendErrorResponse(res, error, "Failed to fetch configuration");
+    }
+  });
+  app2.put("/api/admin/system-config/:section", authenticateToken, async (req, res) => {
+    try {
+      const role = req.jwtUser?.role;
+      const userId = req.jwtUser?.userId;
+      const { section } = req.params;
+      if (role !== "admin" && role !== "super_admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const validSections = ["email", "payment", "ai", "system", "security"];
+      if (!validSections.includes(section)) {
+        return res.status(400).json({ error: "Invalid configuration section" });
+      }
+      const data = req.body;
+      for (const [key, value] of Object.entries(data)) {
+        if ((key.includes("password") || key.includes("secret") || key.includes("key")) && !value) {
+          continue;
+        }
+        const [existing] = await db.select().from(systemConfig).where(eq20(systemConfig.key, key)).limit(1);
+        if (existing) {
+          await db.update(systemConfig).set({
+            value: String(value),
+            section,
+            updatedAt: /* @__PURE__ */ new Date(),
+            updatedBy: userId
+          }).where(eq20(systemConfig.id, existing.id));
+        } else {
+          await db.insert(systemConfig).values({
+            key,
+            value: String(value),
+            section,
+            updatedBy: userId
+          });
+        }
+      }
+      res.json({ success: true, message: "Configuration updated successfully" });
+    } catch (error) {
+      console.error("[SystemConfig] Update error:", error);
+      sendErrorResponse(res, error, "Failed to update configuration");
+    }
+  });
+  app2.get("/api/admin/system-config/:section/:key", authenticateToken, async (req, res) => {
+    try {
+      const role = req.jwtUser?.role;
+      const { section, key } = req.params;
+      if (role !== "admin" && role !== "super_admin") {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const [config] = await db.select().from(systemConfig).where(eq20(systemConfig.key, key)).limit(1);
+      if (!config) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+      if (key.includes("password") || key.includes("secret") || key.includes("key")) {
+        return res.json({ key, value: "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022", section: config.section });
+      }
+      res.json({ key, value: config.value, section: config.section });
+    } catch (error) {
+      console.error("[SystemConfig] Get key error:", error);
+      sendErrorResponse(res, error, "Failed to fetch configuration");
+    }
+  });
+  app2.delete("/api/admin/system-config/:key", authenticateToken, async (req, res) => {
+    try {
+      const role = req.jwtUser?.role;
+      const { key } = req.params;
+      if (role !== "super_admin") {
+        return res.status(403).json({ error: "Super admin access required" });
+      }
+      await db.delete(systemConfig).where(eq20(systemConfig.key, key));
+      res.json({ success: true, message: "Configuration deleted successfully" });
+    } catch (error) {
+      console.error("[SystemConfig] Delete error:", error);
+      sendErrorResponse(res, error, "Failed to delete configuration");
+    }
+  });
 }
 
 // server/routes-bible.ts
@@ -36806,7 +37435,7 @@ var routes_recordings_default = router2;
 init_db();
 init_schema();
 import { Router as Router3 } from "express";
-import { eq as eq21, desc as desc11, sql as sql12 } from "drizzle-orm";
+import { eq as eq22, desc as desc11, sql as sql12 } from "drizzle-orm";
 import crypto6 from "crypto";
 var router3 = Router3();
 var API_KEY_PREFIX = "rw_";
@@ -36852,7 +37481,7 @@ async function validateApiKey(apiKey) {
     return { valid: false, error: "Invalid API key format" };
   }
   const keyHash = crypto6.createHash("sha256").update(apiKey).digest("hex");
-  const [keyRecord] = await db.select().from(apiKeys).where(eq21(apiKeys.keyHash, keyHash)).limit(1);
+  const [keyRecord] = await db.select().from(apiKeys).where(eq22(apiKeys.keyHash, keyHash)).limit(1);
   if (!keyRecord) {
     return { valid: false, error: "API key not found" };
   }
@@ -36868,7 +37497,7 @@ async function incrementUsageCount(keyId) {
   await db.update(apiKeys).set({
     lastUsedAt: /* @__PURE__ */ new Date(),
     usageCount: sql12`${apiKeys.usageCount} + 1`
-  }).where(eq21(apiKeys.id, keyId));
+  }).where(eq22(apiKeys.id, keyId));
 }
 async function authenticateApiKey(req, res, next) {
   const apiKey = req.headers["x-api-key"];
@@ -36938,7 +37567,7 @@ router3.get("/", authenticateToken, requireAdmin, async (req, res) => {
       creatorEmail: authUsers.email,
       creatorFirstName: authUsers.firstName,
       creatorLastName: authUsers.lastName
-    }).from(apiKeys).leftJoin(authUsers, eq21(apiKeys.createdBy, authUsers.id)).orderBy(desc11(apiKeys.createdAt));
+    }).from(apiKeys).leftJoin(authUsers, eq22(apiKeys.createdBy, authUsers.id)).orderBy(desc11(apiKeys.createdAt));
     res.json(keys);
   } catch (error) {
     console.error("Error fetching API keys:", error);
@@ -37002,7 +37631,7 @@ router3.get("/:id", authenticateToken, requireAdmin, async (req, res) => {
       creatorEmail: authUsers.email,
       creatorFirstName: authUsers.firstName,
       creatorLastName: authUsers.lastName
-    }).from(apiKeys).leftJoin(authUsers, eq21(apiKeys.createdBy, authUsers.id)).where(eq21(apiKeys.id, id)).limit(1);
+    }).from(apiKeys).leftJoin(authUsers, eq22(apiKeys.createdBy, authUsers.id)).where(eq22(apiKeys.id, id)).limit(1);
     if (!keyData) {
       return res.status(404).json({ error: "API key not found" });
     }
@@ -37016,7 +37645,7 @@ router3.patch("/:id", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, scopes, rateLimit, rateLimitWindow, expiresAt, ipWhitelist, metadata } = req.body;
-    const [existing] = await db.select().from(apiKeys).where(eq21(apiKeys.id, id)).limit(1);
+    const [existing] = await db.select().from(apiKeys).where(eq22(apiKeys.id, id)).limit(1);
     if (!existing) {
       return res.status(404).json({ error: "API key not found" });
     }
@@ -37028,7 +37657,7 @@ router3.patch("/:id", authenticateToken, requireAdmin, async (req, res) => {
     if (expiresAt !== void 0) updates.expiresAt = expiresAt ? new Date(expiresAt) : null;
     if (ipWhitelist !== void 0) updates.ipWhitelist = ipWhitelist;
     if (metadata !== void 0) updates.metadata = metadata;
-    const [updated] = await db.update(apiKeys).set(updates).where(eq21(apiKeys.id, id)).returning();
+    const [updated] = await db.update(apiKeys).set(updates).where(eq22(apiKeys.id, id)).returning();
     res.json(updated);
   } catch (error) {
     console.error("Error updating API key:", error);
@@ -37038,7 +37667,7 @@ router3.patch("/:id", authenticateToken, requireAdmin, async (req, res) => {
 router3.post("/:id/revoke", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const [existing] = await db.select().from(apiKeys).where(eq21(apiKeys.id, id)).limit(1);
+    const [existing] = await db.select().from(apiKeys).where(eq22(apiKeys.id, id)).limit(1);
     if (!existing) {
       return res.status(404).json({ error: "API key not found" });
     }
@@ -37049,7 +37678,7 @@ router3.post("/:id/revoke", authenticateToken, requireAdmin, async (req, res) =>
       status: "revoked",
       revokedAt: /* @__PURE__ */ new Date(),
       revokedBy: req.jwtUser.userId
-    }).where(eq21(apiKeys.id, id)).returning();
+    }).where(eq22(apiKeys.id, id)).returning();
     res.json({ message: "API key revoked successfully", key: updated });
   } catch (error) {
     console.error("Error revoking API key:", error);
@@ -37059,7 +37688,7 @@ router3.post("/:id/revoke", authenticateToken, requireAdmin, async (req, res) =>
 router3.post("/:id/reactivate", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const [existing] = await db.select().from(apiKeys).where(eq21(apiKeys.id, id)).limit(1);
+    const [existing] = await db.select().from(apiKeys).where(eq22(apiKeys.id, id)).limit(1);
     if (!existing) {
       return res.status(404).json({ error: "API key not found" });
     }
@@ -37070,7 +37699,7 @@ router3.post("/:id/reactivate", authenticateToken, requireAdmin, async (req, res
       status: "active",
       revokedAt: null,
       revokedBy: null
-    }).where(eq21(apiKeys.id, id)).returning();
+    }).where(eq22(apiKeys.id, id)).returning();
     res.json({ message: "API key reactivated successfully", key: updated });
   } catch (error) {
     console.error("Error reactivating API key:", error);
@@ -37080,12 +37709,12 @@ router3.post("/:id/reactivate", authenticateToken, requireAdmin, async (req, res
 router3.delete("/:id", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const [existing] = await db.select().from(apiKeys).where(eq21(apiKeys.id, id)).limit(1);
+    const [existing] = await db.select().from(apiKeys).where(eq22(apiKeys.id, id)).limit(1);
     if (!existing) {
       return res.status(404).json({ error: "API key not found" });
     }
-    await db.delete(apiKeyUsageLogs).where(eq21(apiKeyUsageLogs.apiKeyId, id));
-    await db.delete(apiKeys).where(eq21(apiKeys.id, id));
+    await db.delete(apiKeyUsageLogs).where(eq22(apiKeyUsageLogs.apiKeyId, id));
+    await db.delete(apiKeys).where(eq22(apiKeys.id, id));
     res.json({ message: "API key deleted successfully" });
   } catch (error) {
     console.error("Error deleting API key:", error);
@@ -37096,14 +37725,14 @@ router3.get("/:id/usage", authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { startDate, endDate, limit = 100 } = req.query;
-    let query = db.select().from(apiKeyUsageLogs).where(eq21(apiKeyUsageLogs.apiKeyId, id)).orderBy(desc11(apiKeyUsageLogs.createdAt)).limit(Number(limit));
+    let query = db.select().from(apiKeyUsageLogs).where(eq22(apiKeyUsageLogs.apiKeyId, id)).orderBy(desc11(apiKeyUsageLogs.createdAt)).limit(Number(limit));
     const logs = await query;
     const stats = await db.select({
       totalRequests: sql12`count(*)`,
       avgResponseTime: sql12`avg(${apiKeyUsageLogs.responseTime})`,
       successCount: sql12`sum(case when ${apiKeyUsageLogs.statusCode} < 400 then 1 else 0 end)`,
       errorCount: sql12`sum(case when ${apiKeyUsageLogs.statusCode} >= 400 then 1 else 0 end)`
-    }).from(apiKeyUsageLogs).where(eq21(apiKeyUsageLogs.apiKeyId, id));
+    }).from(apiKeyUsageLogs).where(eq22(apiKeyUsageLogs.apiKeyId, id));
     res.json({
       logs,
       stats: stats[0]
@@ -37142,7 +37771,7 @@ var routes_api_keys_default = router3;
 init_storage_auth();
 init_db();
 init_schema();
-import { eq as eq22, desc as desc12, and as and19, gte as gte6 } from "drizzle-orm";
+import { eq as eq23, desc as desc12, and as and19, gte as gte6 } from "drizzle-orm";
 function setupPublicApiRoutes(app2) {
   console.log("Setting up Public API routes at /api/v1/*");
   app2.get("/api/v1/test", authenticateApiKey, async (req, res) => {
@@ -37177,7 +37806,7 @@ function setupPublicApiRoutes(app2) {
         lastName: authUsers.lastName,
         username: authUsers.username,
         createdAt: authUsers.createdAt
-      }).from(authUsers).where(eq22(authUsers.id, userId)).limit(1);
+      }).from(authUsers).where(eq23(authUsers.id, userId)).limit(1);
       if (!user || user.length === 0) {
         return res.status(404).json({ error: "User not found" });
       }
@@ -37233,7 +37862,7 @@ function setupPublicApiRoutes(app2) {
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       const sessions2 = await db.select().from(sessionUsage).where(
         and19(
-          eq22(sessionUsage.userId, userId),
+          eq23(sessionUsage.userId, userId),
           gte6(sessionUsage.createdAt, thirtyDaysAgo)
         )
       ).orderBy(desc12(sessionUsage.createdAt));
@@ -37265,12 +37894,12 @@ function setupPublicApiRoutes(app2) {
         return res.status(400).json({ error: "User ID not found in API key" });
       }
       const { limit = 10 } = req.query;
-      const conversations2 = await db.select().from(conversationMemories).where(eq22(conversationMemories.userId, userId)).orderBy(desc12(conversationMemories.createdAt)).limit(Number(limit));
+      const conversations3 = await db.select().from(conversationMemories).where(eq23(conversationMemories.userId, userId)).orderBy(desc12(conversationMemories.createdAt)).limit(Number(limit));
       res.json({
         success: true,
         data: {
-          total: conversations2.length,
-          conversations: conversations2.map((c) => ({
+          total: conversations3.length,
+          conversations: conversations3.map((c) => ({
             id: c.id,
             conversationId: c.conversationId,
             spinSituation: c.spinSituation,
@@ -37301,7 +37930,7 @@ function setupPublicApiRoutes(app2) {
         duration: callRecordings.duration,
         status: callRecordings.status,
         createdAt: callRecordings.createdAt
-      }).from(callRecordings).where(eq22(callRecordings.userId, userId)).orderBy(desc12(callRecordings.createdAt)).limit(Number(limit));
+      }).from(callRecordings).where(eq23(callRecordings.userId, userId)).orderBy(desc12(callRecordings.createdAt)).limit(Number(limit));
       res.json({
         success: true,
         data: {
@@ -37622,7 +38251,7 @@ async function registerRoutes(app2) {
       if (!req.jwtUser?.id) {
         return res.status(401).json({ message: "Authentication required" });
       }
-      const userConversations = await db.select().from(conversations).where(eq24(conversations.userId, req.jwtUser.id)).orderBy(desc14(conversations.createdAt)).limit(50);
+      const userConversations = await db.select().from(conversations).where(eq25(conversations.userId, req.jwtUser.id)).orderBy(desc14(conversations.createdAt)).limit(50);
       const sessionHistory = userConversations.map((conv) => {
         const startTime = conv.transcriptionStartedAt || conv.createdAt;
         const endTime = conv.endedAt || /* @__PURE__ */ new Date();
@@ -37664,11 +38293,14 @@ async function registerRoutes(app2) {
   });
   app2.post("/api/conversations/:sessionId/messages", authenticateToken, checkEntitlement, async (req, res) => {
     try {
+      console.log(`\u{1F4E8} Processing message for session: ${req.params.sessionId}`);
       const conversation = await storage.getConversation(req.params.sessionId);
       if (!conversation) {
+        console.log(`\u274C Conversation not found: ${req.params.sessionId}`);
         return res.status(404).json({ message: "Conversation not found" });
       }
       if (conversation.status === "ended") {
+        console.log(`\u274C Conversation already ended: ${req.params.sessionId}`);
         return res.status(400).json({ message: "Conversation has ended" });
       }
       const defaultAudioSource = await storage.getDefaultAudioSource(conversation.id);
@@ -37679,6 +38311,7 @@ async function registerRoutes(app2) {
         speakerLabel: req.body.speakerLabel || null,
         audioSourceId: req.body.audioSourceId || defaultAudioSource.id
       };
+      console.log(`\u2705 Message data prepared, validating...`);
       const validatedMessage = insertMessageSchema.parse(messageData);
       if (req.body.content.trim() === "/end") {
         const messages2 = await storage.getMessages(conversation.id);
@@ -37764,6 +38397,8 @@ async function registerRoutes(app2) {
         assistantMessage
       });
     } catch (error) {
+      console.error("\u274C Error in /api/conversations/:sessionId/messages:", error);
+      console.error("Error stack:", error.stack);
       res.status(500).json({ message: "Failed to process message", error: error.message });
     }
   });
@@ -38150,17 +38785,22 @@ ${qaContext}
   });
   app2.get("/api/conversations/:sessionId/meeting-minutes", authenticateToken, checkEntitlement, async (req, res) => {
     try {
+      console.log(`\u{1F4DD} Generating meeting minutes for session: ${req.params.sessionId}`);
       const conversation = await storage.getConversation(req.params.sessionId);
       if (!conversation) {
+        console.log(`\u274C Conversation not found: ${req.params.sessionId}`);
         return res.status(404).json({ message: "Conversation not found" });
       }
+      console.log(`\u2705 Found conversation: ${conversation.id}`);
       const messages2 = await storage.getMessages(conversation.id);
+      console.log(`\u2705 Found ${messages2.length} messages`);
       const conversationHistory = messages2.map((m) => ({
         sender: m.sender,
         content: m.content,
         speakerLabel: m.speakerLabel
       }));
       const domainExpertise2 = req.query.domain || "Generic Product";
+      console.log(`\u{1F3AF} Domain: ${domainExpertise2}`);
       const { generateMeetingMinutes: generateMeetingMinutes2 } = await Promise.resolve().then(() => (init_openai(), openai_exports));
       const sessionStart = conversation.transcriptionStartedAt ? new Date(conversation.transcriptionStartedAt) : conversation.createdAt ? new Date(conversation.createdAt) : /* @__PURE__ */ new Date();
       const now = /* @__PURE__ */ new Date();
@@ -38169,10 +38809,10 @@ ${qaContext}
       const formattedDuration = durationMinutes >= 60 ? `${Math.floor(durationMinutes / 60)} hour${Math.floor(durationMinutes / 60) > 1 ? "s" : ""} ${durationMinutes % 60} minutes` : `${durationMinutes} minutes`;
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { authUsers: authUsers4 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq26 } = await import("drizzle-orm");
+      const { eq: eq27 } = await import("drizzle-orm");
       let repName = "Sales Representative";
       if (req.jwtUser?.userId) {
-        const [user] = await db2.select().from(authUsers4).where(eq26(authUsers4.id, req.jwtUser.userId)).limit(1);
+        const [user] = await db2.select().from(authUsers4).where(eq27(authUsers4.id, req.jwtUser.userId)).limit(1);
         if (user && (user.firstName || user.lastName)) {
           repName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Sales Representative";
         }
@@ -38185,11 +38825,14 @@ ${qaContext}
         sessionStart
         // Pass actual session start time for accurate date/time
       );
+      console.log(`\u2705 Meeting minutes generated successfully`);
       meetingMinutes.duration = formattedDuration;
       meetingMinutes.repName = repName;
       res.json(meetingMinutes);
     } catch (error) {
-      console.error("Meeting minutes generation error:", error);
+      console.error("\u274C Meeting minutes generation error:", error);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
       if (error.message && error.message.includes("Conversation is too short")) {
         return res.status(400).json({
           success: false,
@@ -38215,11 +38858,11 @@ ${qaContext}
       const meetingMinutesData = req.body;
       const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
       const { callMeetingMinutes: callMeetingMinutes2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-      const { eq: eq26, and: and22, sql: sql15 } = await import("drizzle-orm");
+      const { eq: eq27, and: and22, sql: sql16 } = await import("drizzle-orm");
       const existing = await db2.select().from(callMeetingMinutes2).where(and22(
-        eq26(callMeetingMinutes2.userId, userId),
-        eq26(callMeetingMinutes2.status, "active"),
-        sql15`${callMeetingMinutes2.structuredMinutes}->>'sessionId' = ${sessionId}`
+        eq27(callMeetingMinutes2.userId, userId),
+        eq27(callMeetingMinutes2.status, "active"),
+        sql16`${callMeetingMinutes2.structuredMinutes}->>'sessionId' = ${sessionId}`
       )).limit(1);
       const expiresAt = /* @__PURE__ */ new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
@@ -38230,7 +38873,7 @@ ${qaContext}
           title: meetingMinutesData.opportunityName || "Meeting Minutes",
           summary: meetingMinutesData.discussionSummary,
           updatedAt: /* @__PURE__ */ new Date()
-        }).where(eq26(callMeetingMinutes2.id, existing[0].id));
+        }).where(eq27(callMeetingMinutes2.id, existing[0].id));
         console.log(`\u2705 Updated meeting minutes for session ${sessionId}`);
         res.json({ message: "Meeting minutes updated successfully", id: existing[0].id });
       } else {
@@ -38276,11 +38919,7 @@ ${qaContext}
       }
       const { extractTechEnvironment: extractTechEnvironment2 } = await Promise.resolve().then(() => (init_mind_map_extraction(), mind_map_extraction_exports));
       console.log("\u{1F5FA}\uFE0F Map/Flow: Calling AI extraction...");
-      const extractionPromise = extractTechEnvironment2(sessionId, transcript, domainExpertise2, userId);
-      const timeoutPromise = new Promise(
-        (_, reject) => setTimeout(() => reject(new Error("Map/Flow generation timeout after 60 seconds")), 6e4)
-      );
-      const mindMapData = await Promise.race([extractionPromise, timeoutPromise]);
+      const mindMapData = await extractTechEnvironment2(sessionId, transcript, domainExpertise2, userId);
       console.log(`\u{1F5FA}\uFE0F Map/Flow: Generated ${mindMapData.nodes?.length || 0} nodes, ${mindMapData.edges?.length || 0} edges`);
       if (mindMapData.nodes?.length === 0 && transcript.trim().length >= 200) {
         console.warn("\u26A0\uFE0F Map/Flow: 0 nodes extracted from substantial transcript. Consider investigating AI response.");
@@ -38296,6 +38935,45 @@ ${qaContext}
         message: "Failed to generate mind map",
         error: error.message
       });
+    }
+  });
+  app2.post("/api/conversations/:sessionId/mind-map/stream", authenticateToken, async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { transcript, domainExpertise: domainExpertise2 } = req.body;
+      const userId = req.jwtUser?.userId;
+      if (!transcript || transcript.trim().length < 50) {
+        return res.status(400).json({ success: false, message: "Insufficient transcript content" });
+      }
+      if (!userId) {
+        return res.status(400).json({ success: false, message: "User authentication required" });
+      }
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.setHeader("X-Accel-Buffering", "no");
+      res.flushHeaders?.();
+      const send = (event, data) => {
+        res.write(`event: ${event}
+data: ${JSON.stringify(data)}
+
+`);
+        res.flushHeaders?.();
+      };
+      send("progress", { status: "start", message: "Analyzing conversation & building maps\u2026" });
+      const { extractTechEnvironment: extractTechEnvironment2 } = await Promise.resolve().then(() => (init_mind_map_extraction(), mind_map_extraction_exports));
+      const mindMapData = await extractTechEnvironment2(sessionId, transcript, domainExpertise2, userId);
+      console.log(`\u{1F5FA}\uFE0F Map/Flow: Generated ${mindMapData.nodes?.length || 0} nodes, ${mindMapData.edges?.length || 0} edges`);
+      send("done", { success: true, data: mindMapData });
+      res.end();
+    } catch (error) {
+      console.error("\u{1F5FA}\uFE0F Map/Flow stream error:", error);
+      if (!res.headersSent) res.status(500).json({ success: false, message: error.message });
+      else res.write(`event: error
+data: ${JSON.stringify({ message: error.message })}
+
+`);
+      res.end();
     }
   });
   app2.get("/api/conversations/:sessionId/mind-map", authenticateToken, async (_req, res) => {
@@ -38665,8 +39343,25 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
       const response = await openaiService.generateResponse(analysisPrompt, []);
       let recommendations;
       try {
+        let jsonStr = response.trim();
+        if (jsonStr.startsWith("```")) {
+          const firstNewline = jsonStr.indexOf("\n");
+          const lastBackticks = jsonStr.lastIndexOf("```");
+          if (firstNewline !== -1 && lastBackticks > firstNewline) {
+            jsonStr = jsonStr.slice(firstNewline + 1, lastBackticks).trim();
+          } else if (firstNewline !== -1) {
+            jsonStr = jsonStr.slice(firstNewline + 1).trim();
+          } else {
+            jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "").trim();
+          }
+        }
+        const openBrace = jsonStr.indexOf("{");
+        if (openBrace >= 0 && (openBrace > 0 || !jsonStr.startsWith("{"))) {
+          const lastBrace = jsonStr.lastIndexOf("}");
+          if (lastBrace > openBrace) jsonStr = jsonStr.slice(openBrace, lastBrace + 1);
+        }
         console.log(`AI response length: ${response.length}`);
-        recommendations = JSON.parse(response);
+        recommendations = JSON.parse(jsonStr);
         console.log(`Partner services recommendations generated: ${recommendations.recommendations?.length || 0} services`);
         partnerServicesCache.set(cacheKey, { data: recommendations, timestamp: Date.now() });
       } catch (parseError) {
@@ -38696,6 +39391,212 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
     } catch (error) {
       console.error("Error generating partner services recommendations:", error);
       res.status(500).json({ error: "Failed to generate recommendations" });
+    }
+  });
+  app2.post("/api/conversations/:sessionId/ai-batch", authenticateToken, checkEntitlement, async (req, res) => {
+    const startBatch = Date.now();
+    try {
+      const { sessionId } = req.params;
+      const userId = req.jwtUser?.userId;
+      const {
+        domainExpertise: domainExpertise2,
+        transcriptText: bodyTranscript,
+        multiProductEliteAI: rawMultiProductFlag = false,
+        features: requestedFeatures
+      } = req.body || {};
+      const domain = domainExpertise2 || "Generic Product";
+      const multiProductEliteAI = typeof rawMultiProductFlag === "boolean" ? rawMultiProductFlag : rawMultiProductFlag === "true" || rawMultiProductFlag === true;
+      const defaultFeatures = [
+        "one-liners",
+        "partner-services",
+        "meeting-minutes",
+        "conversation-analysis",
+        "mind-map",
+        "present-to-win"
+      ];
+      const features = Array.isArray(requestedFeatures) && requestedFeatures.length > 0 ? requestedFeatures : defaultFeatures;
+      const conversation = await storage.getConversation(sessionId);
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      const messages2 = await storage.getMessages(conversation.id);
+      const conversationHistory = messages2.map((m) => ({
+        sender: m.sender,
+        content: m.content,
+        speakerLabel: m.speakerLabel
+      }));
+      const conversationText = messages2.length > 0 ? messages2.map((m) => `${m.sender}: ${m.content}`).join("\n") : "";
+      const transcriptForAnalysis = bodyTranscript && String(bodyTranscript).trim() || conversationText;
+      const sessionStart = conversation.transcriptionStartedAt ? new Date(conversation.transcriptionStartedAt) : conversation.createdAt ? new Date(conversation.createdAt) : /* @__PURE__ */ new Date();
+      const durationMs = Date.now() - sessionStart.getTime();
+      const durationMinutes = Math.round(durationMs / 6e4);
+      const formattedDuration = durationMinutes >= 60 ? `${Math.floor(durationMinutes / 60)} hour${Math.floor(durationMinutes / 60) > 1 ? "s" : ""} ${durationMinutes % 60} minutes` : `${durationMinutes} minutes`;
+      const openaiService = await Promise.resolve().then(() => (init_openai(), openai_exports));
+      const { generateMeetingMinutes: generateMeetingMinutes2, generateCombinedAnalysis: generateCombinedAnalysis2, generatePresentToWin: generatePresentToWin2 } = openaiService;
+      const { extractTechEnvironment: extractTechEnvironment2 } = await Promise.resolve().then(() => (init_mind_map_extraction(), mind_map_extraction_exports));
+      const { aiCache: aiCache2 } = await Promise.resolve().then(() => (init_ai_cache(), ai_cache_exports));
+      const runOneLiners = async () => {
+        if (messages2.length < 5) {
+          const phaseAnalysis2 = { phase: "discovery", readinessScore: 15 };
+          const defaultOneliners = [
+            { id: "opener-1", category: "empathy", text: "I really appreciate you sharing that context.", situation: "Opening the conversation", tone: "supportive", phase: "discovery", strategicIntent: "Build trust" },
+            { id: "rapport-1", category: "insight", text: "Based on what I'm hearing, you're dealing with challenges that many successful organizations have overcome.", situation: "Connecting to success stories", tone: "consultative", phase: "discovery", strategicIntent: "Position as trusted advisor" },
+            { id: "discovery-1", category: "curiosity", text: "What would it mean for your team if we could solve this challenge in the next quarter?", situation: "Understanding vision", tone: "curious", phase: "discovery", strategicIntent: "Create vision and timeline" },
+            { id: "reassurance-1", category: "reassurance", text: "You've clearly put a lot of thought into this.", situation: "Acknowledging preparation", tone: "reassuring", phase: "discovery", strategicIntent: "Validate approach" }
+          ];
+          return { oneliners: defaultOneliners, phase: phaseAnalysis2.phase, readinessScore: phaseAnalysis2.readinessScore };
+        }
+        const cacheKey = `oneliners:${sessionId}:${messages2.length}`;
+        const cached = aiCache2.get(cacheKey);
+        if (cached) return cached;
+        const phaseAnalysis = detectConversationPhase(conversationText, messages2.length, conversation.discoveryInsights);
+        const onelinerPrompt = `Sales coach. 4 rapport statements for ${phaseAnalysis.phase} phase.
+
+CONVERSATION:
+${conversationText.slice(-800)}
+
+JSON only:
+{"phase":"${phaseAnalysis.phase}","readinessScore":${phaseAnalysis.readinessScore},"oneliners":[{"id":"1","category":"empathy","text":"Statement","situation":"When","tone":"tone","strategicIntent":"Goal"},{"id":"2","category":"insight","text":"Statement","situation":"When","tone":"tone","strategicIntent":"Goal"},{"id":"3","category":"curiosity","text":"Statement","situation":"When","tone":"tone","strategicIntent":"Goal"},{"id":"4","category":"reassurance","text":"Statement","situation":"When","tone":"tone","strategicIntent":"Goal"}]}`;
+        const response = await Promise.race([
+          openaiService.generateResponse(onelinerPrompt, []),
+          new Promise((_, rej) => setTimeout(() => rej(new Error("Timeout")), 15e3))
+        ]);
+        let oneliners;
+        try {
+          const cleaned = response.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+          oneliners = JSON.parse(cleaned);
+          oneliners.phase = oneliners.phase || phaseAnalysis.phase;
+          oneliners.readinessScore = oneliners.readinessScore ?? phaseAnalysis.readinessScore;
+        } catch {
+          oneliners = { phase: phaseAnalysis.phase, readinessScore: phaseAnalysis.readinessScore, oneliners: [] };
+        }
+        aiCache2.set(cacheKey, oneliners, 12e4);
+        return oneliners;
+      };
+      const runPartnerServices = async () => {
+        const cacheKey = `partner-services:${sessionId}:${domain}`;
+        const CACHE_TTL2 = 6e4;
+        const cached = partnerServicesCache.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < CACHE_TTL2) return cached.data;
+        const painPoints = conversation.discoveryInsights?.painPoints || [];
+        const requirements = conversation.discoveryInsights?.requirements || [];
+        if (messages2.length < 2) {
+          const defaultRec = {
+            recommendations: [
+              { service: { id: "discovery-1", name: `${domain} Discovery Workshop`, type: "consulting", description: `Workshop to map workflows and align ${domain} solutions.`, provider: "Strategic Advisory", estimatedDuration: "1-2 weeks", complexity: "low", tags: ["discovery", domain.toLowerCase()] }, relevanceScore: 95, reasoning: "Understanding your processes ensures the right-fit products.", priority: "high" },
+              { service: { id: "platform-1", name: `${domain} Platform`, type: "product", description: `Unified ${domain} platform.`, provider: domain, estimatedDuration: "2-4 months", complexity: "medium", tags: ["automation", domain.toLowerCase()] }, relevanceScore: 88, reasoning: "Unified approach to consolidating tools.", priority: "high" },
+              { service: { id: "success-1", name: `${domain} Success Partnership`, type: "service", description: `Ongoing partnership.`, provider: "Customer Success", estimatedDuration: "Ongoing", complexity: "low", tags: ["success", domain.toLowerCase()] }, relevanceScore: 82, reasoning: "Maximize investment with ongoing optimization.", priority: "medium" }
+            ]
+          };
+          partnerServicesCache.set(cacheKey, { data: defaultRec, timestamp: Date.now() });
+          return defaultRec;
+        }
+        const analysisPrompt = `Act as expert ${domain} consultant. Conversation:
+${conversationText}
+Pain: ${painPoints.join(", ") || "Discovery"}. Requirements: ${requirements.join(", ") || "Gathering"}.
+Recommend 3 products/services. JSON only: {"recommendations":[{"service":{"id","name","type","description","provider","estimatedDuration","complexity","tags"},"relevanceScore":0-100,"reasoning":"","priority":"high|medium|low"}]}`;
+        const response = await openaiService.generateResponse(analysisPrompt, []);
+        let jsonStr = response.trim().replace(/```(?:json)?\s*/gi, "").replace(/```\s*$/g, "").trim();
+        const openBrace = jsonStr.indexOf("{");
+        if (openBrace >= 0) {
+          const lastBrace = jsonStr.lastIndexOf("}");
+          if (lastBrace > openBrace) jsonStr = jsonStr.slice(openBrace, lastBrace + 1);
+        }
+        let recommendations;
+        try {
+          recommendations = JSON.parse(jsonStr);
+          partnerServicesCache.set(cacheKey, { data: recommendations, timestamp: Date.now() });
+        } catch {
+          recommendations = { recommendations: [{ service: { id: "consultation-fallback", name: "Strategic Solution Consultation", type: "consulting", description: "Personalized consultation.", provider: "Strategic Advisory", estimatedDuration: "1-2 weeks", complexity: "low", tags: ["consultation"] }, relevanceScore: 85, reasoning: "Deeper consultation to tailor solution.", priority: "high" }] };
+        }
+        return recommendations;
+      };
+      const runMeetingMinutes = async () => {
+        const minutes = await generateMeetingMinutes2(
+          conversationHistory,
+          conversation.clientName || "Client",
+          domain,
+          userId,
+          sessionStart
+        );
+        minutes.duration = formattedDuration;
+        const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+        const { authUsers: authUsers4 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+        const { eq: eq27 } = await import("drizzle-orm");
+        let repName = "Sales Representative";
+        if (userId) {
+          const [user] = await db2.select().from(authUsers4).where(eq27(authUsers4.id, userId)).limit(1);
+          if (user && (user.firstName || user.lastName)) repName = [user.firstName, user.lastName].filter(Boolean).join(" ") || repName;
+        }
+        minutes.repName = repName;
+        return minutes;
+      };
+      const runAnalysis = async () => {
+        if (!transcriptForAnalysis.trim()) return null;
+        const result = await generateCombinedAnalysis2(transcriptForAnalysis, conversationHistory.slice(-5), domain, userId, multiProductEliteAI);
+        const { analysis, salesScript, multiProductIntelligence, products: products2, _multiProduct } = result;
+        return {
+          discoveryQuestions: analysis?.discoveryQuestions || [],
+          recommendedSolutions: analysis?.recommendedModules || [],
+          caseStudies: analysis?.caseStudies || [],
+          discoveryInsights: analysis?.discoveryInsights || {},
+          nextQuestions: analysis?.nextQuestions || [],
+          salesScript: salesScript ?? null,
+          closingPitch: analysis?.closingPitch ?? null,
+          nextSteps: analysis?.nextSteps || [],
+          multiProductIntelligence: multiProductIntelligence ?? null,
+          products: products2 ?? null,
+          _multiProduct: _multiProduct ?? false
+        };
+      };
+      const runMindMap = async () => {
+        if (!transcriptForAnalysis.trim() || transcriptForAnalysis.length < 50) return null;
+        const mindMapData = await extractTechEnvironment2(sessionId, transcriptForAnalysis, domain, userId);
+        return { success: true, data: mindMapData };
+      };
+      const runPresentToWin = async () => {
+        if (!transcriptForAnalysis.trim() || !userId) return null;
+        const uid = userId;
+        const types = ["pitch-deck", "case-study", "battle-card"];
+        const results = await Promise.all(
+          types.map((type) => generatePresentToWin2(type, transcriptForAnalysis, domain, uid))
+        );
+        return {
+          "pitch-deck": results[0],
+          "case-study": results[1],
+          "battle-card": results[2]
+        };
+      };
+      const taskMap = {
+        "one-liners": runOneLiners,
+        "partner-services": runPartnerServices,
+        "meeting-minutes": runMeetingMinutes,
+        "conversation-analysis": runAnalysis,
+        "mind-map": runMindMap,
+        "present-to-win": runPresentToWin
+      };
+      const keys = features.filter((f) => taskMap[f]);
+      const settled = await Promise.allSettled(keys.map((k) => taskMap[k]()));
+      const out = {};
+      keys.forEach((k, i) => {
+        const s = settled[i];
+        if (s.status === "fulfilled" && s.value != null) {
+          if (k === "one-liners") out.oneLiners = s.value;
+          else if (k === "partner-services") out.partnerServices = s.value;
+          else if (k === "meeting-minutes") out.meetingMinutes = s.value;
+          else if (k === "conversation-analysis") out.analysis = s.value;
+          else if (k === "mind-map") out.mindMap = s.value;
+          else if (k === "present-to-win") out.presentToWin = s.value;
+        }
+      });
+      const totalDuration = Date.now() - startBatch;
+      console.log(`\u2705 AI batch completed in ${totalDuration}ms for session ${sessionId} (${keys.length} features)`);
+      out._batchDuration = totalDuration;
+      out._features = keys;
+      res.json(out);
+    } catch (error) {
+      console.error("AI batch error:", error);
+      res.status(500).json({ error: "AI batch failed", message: error?.message || "Unknown error" });
     }
   });
   app2.post("/api/conversations/:sessionId/teams-meeting", async (req, res) => {
@@ -38920,10 +39821,14 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
           accessMethod: isSuperAdmin2 ? "super_admin_role" : "super_user_override"
         });
         const sessionId2 = `usage_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const now2 = /* @__PURE__ */ new Date();
         const sessionUsageData2 = {
           userId,
           sessionId: sessionId2,
-          startTime: /* @__PURE__ */ new Date(),
+          startTime: now2,
+          lastResumeTime: now2,
+          accumulatedDurationMs: 0,
+          isPaused: false,
           endTime: null,
           durationSeconds: null,
           status: "active"
@@ -38938,10 +39843,14 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
       const hasEnterpriseLicense = await hasActiveEnterpriseLicense2(userId);
       if (hasEnterpriseLicense) {
         const sessionId2 = `usage_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const now2 = /* @__PURE__ */ new Date();
         const sessionUsageData2 = {
           userId,
           sessionId: sessionId2,
-          startTime: /* @__PURE__ */ new Date(),
+          startTime: now2,
+          lastResumeTime: now2,
+          accumulatedDurationMs: 0,
+          isPaused: false,
           endTime: null,
           durationSeconds: null,
           status: "active"
@@ -38984,10 +39893,14 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
         });
       }
       const sessionId = `usage_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const now = /* @__PURE__ */ new Date();
       const sessionUsageData = {
         userId,
         sessionId,
-        startTime: /* @__PURE__ */ new Date(),
+        startTime: now,
+        lastResumeTime: now,
+        accumulatedDurationMs: 0,
+        isPaused: false,
         endTime: null,
         durationSeconds: null,
         status: "active"
@@ -39018,23 +39931,45 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
         return res.status(400).json({ message: "Session already ended" });
       }
       const endTime = /* @__PURE__ */ new Date();
-      const startTime = new Date(sessionUsage2.startTime);
-      const durationSeconds = Math.floor((endTime.getTime() - startTime.getTime()) / 1e3);
+      let totalDurationMs = sessionUsage2.accumulatedDurationMs || 0;
+      if (!sessionUsage2.isPaused && sessionUsage2.lastResumeTime) {
+        const runningSinceMs = endTime.getTime() - new Date(sessionUsage2.lastResumeTime).getTime();
+        totalDurationMs += runningSinceMs;
+      }
+      const durationSeconds = Math.floor(totalDurationMs / 1e3);
       const durationMinutes = Math.floor(durationSeconds / 60);
       const updatedSession = await storage.updateSessionUsage(sessionId, userId, {
         endTime,
+        accumulatedDurationMs: totalDurationMs,
         durationSeconds: durationSeconds.toString(),
         status: "ended"
       });
+      let sessionSummary = null;
+      try {
+        const { callMeetingMinutes: callMeetingMinutes2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
+        const minutesResult = await db.select().from(callMeetingMinutes2).where(and20(
+          eq25(callMeetingMinutes2.userId, userId),
+          eq25(callMeetingMinutes2.status, "active"),
+          sql13`${callMeetingMinutes2.structuredMinutes}->>'sessionId' = ${sessionId}`
+        )).limit(1);
+        if (minutesResult.length > 0) {
+          sessionSummary = minutesResult[0].summary;
+          console.log(`\u2705 Found meeting minutes summary for session ${sessionId}`);
+        }
+      } catch (error) {
+        console.error("Error fetching meeting minutes:", error);
+      }
       const subscription = await authStorage.getSubscriptionByUserId(userId);
       if (subscription) {
         const currentMinutesUsed = parseInt(subscription.minutesUsed || "0") || 0;
         const sessionHistory = Array.isArray(subscription.sessionHistory) ? subscription.sessionHistory : [];
         sessionHistory.push({
           sessionId,
-          startTime: startTime.toISOString(),
+          startTime: new Date(sessionUsage2.startTime).toISOString(),
           endTime: endTime.toISOString(),
-          durationMinutes
+          durationMinutes,
+          summary: sessionSummary || void 0
+          // Add summary if available
         });
         await authStorage.updateSubscription(subscription.id, {
           minutesUsed: (currentMinutesUsed + durationMinutes).toString(),
@@ -39046,10 +39981,124 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
       res.status(500).json({ message: "Failed to stop session timer", error: error.message });
     }
   });
+  app2.put("/api/session-usage/:sessionId/pause", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser.userId;
+      const { sessionId } = req.params;
+      const sessionUsage2 = await storage.getSessionUsage(sessionId, userId);
+      if (!sessionUsage2) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      if (sessionUsage2.status === "ended") {
+        return res.status(400).json({ message: "Session already ended" });
+      }
+      if (sessionUsage2.isPaused) {
+        return res.status(400).json({ message: "Session already paused" });
+      }
+      const now = /* @__PURE__ */ new Date();
+      let accumulatedMs = sessionUsage2.accumulatedDurationMs || 0;
+      if (sessionUsage2.lastResumeTime) {
+        const runningSinceMs = now.getTime() - new Date(sessionUsage2.lastResumeTime).getTime();
+        accumulatedMs += runningSinceMs;
+      }
+      const updatedSession = await storage.updateSessionUsage(sessionId, userId, {
+        accumulatedDurationMs: accumulatedMs,
+        isPaused: true,
+        status: "paused"
+      });
+      res.json({ sessionUsage: updatedSession });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to pause session timer", error: error.message });
+    }
+  });
+  app2.put("/api/session-usage/:sessionId/resume", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser.userId;
+      const { sessionId } = req.params;
+      const sessionUsage2 = await storage.getSessionUsage(sessionId, userId);
+      if (!sessionUsage2) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      if (sessionUsage2.status === "ended") {
+        return res.status(400).json({ message: "Session already ended" });
+      }
+      if (!sessionUsage2.isPaused) {
+        return res.status(400).json({ message: "Session is not paused" });
+      }
+      const now = /* @__PURE__ */ new Date();
+      const updatedSession = await storage.updateSessionUsage(sessionId, userId, {
+        lastResumeTime: now,
+        isPaused: false,
+        status: "active"
+      });
+      res.json({ sessionUsage: updatedSession });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to resume session timer", error: error.message });
+    }
+  });
+  app2.put("/api/session-usage/:sessionId/sync", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser.userId;
+      const { sessionId } = req.params;
+      const { currentDurationSeconds } = req.body;
+      if (typeof currentDurationSeconds !== "number") {
+        return res.status(400).json({ message: "currentDurationSeconds is required" });
+      }
+      const sessionUsage2 = await storage.getSessionUsage(sessionId, userId);
+      if (!sessionUsage2) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      if (sessionUsage2.status === "ended") {
+        return res.status(400).json({ message: "Session already ended" });
+      }
+      const accumulatedMs = currentDurationSeconds * 1e3;
+      const updatedSession = await storage.updateSessionUsage(sessionId, userId, {
+        accumulatedDurationMs: accumulatedMs
+      });
+      res.json({
+        success: true,
+        sessionUsage: updatedSession
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to sync session time", error: error.message });
+    }
+  });
+  app2.get("/api/session-usage/current", authenticateToken, async (req, res) => {
+    try {
+      const userId = req.jwtUser.userId;
+      const sessions2 = await db.select().from(sessionUsage).where(and20(
+        eq25(sessionUsage.userId, userId),
+        or8(
+          eq25(sessionUsage.status, "active"),
+          eq25(sessionUsage.status, "paused")
+        )
+      )).orderBy(desc14(sessionUsage.startTime)).limit(1);
+      if (sessions2.length === 0) {
+        return res.json({ session: null });
+      }
+      const session = sessions2[0];
+      const now = /* @__PURE__ */ new Date();
+      let currentDurationMs = Number(session.accumulatedDurationMs) || 0;
+      if (!session.isPaused && session.lastResumeTime) {
+        const runningSinceMs = now.getTime() - new Date(session.lastResumeTime).getTime();
+        currentDurationMs += runningSinceMs;
+      }
+      res.json({
+        session: {
+          ...session,
+          currentDurationMs,
+          currentDurationSeconds: Math.floor(currentDurationMs / 1e3)
+        }
+      });
+    } catch (error) {
+      console.error("\u274C Error in /api/session-usage/current:", error);
+      res.status(500).json({ message: "Failed to get current session", error: error.message });
+    }
+  });
   app2.get("/api/session-usage/total", authenticateToken, async (req, res) => {
     try {
       const userId = req.jwtUser.userId;
-      const sessions2 = await db.select().from(sessionUsage).where(eq24(sessionUsage.userId, userId)).orderBy(desc14(sessionUsage.startTime));
+      const sessions2 = await db.select().from(sessionUsage).where(eq25(sessionUsage.userId, userId)).orderBy(desc14(sessionUsage.startTime));
       const now = /* @__PURE__ */ new Date();
       let totalSeconds = 0;
       for (const session of sessions2) {
@@ -39101,13 +40150,37 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
     try {
       const userId = req.jwtUser.userId;
       console.log(`[DEBUG] Fetching subscription for userId: ${userId}`);
-      const subscription = await authStorage.getSubscriptionByUserId(userId);
-      console.log(`[DEBUG] Subscription found:`, subscription ? {
-        id: subscription.id,
-        planType: subscription.planType,
-        status: subscription.status,
-        planId: subscription.planId
-      } : "NULL");
+      let subscription = await authStorage.getSubscriptionByUserId(userId);
+      let isEnterpriseSeat = false;
+      let licensePackage = null;
+      if (!subscription) {
+        let membership = await authStorage.getUserMembership(userId);
+        if (!membership) {
+          membership = await authStorage.ensureOrganizationMembershipFromAssignment(userId) || null;
+        }
+        if (membership && membership.status === "active") {
+          licensePackage = await authStorage.getActiveLicensePackage(membership.organizationId);
+          if (licensePackage) {
+            isEnterpriseSeat = true;
+            subscription = {
+              id: licensePackage.id,
+              userId,
+              planId: null,
+              planType: licensePackage.packageType || "team",
+              status: "active",
+              sessionsUsed: "0",
+              sessionsLimit: null,
+              minutesUsed: "0",
+              minutesLimit: "unlimited",
+              sessionHistory: [],
+              currentPeriodStart: licensePackage.startDate,
+              currentPeriodEnd: licensePackage.endDate,
+              canceledAt: null,
+              createdAt: licensePackage.createdAt
+            };
+          }
+        }
+      }
       if (!subscription) {
         console.log(`[DEBUG] No subscription found for user ${userId}, returning free_trial`);
         return res.json({
@@ -39116,38 +40189,67 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
           message: "No active subscription"
         });
       }
+      if (isEnterpriseSeat && licensePackage) {
+        console.log(`[DEBUG] User ${userId} on enterprise seat, using org license package: ${licensePackage.id}`);
+      } else {
+        console.log(`[DEBUG] Subscription found:`, subscription ? {
+          id: subscription.id,
+          planType: subscription.planType,
+          status: subscription.status,
+          planId: subscription.planId
+        } : "NULL");
+      }
       let planDetails = null;
-      if (subscription.planId) {
+      if (isEnterpriseSeat && licensePackage) {
+        planDetails = {
+          name: licensePackage.packageType?.replace(/-/g, " ") || "Team",
+          price: licensePackage.totalAmount || "0",
+          currency: licensePackage.currency || "INR",
+          billingInterval: "year"
+        };
+      } else if (subscription.planId) {
         planDetails = await authStorage.getPlanById(subscription.planId);
         console.log(`[DEBUG] Plan details:`, planDetails ? {
           name: planDetails.name,
           price: planDetails.price
         } : "NULL");
       }
+      if (!planDetails && subscription.planType && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subscription.planType.trim())) {
+        planDetails = await authStorage.getPlanById(subscription.planType.trim());
+      }
       let sessionHistory = [];
       try {
-        console.log(`[DEBUG] Fetching conversations for user ${userId}`);
-        const userConversations = await db.select().from(conversations).where(eq24(conversations.userId, userId)).orderBy(desc14(conversations.createdAt)).limit(50);
-        console.log(`[DEBUG] Found ${userConversations.length} conversations`);
-        sessionHistory = userConversations.map((conv) => {
-          const startTime = conv.transcriptionStartedAt || conv.createdAt || /* @__PURE__ */ new Date();
-          const endTime = conv.endedAt || conv.createdAt || /* @__PURE__ */ new Date();
-          const durationMs = endTime.getTime() - startTime.getTime();
-          const durationMinutes = Math.max(1, Math.ceil(durationMs / (1e3 * 60)));
+        console.log(`[DEBUG] Fetching session usage for user ${userId}`);
+        const userSessions = await db.select().from(sessionUsage).where(eq25(sessionUsage.userId, userId)).orderBy(desc14(sessionUsage.startTime)).limit(50);
+        console.log(`[DEBUG] Found ${userSessions.length} total sessions (including active)`);
+        sessionHistory = userSessions.map((session) => {
+          let durationSeconds;
+          if (session.status === "ended") {
+            durationSeconds = parseInt(session.durationSeconds || "0");
+          } else {
+            let totalDurationMs = session.accumulatedDurationMs || 0;
+            if (!session.isPaused && session.lastResumeTime) {
+              const now = /* @__PURE__ */ new Date();
+              const runningSinceMs = now.getTime() - new Date(session.lastResumeTime).getTime();
+              totalDurationMs += runningSinceMs;
+            }
+            durationSeconds = Math.floor(totalDurationMs / 1e3);
+          }
+          const durationMinutes = Math.floor(durationSeconds / 60);
           return {
-            sessionId: conv.sessionId,
-            startTime: startTime.toISOString(),
-            endTime: endTime.toISOString(),
+            sessionId: session.sessionId,
+            startTime: session.startTime.toISOString(),
+            endTime: session.endTime ? session.endTime.toISOString() : (/* @__PURE__ */ new Date()).toISOString(),
             durationMinutes,
-            summary: conv.callSummary || null,
-            transcriptionStarted: !!conv.transcriptionStartedAt
+            summary: null,
+            // Can be joined with conversations if needed
+            transcriptionStarted: true
+            // All sessions in session_usage have started
           };
-        }).filter((session) => {
-          return session.transcriptionStarted;
         });
-        console.log(`[DEBUG] Returning ${sessionHistory.length} sessions in history (filtered out non-transcription sessions)`);
+        console.log(`[DEBUG] Returning ${sessionHistory.length} sessions in history from session_usage table (including active)`);
       } catch (error) {
-        console.error(`[DEBUG] Error fetching conversations:`, error);
+        console.error(`[DEBUG] Error fetching session usage:`, error);
         sessionHistory = [];
       }
       const actualSessionsUsed = sessionHistory.length;
@@ -39185,9 +40287,9 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
     try {
       const userId = req.jwtUser.userId;
       const user = await authStorage.getUserById(userId);
-      const allSubscriptions = await db.select().from(subscriptions).where(eq24(subscriptions.userId, userId)).orderBy(desc14(subscriptions.createdAt));
+      const allSubscriptions = await db.select().from(subscriptions).where(eq25(subscriptions.userId, userId)).orderBy(desc14(subscriptions.createdAt));
       const payments2 = await authStorage.getPaymentsByUserId(userId);
-      const orders = await db.select().from(pendingOrders).where(eq24(pendingOrders.userId, userId)).orderBy(desc14(pendingOrders.createdAt));
+      const orders = await db.select().from(pendingOrders).where(eq25(pendingOrders.userId, userId)).orderBy(desc14(pendingOrders.createdAt));
       res.json({
         userId,
         userEmail: user?.email,
@@ -39241,7 +40343,7 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
         createdAt: conversations.createdAt,
         transcriptionStartedAt: conversations.transcriptionStartedAt,
         endedAt: conversations.endedAt
-      }).from(conversations).where(eq24(conversations.userId, userId)).orderBy(sql13`${conversations.createdAt} DESC`).limit(limit);
+      }).from(conversations).where(eq25(conversations.userId, userId)).orderBy(sql13`${conversations.createdAt} DESC`).limit(limit);
       const sessionHistory = userConversations.map((conv) => {
         const startTime = conv.transcriptionStartedAt || conv.createdAt || /* @__PURE__ */ new Date();
         const endTime = conv.endedAt || /* @__PURE__ */ new Date();
@@ -39298,9 +40400,9 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
     try {
       const userId = req.jwtUser.userId;
       const user = await authStorage.getUserById(userId);
-      const allSubscriptions = await db.select().from(subscriptions).where(eq24(subscriptions.userId, userId)).orderBy(desc14(subscriptions.createdAt));
+      const allSubscriptions = await db.select().from(subscriptions).where(eq25(subscriptions.userId, userId)).orderBy(desc14(subscriptions.createdAt));
       const payments2 = await authStorage.getPaymentsByUserId(userId);
-      const orders = await db.select().from(pendingOrders).where(eq24(pendingOrders.userId, userId)).orderBy(desc14(pendingOrders.createdAt));
+      const orders = await db.select().from(pendingOrders).where(eq25(pendingOrders.userId, userId)).orderBy(desc14(pendingOrders.createdAt));
       res.json({
         userId,
         userEmail: user?.email,
@@ -39342,10 +40444,38 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
     try {
       const userId = req.jwtUser.userId;
       const { billingStorage: billingStorage3 } = await Promise.resolve().then(() => (init_storage_billing(), storage_billing_exports));
-      const allPurchases = await billingStorage3.getUserAddonPurchases(userId);
       const invoices = [];
+      const seenOrderIds = /* @__PURE__ */ new Set();
+      const completedOrders = await db.select().from(pendingOrders).where(and20(eq25(pendingOrders.userId, userId), eq25(pendingOrders.status, "completed"))).orderBy(desc14(pendingOrders.completedAt)).limit(100);
+      for (const order of completedOrders) {
+        const amount = parseFloat(order.amount || "0");
+        const currency = order.currency || "USD";
+        const meta = order.metadata || {};
+        invoices.push({
+          id: order.id,
+          orderId: order.id,
+          amount: amount.toFixed(2),
+          currency,
+          status: "succeeded",
+          paymentMethod: order.gatewayProvider === "razorpay" ? "razorpay" : "online",
+          razorpayOrderId: order.gatewayOrderId || order.id,
+          razorpayPaymentId: null,
+          receiptUrl: `/api/billing/invoice?orderId=${order.id}`,
+          createdAt: order.completedAt || order.createdAt,
+          metadata: {
+            itemCount: meta.itemCount || 1,
+            subtotal: meta.subtotal != null ? String(meta.subtotal) : amount.toFixed(2),
+            gst: meta.gstAmount != null ? String(meta.gstAmount) : "0",
+            total: amount.toFixed(2),
+            packageName: meta.items?.length ? meta.items.map((i) => i.packageName).join(", ") : "Cart purchase"
+          }
+        });
+        seenOrderIds.add(order.id);
+      }
+      const allPurchases = await billingStorage3.getUserAddonPurchases(userId);
       allPurchases.forEach((purchase) => {
         const metadata = purchase.metadata || {};
+        if (metadata.cartOrderId && seenOrderIds.has(metadata.cartOrderId)) return;
         if (metadata.purchaseHistory && Array.isArray(metadata.purchaseHistory)) {
           metadata.purchaseHistory.forEach((historyItem) => {
             const amount = parseFloat(historyItem.amount || "0");
@@ -39354,13 +40484,8 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
             let displayCurrency = currency;
             let baseAmount;
             let gstAmount;
-            if (currency === "INR") {
-              baseAmount = displayAmount / 1.18;
-              gstAmount = displayAmount - baseAmount;
-            } else {
-              baseAmount = displayAmount;
-              gstAmount = 0;
-            }
+            baseAmount = displayAmount / 1.18;
+            gstAmount = displayAmount - baseAmount;
             invoices.push({
               id: historyItem.orderId || historyItem.paymentId,
               orderId: historyItem.gatewayOrderId || historyItem.orderId,
@@ -39381,11 +40506,6 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
                 minutesAdded: historyItem.minutesAdded,
                 description: `${historyItem.packageName} - Session Minutes`,
                 invoiceNumber: `INV-${historyItem.orderId?.substring(0, 8) || "TEST"}`,
-                customerName: "Rev Winner Customer",
-                customerEmail: "customer@revwinner.com",
-                companyName: "Rev Winner",
-                companyAddress: "Digital Services Platform",
-                gstNumber: "TEST-GST-123456789",
                 paymentMode: historyItem.paymentMethod || "Online Payment",
                 originalAmount: amount,
                 originalCurrency: currency
@@ -39397,13 +40517,8 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
           const currency = purchase.currency || "INR";
           let baseAmount;
           let gstAmount;
-          if (currency === "INR") {
-            baseAmount = totalWithGst / 1.18;
-            gstAmount = totalWithGst - baseAmount;
-          } else {
-            baseAmount = totalWithGst;
-            gstAmount = 0;
-          }
+          baseAmount = totalWithGst / 1.18;
+          gstAmount = totalWithGst - baseAmount;
           invoices.push({
             id: metadata.cartOrderId,
             orderId: metadata.cartOrderId,
@@ -39428,13 +40543,8 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
           const currency = purchase.currency || "INR";
           let baseAmount;
           let gstAmount;
-          if (currency === "INR") {
-            baseAmount = totalWithGst / 1.18;
-            gstAmount = totalWithGst - baseAmount;
-          } else {
-            baseAmount = totalWithGst;
-            gstAmount = 0;
-          }
+          baseAmount = totalWithGst / 1.18;
+          gstAmount = totalWithGst - baseAmount;
           invoices.push({
             id: purchase.id,
             orderId: purchase.id,
@@ -39900,7 +41010,12 @@ Provide a helpful, concise answer (2-4 paragraphs max).` }
         });
       }
       const { billingStorage: billingStorage3 } = await Promise.resolve().then(() => (init_storage_billing(), storage_billing_exports));
-      const trainMePurchase = await billingStorage3.getActiveAddonPurchase(userId, "train_me");
+      let trainMePurchase = null;
+      try {
+        trainMePurchase = await billingStorage3.getActiveAddonPurchase(userId, "train_me");
+      } catch (purchaseError) {
+        console.error("\u274C Error checking addon purchase:", purchaseError);
+      }
       if (trainMePurchase) {
         const now = /* @__PURE__ */ new Date();
         const expiryDate = trainMePurchase.endDate;
@@ -39917,7 +41032,12 @@ Provide a helpful, concise answer (2-4 paragraphs max).` }
           source: "purchase"
         });
       }
-      const enterpriseAssignment = await billingStorage3.getEnterpriseAssignmentByUser(userId);
+      let enterpriseAssignment = null;
+      try {
+        enterpriseAssignment = await billingStorage3.getEnterpriseAssignmentByUser(userId);
+      } catch (enterpriseError) {
+        console.error("\u274C Error checking enterprise assignment:", enterpriseError);
+      }
       if (enterpriseAssignment?.trainMeEnabled) {
         return res.json({
           active: true,
@@ -39927,23 +41047,55 @@ Provide a helpful, concise answer (2-4 paragraphs max).` }
           source: "enterprise"
         });
       }
-      const user = await authStorage.getUserById(userId);
-      if (user && user.trainMeSubscriptionDate) {
-        const subscriptionDate = new Date(user.trainMeSubscriptionDate);
-        const expiryDate = new Date(subscriptionDate);
-        expiryDate.setDate(expiryDate.getDate() + 30);
-        const now = /* @__PURE__ */ new Date();
-        if (expiryDate > now) {
-          const diffTime = expiryDate.getTime() - now.getTime();
-          const daysRemaining = Math.max(0, Math.ceil(diffTime / (1e3 * 60 * 60 * 24)));
-          return res.json({
-            active: true,
-            purchaseDate: subscriptionDate.toISOString(),
-            daysRemaining,
-            expiryDate: expiryDate.toISOString(),
-            source: "legacy"
-          });
+      let membership = null;
+      try {
+        membership = await authStorage.getUserMembership(userId);
+        if (!membership) {
+          membership = await authStorage.ensureOrganizationMembershipFromAssignment(userId) || null;
         }
+      } catch (membershipError) {
+        console.error("\u274C Error checking organization membership:", membershipError);
+      }
+      if (membership?.status === "active") {
+        try {
+          const orgAddons = await authStorage.getOrganizationAddons(membership.organizationId);
+          const orgTrainMe = orgAddons.find((a) => a.type === "train_me" && a.status === "active" && (!a.endDate || new Date(a.endDate) > /* @__PURE__ */ new Date()));
+          if (orgTrainMe) {
+            const endDate = orgTrainMe.endDate ? new Date(orgTrainMe.endDate) : null;
+            const daysRemaining = endDate ? Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1e3 * 60 * 60 * 24))) : 999;
+            return res.json({
+              active: true,
+              purchaseDate: orgTrainMe.startDate || null,
+              daysRemaining,
+              expiryDate: orgTrainMe.endDate || null,
+              source: "organization"
+            });
+          }
+        } catch (orgAddonError) {
+          console.error("\u274C Error checking organization addons:", orgAddonError);
+        }
+      }
+      try {
+        const user = await authStorage.getUserById(userId);
+        if (user && user.trainMeSubscriptionDate) {
+          const subscriptionDate = new Date(user.trainMeSubscriptionDate);
+          const expiryDate = new Date(subscriptionDate);
+          expiryDate.setDate(expiryDate.getDate() + 30);
+          const now = /* @__PURE__ */ new Date();
+          if (expiryDate > now) {
+            const diffTime = expiryDate.getTime() - now.getTime();
+            const daysRemaining = Math.max(0, Math.ceil(diffTime / (1e3 * 60 * 60 * 24)));
+            return res.json({
+              active: true,
+              purchaseDate: subscriptionDate.toISOString(),
+              daysRemaining,
+              expiryDate: expiryDate.toISOString(),
+              source: "legacy"
+            });
+          }
+        }
+      } catch (legacyError) {
+        console.error("\u274C Error checking legacy subscription:", legacyError);
       }
       return res.json({
         active: false,
@@ -39953,8 +41105,10 @@ Provide a helpful, concise answer (2-4 paragraphs max).` }
         source: "none"
       });
     } catch (error) {
-      console.error("Train Me status error:", error);
-      res.status(500).json({ error: "Failed to check Train Me status" });
+      console.error("\u274C Train Me status error:", error);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+      res.status(500).json({ error: "Failed to check Train Me status", message: error.message });
     }
   });
   app2.get("/api/domain-expertise", authenticateToken, async (req, res) => {
@@ -40684,6 +41838,7 @@ Provide a helpful, concise answer (2-4 paragraphs max).` }
   app2.use("/api/api-keys", routes_api_keys_default);
   console.log("\u{1F511} API Keys routes registered");
   setupSalesIntelligenceRoutes(app2);
+  setupSystemConfigRoutes(app2);
   registerBibleRoutes(app2);
   app2.use("/api/download", routes_api_docs_default);
   app2.use(routes_recordings_default);
@@ -40730,7 +41885,7 @@ Provide a helpful, concise answer (2-4 paragraphs max).` }
       if (!userId) {
         return res.status(401).json({ error: "Authentication required" });
       }
-      const feedbackList = await db.select().from(userFeedback).where(eq24(userFeedback.userId, userId)).orderBy(desc14(userFeedback.createdAt));
+      const feedbackList = await db.select().from(userFeedback).where(eq25(userFeedback.userId, userId)).orderBy(desc14(userFeedback.createdAt));
       res.json({ success: true, data: feedbackList });
     } catch (error) {
       console.error("Get feedback error:", error);
@@ -40750,10 +41905,10 @@ Provide a helpful, concise answer (2-4 paragraphs max).` }
       const { status, category } = req.query;
       let query = db.select().from(userFeedback);
       if (status) {
-        query = query.where(eq24(userFeedback.status, status));
+        query = query.where(eq25(userFeedback.status, status));
       }
       if (category) {
-        query = query.where(eq24(userFeedback.category, category));
+        query = query.where(eq25(userFeedback.category, category));
       }
       const feedbackList = await query.orderBy(desc14(userFeedback.createdAt));
       res.json({ success: true, data: feedbackList });
@@ -40776,7 +41931,7 @@ Provide a helpful, concise answer (2-4 paragraphs max).` }
       const updates = { updatedAt: /* @__PURE__ */ new Date() };
       if (status) updates.status = status;
       if (adminNotes !== void 0) updates.adminNotes = adminNotes;
-      const updated = await db.update(userFeedback).set(updates).where(eq24(userFeedback.id, req.params.id)).returning();
+      const updated = await db.update(userFeedback).set(updates).where(eq25(userFeedback.id, req.params.id)).returning();
       if (!updated.length) {
         return res.status(404).json({ error: "Feedback not found" });
       }
@@ -41705,7 +42860,23 @@ var teams_integration_default = TeamsIntegration;
 
 // server/index.ts
 init_storage();
+init_db();
+import { sql as sql15 } from "drizzle-orm";
 import "dotenv/config";
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("\u274C Unhandled Promise Rejection:", reason);
+  if (reason?.error) {
+    console.error("Error details:", JSON.stringify(reason.error, null, 2));
+  }
+});
+process.on("uncaughtException", (error) => {
+  console.error("\u274C Uncaught Exception:", error);
+  console.error("Stack:", error.stack);
+  if (process.env.NODE_ENV === "production") {
+    console.error("Exiting due to uncaught exception in production");
+    process.exit(1);
+  }
+});
 var AUTO_REBUILD_COOLDOWN = 5 * 60 * 1e3;
 var app = express3();
 app.set("trust proxy", true);
@@ -41767,8 +42938,14 @@ app.use((req, res, next) => {
       console.log("Teams integration disabled - Microsoft App credentials not configured");
     }
     try {
-      const { initializeScheduledJobs: initializeScheduledJobs2 } = await Promise.resolve().then(() => (init_scheduled_jobs(), scheduled_jobs_exports));
-      initializeScheduledJobs2();
+      const dbHealthy = await db.execute(sql15`SELECT 1 as health`).then(() => true).catch(() => false);
+      if (dbHealthy) {
+        const { initializeScheduledJobs: initializeScheduledJobs2 } = await Promise.resolve().then(() => (init_scheduled_jobs(), scheduled_jobs_exports));
+        initializeScheduledJobs2();
+      } else {
+        console.warn("\u26A0\uFE0F  Database not available - scheduled jobs disabled");
+        console.warn("   Check your DATABASE_URL and Neon endpoint status");
+      }
     } catch (error) {
       console.error("Failed to initialize scheduled jobs:", error);
     }
@@ -41807,8 +42984,8 @@ app.use((req, res, next) => {
         try {
           const { db: db2 } = await Promise.resolve().then(() => (init_db(), db_exports));
           const { domainExpertise: domainExpertise2, trainingDocuments: trainingDocuments2, knowledgeEntries: knowledgeEntries2 } = await Promise.resolve().then(() => (init_schema(), schema_exports));
-          const { eq: eq26, and: and22, sql: sql15 } = await import("drizzle-orm");
-          const domainsWithDocs = await db2.execute(sql15`
+          const { eq: eq27, and: and22, sql: sql16 } = await import("drizzle-orm");
+          const domainsWithDocs = await db2.execute(sql16`
             SELECT DISTINCT de.id, de.name, de.user_id,
               (SELECT COUNT(*) FROM training_documents td 
                WHERE td.domain_expertise_id = de.id AND td.processing_status = 'completed') as doc_count,

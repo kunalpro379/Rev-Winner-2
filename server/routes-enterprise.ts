@@ -87,8 +87,22 @@ export function setupEnterpriseRoutes(app: Express) {
       }
       
       const organization = await authStorage.getOrganizationByManagerId(userId);
-      console.log(`[has-organization] User ${userId} organization:`, organization ? organization.id : 'none');
-      res.json({ hasOrganization: !!organization });
+      console.log(`[has-organization] User ${userId} organization:`, organization ? JSON.stringify(organization) : 'none');
+      
+      // Return organization details if exists
+      if (organization) {
+        console.log(`[has-organization] Returning org details:`, { id: organization.id, name: organization.companyName, licenseManagerId: organization.licenseManagerId });
+        res.json({ 
+          hasOrganization: true,
+          organization: {
+            id: organization.id,
+            name: organization.companyName, // Use companyName field
+            licenseManagerId: organization.licenseManagerId
+          }
+        });
+      } else {
+        res.json({ hasOrganization: false });
+      }
     } catch (error: any) {
       console.error("Error checking has-organization:", error);
       res.status(500).json({ hasOrganization: false, error: error.message });
@@ -115,6 +129,8 @@ export function setupEnterpriseRoutes(app: Express) {
         return res.status(404).json({ message: "No organization found for this user" });
       }
       
+      console.log(`[overview] Fetching overview for organization: ${organization.id} (${organization.companyName})`);
+      
       // Verify user can manage this organization
       const canManage = await authStorage.canManageLicenses(userId, organization.id);
       if (!canManage && req.jwtUser.role !== 'admin') {
@@ -123,6 +139,11 @@ export function setupEnterpriseRoutes(app: Express) {
       
       // Get organization overview
       const overview = await authStorage.getOrganizationOverview(organization.id);
+      
+      console.log(`[overview] Add-ons found: ${overview.addons?.length || 0}`);
+      if (overview.addons && overview.addons.length > 0) {
+        console.log('[overview] Add-ons:', JSON.stringify(overview.addons, null, 2));
+      }
       
       res.json({ success: true, ...overview });
     } catch (error: any) {

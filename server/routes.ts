@@ -3112,16 +3112,10 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
             let baseAmount: number;
             let gstAmount: number;
             
-            // Proper GST calculation based on currency
-            if (currency === 'INR') {
-              // For INR, the amount includes GST, so calculate base amount
-              baseAmount = displayAmount / 1.18;
-              gstAmount = displayAmount - baseAmount;
-            } else {
-              // For USD and other currencies, no GST
-              baseAmount = displayAmount;
-              gstAmount = 0;
-            }
+            // Proper GST calculation - 18% for all purchases
+            // For all currencies, the amount includes GST, so calculate base amount
+            baseAmount = displayAmount / 1.18;
+            gstAmount = displayAmount - baseAmount;
             
             invoices.push({
               id: historyItem.orderId || historyItem.paymentId,
@@ -3156,16 +3150,10 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
           let baseAmount: number;
           let gstAmount: number;
           
-          // Proper GST calculation based on currency
-          if (currency === 'INR') {
-            // For INR, the amount includes GST, so calculate base amount
-            baseAmount = totalWithGst / 1.18;
-            gstAmount = totalWithGst - baseAmount;
-          } else {
-            // For USD and other currencies, no GST
-            baseAmount = totalWithGst;
-            gstAmount = 0;
-          }
+          // Proper GST calculation - 18% for all purchases
+          // For all currencies, the amount includes GST, so calculate base amount
+          baseAmount = totalWithGst / 1.18;
+          gstAmount = totalWithGst - baseAmount;
           
           invoices.push({
             id: metadata.cartOrderId,
@@ -3193,16 +3181,10 @@ IMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after
           let baseAmount: number;
           let gstAmount: number;
           
-          // Proper GST calculation based on currency
-          if (currency === 'INR') {
-            // For INR, the amount includes GST, so calculate base amount
-            baseAmount = totalWithGst / 1.18;
-            gstAmount = totalWithGst - baseAmount;
-          } else {
-            // For USD and other currencies, no GST
-            baseAmount = totalWithGst;
-            gstAmount = 0;
-          }
+          // Proper GST calculation - 18% for all purchases
+          // For all currencies, the amount includes GST, so calculate base amount
+          baseAmount = totalWithGst / 1.18;
+          gstAmount = totalWithGst - baseAmount;
           
           invoices.push({
             id: purchase.id,

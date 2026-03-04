@@ -1245,9 +1245,9 @@ export class BillingStorage implements IBillingStorage {
       return sum;
     }, 0);
 
-    // Calculate GST - Only for INR, not for USD
+    // Calculate GST - 18% for all purchases
     const currency = items[0]?.currency || 'USD';
-    const GST_RATE = currency === 'INR' ? 0.18 : 0; // 18% GST for INR, 0% for USD
+    const GST_RATE = 0.18; // 18% GST for all purchases
     const gstAmount = (subtotal - discount) * GST_RATE;
 
     // Calculate total

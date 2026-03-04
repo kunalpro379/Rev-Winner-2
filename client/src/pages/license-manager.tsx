@@ -78,6 +78,18 @@ export default function LicenseManager() {
     refetchOnMount: 'always', // Always refetch when component mounts to get fresh data
   });
 
+  // Debug logging for add-ons
+  useEffect(() => {
+    if (overview) {
+      console.log('[License Manager] Overview data received:', {
+        organizationId: overview.organization?.id,
+        companyName: overview.organization?.companyName,
+        addonsCount: overview.addons?.length || 0,
+        addons: overview.addons
+      });
+    }
+  }, [overview]);
+
   // ALL MUTATIONS MUST BE DECLARED BEFORE ANY CONDITIONAL RETURNS (React Rules of Hooks)
   // Assign license mutation
   const assignMutation = useMutation({
